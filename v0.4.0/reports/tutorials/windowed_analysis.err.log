@@ -1,0 +1,65 @@
+Traceback (most recent call last):
+  File "/home/runner/work/neurodent/neurodent/.venv/lib/python3.10/site-packages/jupyter_cache/executors/utils.py", line 58, in single_nb_execution
+    executenb(
+  File "/home/runner/work/neurodent/neurodent/.venv/lib/python3.10/site-packages/nbclient/client.py", line 1319, in execute
+    return NotebookClient(nb=nb, resources=resources, km=km, **kwargs).execute()
+  File "/home/runner/work/neurodent/neurodent/.venv/lib/python3.10/site-packages/jupyter_core/utils/__init__.py", line 165, in wrapped
+    return loop.run_until_complete(inner)
+  File "/home/runner/work/_temp/uv-python-dir/cpython-3.10.8-linux-x86_64-gnu/lib/python3.10/asyncio/base_events.py", line 649, in run_until_complete
+    return future.result()
+  File "/home/runner/work/neurodent/neurodent/.venv/lib/python3.10/site-packages/nbclient/client.py", line 709, in async_execute
+    await self.async_execute_cell(
+  File "/home/runner/work/neurodent/neurodent/.venv/lib/python3.10/site-packages/nbclient/client.py", line 1062, in async_execute_cell
+    await self._check_raise_for_error(cell, cell_index, exec_reply)
+  File "/home/runner/work/neurodent/neurodent/.venv/lib/python3.10/site-packages/nbclient/client.py", line 918, in _check_raise_for_error
+    raise CellExecutionError.from_cell_and_msg(cell, exec_reply_content)
+nbclient.exceptions.CellExecutionError: An error occurred while executing the following cell:
+------------------
+# Wrap the result for circadian analysis
+zar = ZeitgeberAnalysisResult(
+    war_filtered,
+    baseline_hours=12,
+    zeitgeber_shift_hours=6,
+    shift_for_48h=True
+)
+
+# Access the processed data
+df_zar = zar.get_result(features=['rms'])
+
+timestamps = war_filtered.result['timestamp']
+print(f"Original Time Range: {timestamps.min()} to {timestamps.max()}")
+print(f"ZT Coordinate Range: {df_zar.total_minutes.min()} to {df_zar.total_minutes.max()} min")
+print(f"Baseline-Corrected Columns: {[c for c in df_zar.columns if '_nobase' in c][:3]}")
+------------------
+
+----- stderr -----
+INFO:neurodent.results.zeitgeber:Adding binned zeitgeber time columns with 60min bins
+----- stderr -----
+INFO:neurodent.results.zeitgeber:Running zeitgeber analysis pipeline...
+----- stderr -----
+INFO:neurodent.results.zeitgeber:Using default baseline: first 12 hours (0-720 min)
+----- stderr -----
+INFO:neurodent.results.zeitgeber:Processed data for 1 unique animals
+----- stdout -----
+Original Time Range: 2023-12-13 00:00:00 to 2023-12-13 00:00:00
+------------------
+
+[0;31m---------------------------------------------------------------------------[0m
+[0;31mAttributeError[0m                            Traceback (most recent call last)
+[0;32m/tmp/ipykernel_4087/4112591011.py[0m in [0;36m?[0;34m()[0m
+[1;32m     10[0m [0mdf_zar[0m [0;34m=[0m [0mzar[0m[0;34m.[0m[0mget_result[0m[0;34m([0m[0mfeatures[0m[0;34m=[0m[0;34m[[0m[0;34m'rms'[0m[0;34m][0m[0;34m)[0m[0;34m[0m[0;34m[0m[0m
+[1;32m     11[0m [0;34m[0m[0m
+[1;32m     12[0m [0mtimestamps[0m [0;34m=[0m [0mwar_filtered[0m[0;34m.[0m[0mresult[0m[0;34m[[0m[0;34m'timestamp'[0m[0;34m][0m[0;34m[0m[0;34m[0m[0m
+[1;32m     13[0m [0mprint[0m[0;34m([0m[0;34mf"Original Time Range: {timestamps.min()} to {timestamps.max()}"[0m[0;34m)[0m[0;34m[0m[0;34m[0m[0m
+[0;32m---> 14[0;31m [0mprint[0m[0;34m([0m[0;34mf"ZT Coordinate Range: {df_zar.total_minutes.min()} to {df_zar.total_minutes.max()} min"[0m[0;34m)[0m[0;34m[0m[0;34m[0m[0m
+[0m[1;32m     15[0m [0mprint[0m[0;34m([0m[0;34mf"Baseline-Corrected Columns: {[c for c in df_zar.columns if '_nobase' in c][:3]}"[0m[0;34m)[0m[0;34m[0m[0;34m[0m[0m
+
+[0;32m~/work/neurodent/neurodent/.venv/lib/python3.10/site-packages/pandas/core/generic.py[0m in [0;36m?[0;34m(self, name)[0m
+[1;32m   6317[0m             [0;32mand[0m [0mname[0m [0;32mnot[0m [0;32min[0m [0mself[0m[0;34m.[0m[0m_accessors[0m[0;34m[0m[0;34m[0m[0m
+[1;32m   6318[0m             [0;32mand[0m [0mself[0m[0;34m.[0m[0m_info_axis[0m[0;34m.[0m[0m_can_hold_identifiers_and_holds_name[0m[0;34m([0m[0mname[0m[0;34m)[0m[0;34m[0m[0;34m[0m[0m
+[1;32m   6319[0m         ):
+[1;32m   6320[0m             [0;32mreturn[0m [0mself[0m[0;34m[[0m[0mname[0m[0;34m][0m[0;34m[0m[0;34m[0m[0m
+[0;32m-> 6321[0;31m         [0;32mreturn[0m [0mobject[0m[0;34m.[0m[0m__getattribute__[0m[0;34m([0m[0mself[0m[0;34m,[0m [0mname[0m[0;34m)[0m[0;34m[0m[0;34m[0m[0m
+[0m
+[0;31mAttributeError[0m: 'DataFrame' object has no attribute 'total_minutes'
+

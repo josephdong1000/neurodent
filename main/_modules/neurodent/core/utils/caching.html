@@ -1,0 +1,931 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>neurodent.core.utils.caching &#8212; Neurodent 0.4.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../../_static/documentation_options.js?v=6c02275b"></script>
+    <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/neurodent/core/utils/caching';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://josephdong1000.github.io/neurodent/_static/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.4.0';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner =
+            false;
+        </script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">NeuRodent</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../license/index.html">
+    License
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-2"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-2"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-2"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-2">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../license/index.html">
+    License
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-3"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-3"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-3"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-3">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">neurodent.core.utils.caching</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for neurodent.core.utils.caching</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Zarr fragment caching/streaming and cache-decision policy.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">zarr</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.paths</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_temp_directory</span>
+
+
+<div class="viewcode-block" id="cache_fragments_to_zarr">
+<a class="viewcode-back" href="../../../../api/core/utils.html#neurodent.core.utils.cache_fragments_to_zarr">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cache_fragments_to_zarr</span><span class="p">(</span>
+    <span class="n">np_fragments</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">n_fragments</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">tmpdir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">chunk_size</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="s2">&quot;zarr.Array&quot;</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Cache numpy fragments array to zarr format for efficient memory management.</span>
+
+<span class="sd">    This function converts a numpy array of recording fragments to a zarr array stored</span>
+<span class="sd">    in a temporary location. This allows better memory management and garbage collection</span>
+<span class="sd">    by avoiding keeping large numpy arrays in memory for extended periods.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        np_fragments (np.ndarray): Numpy array of shape (n_fragments, n_samples, n_channels)</span>
+<span class="sd">            containing the recording fragments to cache.</span>
+<span class="sd">        n_fragments (int): Number of fragments to cache (allows for subset caching).</span>
+<span class="sd">        tmpdir (str, optional): Directory path for temporary zarr storage. If None,</span>
+<span class="sd">            uses get_temp_directory(). Defaults to None.</span>
+<span class="sd">        chunk_size (int, optional): Number of fragments per zarr chunk along the first</span>
+<span class="sd">            axis. Controls the read/write granularity when accessing the zarr array.</span>
+<span class="sd">            Smaller values reduce memory overhead per chunk; larger values improve</span>
+<span class="sd">            sequential throughput. When None, defaults to ``min(100, n_fragments)``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple[str, zarr.Array]: A tuple containing:</span>
+<span class="sd">            - str: Path to the temporary zarr file</span>
+<span class="sd">            - zarr.Array: The zarr array object for accessing cached data</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ImportError: If zarr is not available</span>
+<span class="sd">        ValueError: If ``chunk_size`` is not None and is less than 1</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">chunk_size</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">chunk_size</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;chunk_size must be &gt;= 1, got </span><span class="si">{</span><span class="n">chunk_size</span><span class="si">!r}</span><span class="s2">. &quot;</span>
+            <span class="s2">&quot;Pass None to use the default chunk size.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">zarr</span>
+    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span><span class="s2">&quot;zarr package is required for fragment caching&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">tmpdir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">tmpdir</span> <span class="o">=</span> <span class="n">get_temp_directory</span><span class="p">()</span>
+
+    <span class="c1"># Generate unique temporary path</span>
+    <span class="n">tmppath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;temp_</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">urandom</span><span class="p">(</span><span class="mi">24</span><span class="p">)</span><span class="o">.</span><span class="n">hex</span><span class="p">()</span><span class="si">}</span><span class="s2">.zarr&quot;</span><span class="p">)</span>
+
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Caching numpy array with zarr in </span><span class="si">{</span><span class="n">tmppath</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Create Zarr array with optimal settings for fragment-wise access</span>
+    <span class="k">if</span> <span class="n">chunk_size</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">chunk_size</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="n">n_fragments</span><span class="p">)</span>  <span class="c1"># Cap at 100 fragments per chunk</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">chunk_size</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;chunk_size must be an integer or None&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">chunk_size</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;chunk_size must be &gt;= 1 when provided&quot;</span><span class="p">)</span>
+        <span class="n">chunk_size</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">chunk_size</span><span class="p">,</span> <span class="n">n_fragments</span><span class="p">)</span>
+    <span class="n">zarr_array</span> <span class="o">=</span> <span class="n">zarr</span><span class="o">.</span><span class="n">open</span><span class="p">(</span>
+        <span class="n">tmppath</span><span class="p">,</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;w&quot;</span><span class="p">,</span>
+        <span class="n">shape</span><span class="o">=</span><span class="n">np_fragments</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span>
+        <span class="n">chunks</span><span class="o">=</span><span class="p">(</span>
+            <span class="n">chunk_size</span><span class="p">,</span>
+            <span class="o">-</span><span class="mi">1</span><span class="p">,</span>  <span class="c1"># No chunking along timestamp dimension</span>
+            <span class="o">-</span><span class="mi">1</span><span class="p">,</span>  <span class="c1"># No chunking along channel dimension</span>
+        <span class="p">),</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">np_fragments</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
+        <span class="n">compressor</span><span class="o">=</span><span class="n">zarr</span><span class="o">.</span><span class="n">Blosc</span><span class="p">(</span><span class="n">cname</span><span class="o">=</span><span class="s2">&quot;lz4&quot;</span><span class="p">,</span> <span class="n">clevel</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="n">zarr</span><span class="o">.</span><span class="n">Blosc</span><span class="o">.</span><span class="n">SHUFFLE</span><span class="p">),</span>  <span class="c1"># Fast compression</span>
+    <span class="p">)</span>
+    <span class="n">zarr_array</span><span class="p">[:</span><span class="n">n_fragments</span><span class="p">]</span> <span class="o">=</span> <span class="n">np_fragments</span><span class="p">[:</span><span class="n">n_fragments</span><span class="p">]</span>
+
+    <span class="c1"># Log debug properties of the zarr array</span>
+    <span class="n">total_memory_bytes</span> <span class="o">=</span> <span class="n">zarr_array</span><span class="o">.</span><span class="n">nbytes</span>
+    <span class="n">total_memory_mb</span> <span class="o">=</span> <span class="n">total_memory_bytes</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">)</span>
+    <span class="n">total_memory_gb</span> <span class="o">=</span> <span class="n">total_memory_mb</span> <span class="o">/</span> <span class="mi">1024</span>
+
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  - Total memory footprint: </span><span class="si">{</span><span class="n">total_memory_mb</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> MB, </span><span class="si">{</span><span class="n">total_memory_gb</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2"> GB&quot;</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  - Zarr array shape: </span><span class="si">{</span><span class="n">zarr_array</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  - Zarr array chunks: </span><span class="si">{</span><span class="n">zarr_array</span><span class="o">.</span><span class="n">chunks</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">tmppath</span><span class="p">,</span> <span class="n">zarr_array</span></div>
+
+
+
+<div class="viewcode-block" id="stream_fragments_to_zarr">
+<a class="viewcode-back" href="../../../../api/core/utils.html#neurodent.core.utils.stream_fragments_to_zarr">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">stream_fragments_to_zarr</span><span class="p">(</span>
+    <span class="n">get_fragment_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
+    <span class="n">n_fragments</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">fragment_shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">,</span>
+    <span class="n">fragment_dtype</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
+    <span class="n">chunk_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">tmpdir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Stream recording fragments to a zarr store in memory-bounded batches.</span>
+
+<span class="sd">    Unlike :func:`cache_fragments_to_zarr`, this function never holds more than</span>
+<span class="sd">    ``chunk_size`` fragments in RAM at once.  It calls ``get_fragment_fn`` one</span>
+<span class="sd">    batch at a time, writes each batch to the zarr store, and immediately frees</span>
+<span class="sd">    the batch buffer — so peak RAM is proportional to ``chunk_size`` rather than</span>
+<span class="sd">    ``n_fragments``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        get_fragment_fn (Callable[[int], np.ndarray]): A callable that accepts a</span>
+<span class="sd">            fragment index (0-based) and returns the corresponding fragment as a</span>
+<span class="sd">            NumPy array of shape ``fragment_shape``.</span>
+<span class="sd">        n_fragments (int): Total number of fragments to stream.</span>
+<span class="sd">        fragment_shape (tuple): Shape of a single fragment (e.g. ``(n_samples,</span>
+<span class="sd">            n_channels)``).</span>
+<span class="sd">        fragment_dtype (np.dtype): Data-type of the fragment arrays.</span>
+<span class="sd">        chunk_size (int): Number of fragments to buffer per batch.  Must be &gt;= 1.</span>
+<span class="sd">            Larger values improve sequential write throughput; smaller values</span>
+<span class="sd">            reduce peak RAM.</span>
+<span class="sd">        tmpdir (str, optional): Directory for the temporary zarr file.  If</span>
+<span class="sd">            ``None``, uses :func:`get_temp_directory`.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        str: Path to the temporary zarr file on disk.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``chunk_size`` &lt; 1.</span>
+<span class="sd">        ImportError: If zarr is not available.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">chunk_size</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;chunk_size must be &gt;= 1, got </span><span class="si">{</span><span class="n">chunk_size</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">tmpdir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">tmpdir</span> <span class="o">=</span> <span class="n">get_temp_directory</span><span class="p">()</span>
+
+    <span class="n">tmppath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;temp_</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">urandom</span><span class="p">(</span><span class="mi">24</span><span class="p">)</span><span class="o">.</span><span class="n">hex</span><span class="p">()</span><span class="si">}</span><span class="s2">.zarr&quot;</span><span class="p">)</span>
+    <span class="n">batch</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">chunk_size</span><span class="p">,</span> <span class="n">n_fragments</span><span class="p">)</span>
+
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Streaming </span><span class="si">{</span><span class="n">n_fragments</span><span class="si">}</span><span class="s2"> fragments to zarr in batches of </span><span class="si">{</span><span class="n">batch</span><span class="si">}</span><span class="s2"> &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;(path: </span><span class="si">{</span><span class="n">tmppath</span><span class="si">}</span><span class="s2">)&quot;</span>
+    <span class="p">)</span>
+
+    <span class="n">zarr_array</span> <span class="o">=</span> <span class="n">zarr</span><span class="o">.</span><span class="n">open</span><span class="p">(</span>
+        <span class="n">tmppath</span><span class="p">,</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;w&quot;</span><span class="p">,</span>
+        <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n_fragments</span><span class="p">,)</span> <span class="o">+</span> <span class="n">fragment_shape</span><span class="p">,</span>
+        <span class="n">chunks</span><span class="o">=</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">),</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">fragment_dtype</span><span class="p">,</span>
+        <span class="n">compressor</span><span class="o">=</span><span class="n">zarr</span><span class="o">.</span><span class="n">Blosc</span><span class="p">(</span><span class="n">cname</span><span class="o">=</span><span class="s2">&quot;lz4&quot;</span><span class="p">,</span> <span class="n">clevel</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="n">zarr</span><span class="o">.</span><span class="n">Blosc</span><span class="o">.</span><span class="n">SHUFFLE</span><span class="p">),</span>
+    <span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">batch_start</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_fragments</span><span class="p">,</span> <span class="n">batch</span><span class="p">):</span>
+        <span class="n">batch_end</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">batch_start</span> <span class="o">+</span> <span class="n">batch</span><span class="p">,</span> <span class="n">n_fragments</span><span class="p">)</span>
+        <span class="n">batch_len</span> <span class="o">=</span> <span class="n">batch_end</span> <span class="o">-</span> <span class="n">batch_start</span>
+        <span class="n">np_batch</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">batch_len</span><span class="p">,)</span> <span class="o">+</span> <span class="n">fragment_shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">fragment_dtype</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">local_idx</span><span class="p">,</span> <span class="n">global_idx</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">batch_start</span><span class="p">,</span> <span class="n">batch_end</span><span class="p">)):</span>
+            <span class="n">np_batch</span><span class="p">[</span><span class="n">local_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_fragment_fn</span><span class="p">(</span><span class="n">global_idx</span><span class="p">)</span>
+        <span class="n">zarr_array</span><span class="p">[</span><span class="n">batch_start</span><span class="p">:</span><span class="n">batch_end</span><span class="p">]</span> <span class="o">=</span> <span class="n">np_batch</span>
+        <span class="k">del</span> <span class="n">np_batch</span>
+
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  - Zarr array shape: </span><span class="si">{</span><span class="n">zarr_array</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  - Zarr array chunks: </span><span class="si">{</span><span class="n">zarr_array</span><span class="o">.</span><span class="n">chunks</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">del</span> <span class="n">zarr_array</span>
+
+    <span class="k">return</span> <span class="n">tmppath</span></div>
+
+
+
+<div class="viewcode-block" id="stream_recording_to_zarr">
+<a class="viewcode-back" href="../../../../api/core/utils.html#neurodent.core.utils.stream_recording_to_zarr">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">stream_recording_to_zarr</span><span class="p">(</span>
+    <span class="n">recording</span><span class="p">,</span>
+    <span class="n">n_fragments</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">n_samples_per_frag</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">n_frag_per_chunk</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">tmpdir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Stream a SpikeInterface recording to a zarr store in memory-bounded batches.</span>
+
+<span class="sd">    Reads chunk-sized slices from ``recording.get_traces()``, reshapes each</span>
+<span class="sd">    chunk to ``(n_frags_in_chunk, n_samples_per_frag, n_channels)``, and</span>
+<span class="sd">    writes it to a zarr store.  Peak RAM is proportional to ``n_frag_per_chunk``</span>
+<span class="sd">    rather than ``n_fragments``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        recording: A SpikeInterface ``BaseRecording`` object (may be a lazy</span>
+<span class="sd">            wrapper such as a ``NotchFilterRecording``).</span>
+<span class="sd">        n_fragments (int): Total number of fragments to stream.</span>
+<span class="sd">        n_samples_per_frag (int): Number of samples in each fragment.</span>
+<span class="sd">        n_frag_per_chunk (int): Number of fragments to buffer per batch.</span>
+<span class="sd">            Must be &gt;= 1.  Larger values improve sequential write throughput;</span>
+<span class="sd">            smaller values reduce peak RAM.</span>
+<span class="sd">        tmpdir (str, optional): Directory for the temporary zarr file.  If</span>
+<span class="sd">            ``None``, uses :func:`get_temp_directory`.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        str: Path to the temporary zarr file on disk.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``n_frag_per_chunk`` &lt; 1.</span>
+<span class="sd">        ImportError: If zarr is not available.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">n_frag_per_chunk</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;n_frag_per_chunk must be &gt;= 1, got </span><span class="si">{</span><span class="n">n_frag_per_chunk</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">zarr</span>
+    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span><span class="s2">&quot;zarr package is required for fragment caching&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">tmpdir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">tmpdir</span> <span class="o">=</span> <span class="n">get_temp_directory</span><span class="p">()</span>
+
+    <span class="n">n_channels</span> <span class="o">=</span> <span class="n">recording</span><span class="o">.</span><span class="n">get_num_channels</span><span class="p">()</span>
+    <span class="n">fragment_dtype</span> <span class="o">=</span> <span class="n">recording</span><span class="o">.</span><span class="n">get_dtype</span><span class="p">()</span>
+    <span class="n">tmppath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;temp_</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">urandom</span><span class="p">(</span><span class="mi">24</span><span class="p">)</span><span class="o">.</span><span class="n">hex</span><span class="p">()</span><span class="si">}</span><span class="s2">.zarr&quot;</span><span class="p">)</span>
+    <span class="c1"># Cap the batch size so we never request more fragments than exist</span>
+    <span class="n">batch_size</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">n_frag_per_chunk</span><span class="p">,</span> <span class="n">n_fragments</span><span class="p">)</span>
+
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Streaming recording (</span><span class="si">{</span><span class="n">n_fragments</span><span class="si">}</span><span class="s2"> fragments × </span><span class="si">{</span><span class="n">n_samples_per_frag</span><span class="si">}</span><span class="s2"> samples) &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;to zarr in batches of </span><span class="si">{</span><span class="n">batch_size</span><span class="si">}</span><span class="s2"> (path: </span><span class="si">{</span><span class="n">tmppath</span><span class="si">}</span><span class="s2">)&quot;</span>
+    <span class="p">)</span>
+
+    <span class="n">zarr_array</span> <span class="o">=</span> <span class="n">zarr</span><span class="o">.</span><span class="n">open</span><span class="p">(</span>
+        <span class="n">tmppath</span><span class="p">,</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;w&quot;</span><span class="p">,</span>
+        <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n_fragments</span><span class="p">,</span> <span class="n">n_samples_per_frag</span><span class="p">,</span> <span class="n">n_channels</span><span class="p">),</span>
+        <span class="n">chunks</span><span class="o">=</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">),</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">fragment_dtype</span><span class="p">,</span>
+        <span class="n">compressor</span><span class="o">=</span><span class="n">zarr</span><span class="o">.</span><span class="n">Blosc</span><span class="p">(</span><span class="n">cname</span><span class="o">=</span><span class="s2">&quot;lz4&quot;</span><span class="p">,</span> <span class="n">clevel</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="n">zarr</span><span class="o">.</span><span class="n">Blosc</span><span class="o">.</span><span class="n">SHUFFLE</span><span class="p">),</span>
+    <span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">batch_start</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_fragments</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">):</span>
+        <span class="n">batch_end</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">batch_start</span> <span class="o">+</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">n_fragments</span><span class="p">)</span>
+        <span class="n">start_sample</span> <span class="o">=</span> <span class="n">batch_start</span> <span class="o">*</span> <span class="n">n_samples_per_frag</span>
+        <span class="n">end_sample</span> <span class="o">=</span> <span class="n">batch_end</span> <span class="o">*</span> <span class="n">n_samples_per_frag</span>
+        <span class="n">chunk_traces</span> <span class="o">=</span> <span class="n">recording</span><span class="o">.</span><span class="n">get_traces</span><span class="p">(</span>
+            <span class="n">start_frame</span><span class="o">=</span><span class="n">start_sample</span><span class="p">,</span> <span class="n">end_frame</span><span class="o">=</span><span class="n">end_sample</span><span class="p">,</span> <span class="n">return_scaled</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
+        <span class="n">chunk_fragments</span> <span class="o">=</span> <span class="n">chunk_traces</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span>
+            <span class="n">batch_end</span> <span class="o">-</span> <span class="n">batch_start</span><span class="p">,</span> <span class="n">n_samples_per_frag</span><span class="p">,</span> <span class="n">n_channels</span>
+        <span class="p">)</span>
+        <span class="n">zarr_array</span><span class="p">[</span><span class="n">batch_start</span><span class="p">:</span><span class="n">batch_end</span><span class="p">]</span> <span class="o">=</span> <span class="n">chunk_fragments</span>
+        <span class="c1"># Explicitly free each batch to keep peak RAM bounded to batch_size fragments</span>
+        <span class="k">del</span> <span class="n">chunk_traces</span><span class="p">,</span> <span class="n">chunk_fragments</span>
+
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  - Zarr array shape: </span><span class="si">{</span><span class="n">zarr_array</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  - Zarr array chunks: </span><span class="si">{</span><span class="n">zarr_array</span><span class="o">.</span><span class="n">chunks</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">del</span> <span class="n">zarr_array</span>
+
+    <span class="k">return</span> <span class="n">tmppath</span></div>
+
+
+
+<div class="viewcode-block" id="should_use_cached_file">
+<a class="viewcode-back" href="../../../../api/core/utils.html#neurodent.core.utils.should_use_cached_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">should_use_cached_file</span><span class="p">(</span>
+    <span class="n">cache_path</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">],</span>
+    <span class="n">source_paths</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">]],</span>
+    <span class="n">use_cached</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;auto&quot;</span><span class="p">,</span> <span class="s2">&quot;always&quot;</span><span class="p">,</span> <span class="s2">&quot;never&quot;</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;auto&quot;</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Determine whether to use a cached intermediate file based on caching policy and file timestamps.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        cache_path: Path to the cached intermediate file</span>
+<span class="sd">        source_paths: List of source file paths that the cache depends on</span>
+<span class="sd">        use_cached: Caching policy</span>
+<span class="sd">            - &quot;auto&quot;: Use cached if exists and newer than all sources (default)</span>
+<span class="sd">            - &quot;always&quot;: Always use cached if it exists</span>
+<span class="sd">            - &quot;never&quot;: Never use cached (always regenerate)</span>
+<span class="sd">            - &quot;error&quot;: Raise error if cached doesn&#39;t exist</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        bool: True if cached file should be used, False if it should be regenerated</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        FileNotFoundError: When use_cached=&quot;error&quot; and cache doesn&#39;t exist</span>
+<span class="sd">        ValueError: For invalid use_cached values</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cache_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">cache_path</span><span class="p">)</span>
+    <span class="n">source_paths</span> <span class="o">=</span> <span class="p">[</span><span class="n">Path</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">source_paths</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">use_cached</span> <span class="o">==</span> <span class="s2">&quot;never&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">elif</span> <span class="n">use_cached</span> <span class="o">==</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">cache_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cache file required but not found: </span><span class="si">{</span><span class="n">cache_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">elif</span> <span class="n">use_cached</span> <span class="o">==</span> <span class="s2">&quot;always&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">cache_path</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+    <span class="k">elif</span> <span class="n">use_cached</span> <span class="o">==</span> <span class="s2">&quot;auto&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">cache_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="c1"># Check if cache is newer than all source files</span>
+        <span class="n">cache_mtime</span> <span class="o">=</span> <span class="n">cache_path</span><span class="o">.</span><span class="n">stat</span><span class="p">()</span><span class="o">.</span><span class="n">st_mtime</span>
+
+        <span class="k">for</span> <span class="n">source_path</span> <span class="ow">in</span> <span class="n">source_paths</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">source_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+                <span class="k">continue</span>  <span class="c1"># Skip missing source files</span>
+            <span class="k">if</span> <span class="n">source_path</span><span class="o">.</span><span class="n">stat</span><span class="p">()</span><span class="o">.</span><span class="n">st_mtime</span> <span class="o">&gt;</span> <span class="n">cache_mtime</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cache </span><span class="si">{</span><span class="n">cache_path</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> is older than </span><span class="si">{</span><span class="n">source_path</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">, regenerating&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using cached intermediate file: </span><span class="si">{</span><span class="n">cache_path</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid use_cached value: </span><span class="si">{</span><span class="n">use_cached</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_cache_status_message">
+<a class="viewcode-back" href="../../../../api/core/utils.html#neurodent.core.utils.get_cache_status_message">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_cache_status_message</span><span class="p">(</span><span class="n">cache_path</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">],</span> <span class="n">use_cached</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generate a descriptive message about cache usage for logging.&quot;&quot;&quot;</span>
+    <span class="n">cache_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">cache_path</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">use_cached</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Using cached intermediate: </span><span class="si">{</span><span class="n">cache_path</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Regenerating intermediate: </span><span class="si">{</span><span class="n">cache_path</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="should_use_cache_unified">
+<a class="viewcode-back" href="../../../../api/core/utils.html#neurodent.core.utils.should_use_cache_unified">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">should_use_cache_unified</span><span class="p">(</span>
+    <span class="n">cache_path</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">],</span>
+    <span class="n">source_paths</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">]],</span>
+    <span class="n">cache_policy</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;auto&quot;</span><span class="p">,</span> <span class="s2">&quot;always&quot;</span><span class="p">,</span> <span class="s2">&quot;force_regenerate&quot;</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Unified cache decision logic for all intermediate files.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        cache_path: Path to the cache file</span>
+<span class="sd">        source_paths: List of source file paths to check timestamps against</span>
+<span class="sd">        cache_policy: Caching policy:</span>
+<span class="sd">            - &quot;auto&quot;: Use cache if exists and newer than sources, regenerate with logging if missing/invalid</span>
+<span class="sd">            - &quot;always&quot;: Use cache if exists, raise error if missing/invalid</span>
+<span class="sd">            - &quot;force_regenerate&quot;: Always regenerate and overwrite existing cache</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        bool: True if cache should be used, False if should regenerate</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If cache_policy is invalid</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">cache_policy</span> <span class="o">==</span> <span class="s2">&quot;force_regenerate&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">elif</span> <span class="n">cache_policy</span> <span class="o">==</span> <span class="s2">&quot;always&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">Path</span><span class="p">(</span><span class="n">cache_path</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+    <span class="k">elif</span> <span class="n">cache_policy</span> <span class="o">==</span> <span class="s2">&quot;auto&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">should_use_cached_file</span><span class="p">(</span><span class="n">cache_path</span><span class="p">,</span> <span class="n">source_paths</span><span class="p">,</span> <span class="s2">&quot;auto&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid cache_policy: </span><span class="si">{</span><span class="n">cache_policy</span><span class="si">}</span><span class="s2">. Must be one of: auto, always, force_regenerate&quot;</span><span class="p">)</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025, Joseph Dong, Yongtaek Oh, Eric Marsh.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

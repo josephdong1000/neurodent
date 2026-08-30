@@ -1,0 +1,1183 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Dataset Configuration &#8212; Neurodent 0.4.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../_static/documentation_options.js?v=6c02275b"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'quickstart/dataset_configuration';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://josephdong1000.github.io/neurodent/_static/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.4.0';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner =
+            false;
+        </script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Tutorials" href="../tutorials/index.html" />
+    <link rel="prev" title="Snakemake Pipeline Setup" href="snakemake_setup.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">NeuRodent</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api/index.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../license/index.html">
+    License
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-2"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-2"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-2"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-2">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../license/index.html">
+    License
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-3"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-3"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-3"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-3">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="basic_usage.html">Basic Usage Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_loading.html">Data Loading Tutorial</a></li>
+
+
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and Tips</a></li>
+<li class="toctree-l1"><a class="reference internal" href="snakemake_setup.html">Snakemake Pipeline Setup</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Dataset Configuration</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Quickstart</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Dataset Configuration</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="dataset-configuration">
+<h1>Dataset Configuration<a class="headerlink" href="#dataset-configuration" title="Link to this heading">#</a></h1>
+<p>NeuRodent supports multiple datasets and file formats through a flexible configuration system. This guide shows how to select and configure different datasets for your analyses.</p>
+<section id="quick-start">
+<h2>Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading">#</a></h2>
+<p><strong>Switch datasets using environment variable:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Run with Sox5 binary dataset</span>
+<span class="nv">NEURODENT_DATASET</span><span class="o">=</span>sox5_bin<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>snakemake<span class="w"> </span>--profile<span class="w"> </span>your-profile
+
+<span class="c1"># Run with AP3B2 RHD dataset</span>
+<span class="nv">NEURODENT_DATASET</span><span class="o">=</span>ap3b2_rhd<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>snakemake<span class="w"> </span>--profile<span class="w"> </span>your-profile
+</pre></div>
+</div>
+</section>
+<section id="how-it-works">
+<h2>How It Works<a class="headerlink" href="#how-it-works" title="Link to this heading">#</a></h2>
+<p><strong>File structure:</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>config/
+├── config.yaml               # Main config (shared settings)
+├── config.local.yaml         # Local overrides (gitignored)
+├── datasets/                 # Dataset-specific configs
+│   ├── sox5_bin.yaml        # Sox5 project, binary format
+│   └── ap3b2_rhd.yaml       # AP3B2 project, RHD format
+└── samples*.json            # Sample metadata files
+</pre></div>
+</div>
+<p><strong>How dataset selection works:</strong></p>
+<ol class="arabic simple">
+<li><p>Main config (<code class="docutils literal notranslate"><span class="pre">config.yaml</span></code>) contains shared settings for all datasets</p></li>
+<li><p>Local overrides (<code class="docutils literal notranslate"><span class="pre">config.local.yaml</span></code>) are merged if the file exists (can set <code class="docutils literal notranslate"><span class="pre">active_dataset</span></code>)</p></li>
+<li><p>Active dataset is resolved via <code class="docutils literal notranslate"><span class="pre">NEURODENT_DATASET</span></code> env var or the <code class="docutils literal notranslate"><span class="pre">active_dataset</span></code> key</p></li>
+<li><p>Dataset config is loaded from <code class="docutils literal notranslate"><span class="pre">config/datasets/{active_dataset}.yaml</span></code></p></li>
+<li><p>Dataset config is deep-merged on top of the combined config</p></li>
+</ol>
+<p><strong>Merge order</strong> (later configs override earlier ones):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>config.yaml → config.local.yaml → datasets/{active}.yaml
+</pre></div>
+</div>
+</section>
+<section id="switching-datasets">
+<h2>Switching Datasets<a class="headerlink" href="#switching-datasets" title="Link to this heading">#</a></h2>
+<p>There are three methods to select a dataset, each suited for different use cases.</p>
+<section id="method-1-environment-variable-recommended-for-cluster">
+<h3>Method 1: Environment Variable (Recommended for Cluster)<a class="headerlink" href="#method-1-environment-variable-recommended-for-cluster" title="Link to this heading">#</a></h3>
+<p><strong>Best for:</strong> Switching datasets per job, CI/CD pipelines, cluster batch jobs</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">NEURODENT_DATASET</span><span class="o">=</span>ap3b2_rhd<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>snakemake<span class="w"> </span>--profile<span class="w"> </span>your-profile
+</pre></div>
+</div>
+<p><strong>Pros:</strong> No file editing, easy to switch, perfect for scripts</p>
+<p><strong>Cons:</strong> Must specify for every command</p>
+</section>
+<section id="method-2-edit-config-yaml">
+<h3>Method 2: Edit config.yaml<a class="headerlink" href="#method-2-edit-config-yaml" title="Link to this heading">#</a></h3>
+<p><strong>Best for:</strong> Setting team-wide default dataset</p>
+<p>Edit <code class="docutils literal notranslate"><span class="pre">config/config.yaml</span></code> and change the <code class="docutils literal notranslate"><span class="pre">active_dataset</span></code> line:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># config/config.yaml</span>
+<span class="nt">active_dataset</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ap3b2_rhd&quot;</span><span class="w">  </span><span class="c1"># Change this line</span>
+</pre></div>
+</div>
+<p><strong>Pros:</strong> Set once, git-tracked</p>
+<p><strong>Cons:</strong> Affects all users who pull your changes</p>
+</section>
+<section id="method-3-local-override">
+<h3>Method 3: Local Override<a class="headerlink" href="#method-3-local-override" title="Link to this heading">#</a></h3>
+<p><strong>Best for:</strong> Personal dataset preference</p>
+<p>Edit <code class="docutils literal notranslate"><span class="pre">config/config.local.yaml</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># config/config.local.yaml</span>
+<span class="nt">active_dataset</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ap3b2_rhd&quot;</span>
+</pre></div>
+</div>
+<p><strong>Pros:</strong> Local-only (gitignored), doesn’t affect team</p>
+<p><strong>Cons:</strong> Can be forgotten</p>
+</section>
+</section>
+<section id="priority-order">
+<h2>Priority Order<a class="headerlink" href="#priority-order" title="Link to this heading">#</a></h2>
+<p>If multiple methods are used, this is the priority:</p>
+<ol class="arabic simple">
+<li><p><strong>Environment variable</strong> (<code class="docutils literal notranslate"><span class="pre">NEURODENT_DATASET</span></code>) - <strong>highest priority</strong></p></li>
+<li><p><strong>Local config</strong> (<code class="docutils literal notranslate"><span class="pre">config.local.yaml</span></code>)</p></li>
+<li><p><strong>Main config</strong> (<code class="docutils literal notranslate"><span class="pre">config.yaml</span></code>) - <strong>lowest priority</strong></p></li>
+</ol>
+</section>
+<section id="verification">
+<h2>Verification<a class="headerlink" href="#verification" title="Link to this heading">#</a></h2>
+<p>Verify which dataset is active:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>uv<span class="w"> </span>run<span class="w"> </span>snakemake<span class="w"> </span>--dry-run<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-20
+</pre></div>
+</div>
+<p>Expected output (shows the dataset-specific overrides applied):</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>[ok] Using dataset: sox5_bin
+  Config file: config/datasets/sox5_bin.yaml
+
+  Dataset configuration overrides:
+    samples:
+      samples_file: &quot;config/samples.json&quot;
+    analysis:
+      war_generation:
+        ...
+</pre></div>
+</div>
+</section>
+<section id="adding-new-datasets">
+<h2>Adding New Datasets<a class="headerlink" href="#adding-new-datasets" title="Link to this heading">#</a></h2>
+<section id="step-1-create-samples-json">
+<h3>Step 1: Create Samples JSON<a class="headerlink" href="#step-1-create-samples-json" title="Link to this heading">#</a></h3>
+<p>The samples JSON file defines the animals in your experiment and their metadata.
+Create <code class="docutils literal notranslate"><span class="pre">config/samples_mydata.json</span></code> using the unified <code class="docutils literal notranslate"><span class="pre">animals</span></code> list format:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;data_root&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/path/to/your/data&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;animals&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;M1&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;genotype&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;WT&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;sex&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;M&quot;</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;F3&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;genotype&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;KO&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;sex&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;F&quot;</span><span class="p">}</span>
+<span class="w">    </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<section id="animals-parameter-reference">
+<span id="id1"></span><h4>Animals Parameter Reference<a class="headerlink" href="#animals-parameter-reference" title="Link to this heading">#</a></h4>
+<p>Each entry in the <code class="docutils literal notranslate"><span class="pre">animals</span></code> list is a dictionary. The following table
+describes all available parameters:</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 15.0%" />
+<col style="width: 10.0%" />
+<col style="width: 55.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Required</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">id</span></code></p></td>
+<td><p>string</p></td>
+<td><p>Yes</p></td>
+<td><p>Unique identifier for the animal (e.g. <code class="docutils literal notranslate"><span class="pre">&quot;M1&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;AP3B2homo-240-M&quot;</span></code>).
+Used as the primary key throughout the pipeline.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">genotype</span></code></p></td>
+<td><p>string</p></td>
+<td><p>Yes</p></td>
+<td><p>Genotype label (e.g. <code class="docutils literal notranslate"><span class="pre">&quot;WT&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;KO&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;Het&quot;</span></code>); surfaces as the
+<code class="docutils literal notranslate"><span class="pre">genotype</span></code> column for downstream grouping. The legacy key <code class="docutils literal notranslate"><span class="pre">gene</span></code> is
+still accepted as an alias. Optionally normalized to a short label via
+<code class="docutils literal notranslate"><span class="pre">GENOTYPE_MAP</span></code> (exact match; when that map is set it is authoritative —
+an uncovered value raises at load).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">sex</span></code></p></td>
+<td><p>string</p></td>
+<td><p>Yes</p></td>
+<td><p>Sex of the animal (e.g. <code class="docutils literal notranslate"><span class="pre">&quot;M&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;F&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;Male&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;Female&quot;</span></code>).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">manual_datetime</span></code></p></td>
+<td><p>string</p></td>
+<td><p>No</p></td>
+<td><p>Recording <strong>start</strong> datetime. Accepts any standard datetime format
+including ISO 8601 (e.g. <code class="docutils literal notranslate"><span class="pre">&quot;2025-05-10T10:00:00&quot;</span></code>) and
+<code class="docutils literal notranslate"><span class="pre">&quot;YYYY-MM-DD</span> <span class="pre">HH:MM:SS&quot;</span></code>.
+Use this when automatic datetime parsing from filenames is unreliable
+or when files lack embedded timestamps. See <a class="reference internal" href="#manual-datetimes"><span class="std std-ref">Manual Datetimes</span></a>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">datetimes_are_start</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>No</p></td>
+<td><p>Whether <code class="docutils literal notranslate"><span class="pre">manual_datetime</span></code> represents the recording <strong>start</strong> time
+(<code class="docutils literal notranslate"><span class="pre">true</span></code>, default) or <strong>end</strong> time (<code class="docutils literal notranslate"><span class="pre">false</span></code>).
+See <a class="reference internal" href="#manual-datetimes"><span class="std std-ref">Manual Datetimes</span></a>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">bad_channels</span></code></p></td>
+<td><p>list or dict</p></td>
+<td><p>No</p></td>
+<td><p>Channels to exclude from analysis. Accepts two formats:</p>
+<ul class="simple">
+<li><p><strong>List</strong> — channels bad across <em>all</em> sessions:
+<code class="docutils literal notranslate"><span class="pre">[&quot;LHip&quot;,</span> <span class="pre">&quot;RHip&quot;]</span></code></p></li>
+<li><p><strong>Dict</strong> — per-session bad channels:
+<code class="docutils literal notranslate"><span class="pre">{&quot;Session1&quot;:</span> <span class="pre">[&quot;LHip&quot;],</span> <span class="pre">&quot;Session2&quot;:</span> <span class="pre">[&quot;RMot&quot;]}</span></code></p></li>
+</ul>
+<p>See <a class="reference internal" href="#bad-channels"><span class="std std-ref">Bad Channels</span></a> for details.</p>
+</td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">pattern</span></code></p></td>
+<td><p>string</p></td>
+<td><p>No</p></td>
+<td><p>Per-animal file discovery pattern, overriding the global
+<code class="docutils literal notranslate"><span class="pre">pattern</span></code> in the dataset config. Supports <code class="docutils literal notranslate"><span class="pre">{data_root}</span></code>,
+<code class="docutils literal notranslate"><span class="pre">{animal}</span></code>, and <code class="docutils literal notranslate"><span class="pre">{index}</span></code> placeholders
+(e.g. <code class="docutils literal notranslate"><span class="pre">&quot;{data_root}/custom/{animal}_{index}.rhd&quot;</span></code>).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">lro_kwargs</span></code></p></td>
+<td><p>dict</p></td>
+<td><p>No</p></td>
+<td><p>Per-animal keyword arguments passed to
+<code class="docutils literal notranslate"><span class="pre">LongRecordingOrganizer</span></code>, overriding the global <code class="docutils literal notranslate"><span class="pre">lro_kwargs</span></code>.
+Useful when an animal’s files require different loading parameters
+(e.g. <code class="docutils literal notranslate"><span class="pre">{&quot;mode&quot;:</span> <span class="pre">&quot;si&quot;,</span> <span class="pre">&quot;extract_func&quot;:</span> <span class="pre">&quot;read_intan&quot;}</span></code>).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">exclude</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>No</p></td>
+<td><p>If <code class="docutils literal notranslate"><span class="pre">true</span></code>, the animal is skipped entirely by the pipeline.
+The entry is retained in the config for documentation but no
+rules are executed for it. Default: <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Any additional keys (beyond those listed above) are passed through to
+<code class="docutils literal notranslate"><span class="pre">ANIMAL_METADATA</span></code> and are available for custom downstream processing.</p>
+</section>
+<section id="top-level-config-keys">
+<h4>Top-Level Config Keys<a class="headerlink" href="#top-level-config-keys" title="Link to this heading">#</a></h4>
+<p>In addition to <code class="docutils literal notranslate"><span class="pre">animals</span></code>, the samples JSON supports these top-level keys:</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<colgroup>
+<col style="width: 31.2%" />
+<col style="width: 68.8%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Key</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">data_root</span></code></p></td>
+<td><p><strong>Required.</strong> Root path containing the raw data directories.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">channels</span></code></p></td>
+<td><p>Mapping of each canonical channel abbreviation to the <strong>exact</strong> raw channel
+names that appear in the data (e.g. <code class="docutils literal notranslate"><span class="pre">{&quot;LAud&quot;:</span> <span class="pre">[&quot;0&quot;],</span> <span class="pre">&quot;RAud&quot;:</span> <span class="pre">[&quot;5&quot;],</span> <span class="pre">...}</span></code>).
+Channel resolution is an exact lookup against these names — no inference.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">GENOTYPE_MAP</span></code></p></td>
+<td><p>Optional exact <code class="docutils literal notranslate"><span class="pre">{canonical_label:</span> <span class="pre">[accepted</span> <span class="pre">spellings]}</span></code> map normalizing
+the per-animal <code class="docutils literal notranslate"><span class="pre">genotype</span></code> value (e.g. collapsing full strings to <code class="docutils literal notranslate"><span class="pre">&quot;KO&quot;</span></code> /
+<code class="docutils literal notranslate"><span class="pre">&quot;WT&quot;</span></code>). Omitted = passthrough (raw values used as-is). When set it is
+authoritative: a value it does not cover raises at load. <code class="docutils literal notranslate"><span class="pre">SEX_MAP</span></code> works
+the same way for <code class="docutils literal notranslate"><span class="pre">sex</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">bad_channels</span></code></p></td>
+<td><p>Legacy top-level bad-channel dict (see <a class="reference internal" href="#bad-channels"><span class="std std-ref">Bad Channels</span></a>).
+Prefer per-animal <code class="docutils literal notranslate"><span class="pre">bad_channels</span></code> in the <code class="docutils literal notranslate"><span class="pre">animals</span></code> list.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="bad-channels">
+<span id="id2"></span><h4>Bad Channels<a class="headerlink" href="#bad-channels" title="Link to this heading">#</a></h4>
+<p>Bad channels can be specified per animal in two ways.</p>
+<p><strong>Channels bad across all sessions</strong> — use a list:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;animals&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;M1&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;genotype&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;WT&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;sex&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;M&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;bad_channels&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;LHip&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;RHip&quot;</span><span class="p">]</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>This is the simplest approach when the same channels are consistently
+noisy for a given animal.</p>
+<p><strong>Per-session bad channels</strong> — use a dict mapping session identifiers to
+channel lists:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;animals&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;M1&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;genotype&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;WT&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;sex&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;M&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;bad_channels&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="nt">&quot;Session1&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;LHip&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;RHip&quot;</span><span class="p">],</span>
+<span class="w">                </span><span class="nt">&quot;Session2&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;LHip&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;RHip&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;LMot&quot;</span><span class="p">]</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>You can also combine both approaches: use the list for channels that are
+broadly bad across sessions and add per-session entries for channels that
+are only bad in specific recordings. When both <code class="docutils literal notranslate"><span class="pre">_all</span></code> (from a list) and
+per-session entries are present, the pipeline merges them automatically.</p>
+</section>
+<section id="manual-datetimes">
+<span id="id3"></span><h4>Manual Datetimes<a class="headerlink" href="#manual-datetimes" title="Link to this heading">#</a></h4>
+<p>Recording timestamps are specified via the <code class="docutils literal notranslate"><span class="pre">manual_datetime</span></code> field on
+each animal entry. <strong>By default this is the recording start time.</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;animals&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;M1&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;genotype&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;WT&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;sex&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;M&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;manual_datetime&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2025-05-10T10:00:00&quot;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>This manual approach avoids the complexity and fragility of automatic
+datetime parsing from heterogeneous filename formats. The value is parsed
+by <code class="docutils literal notranslate"><span class="pre">dateutil.parser.parse</span></code>, so any standard format is accepted:</p>
+<ul class="simple">
+<li><p>ISO 8601: <code class="docutils literal notranslate"><span class="pre">&quot;2025-05-10T10:00:00&quot;</span></code> (recommended)</p></li>
+<li><p>Spaced: <code class="docutils literal notranslate"><span class="pre">&quot;2025-05-10</span> <span class="pre">10:00:00&quot;</span></code></p></li>
+<li><p>Date only: <code class="docutils literal notranslate"><span class="pre">&quot;2025-05-10&quot;</span></code> (midnight assumed)</p></li>
+</ul>
+<p><strong>Start vs. end time.</strong> By default <code class="docutils literal notranslate"><span class="pre">manual_datetime</span></code> is treated as the
+recording <strong>start</strong> time.  To indicate an <strong>end</strong> time instead, set
+<code class="docutils literal notranslate"><span class="pre">datetimes_are_start</span></code> to <code class="docutils literal notranslate"><span class="pre">false</span></code> on the same animal entry:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;animals&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;M1&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;genotype&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;WT&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;sex&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;M&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;manual_datetime&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2025-05-10T22:00:00&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;datetimes_are_start&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Alternatively, <code class="docutils literal notranslate"><span class="pre">datetimes_are_start</span></code> can be set inside the <code class="docutils literal notranslate"><span class="pre">lro_kwargs</span></code>
+dict on the animal entry or in the global <code class="docutils literal notranslate"><span class="pre">lro_kwargs</span></code> of the dataset
+config YAML.</p>
+</section>
+</section>
+<section id="per-session-anchors-and-null-cumulation">
+<h3>Per-session anchors and <code class="docutils literal notranslate"><span class="pre">null</span></code> cumulation<a class="headerlink" href="#per-session-anchors-and-null-cumulation" title="Link to this heading">#</a></h3>
+<p>When a recording is split into multiple sessions (the <code class="docutils literal notranslate"><span class="pre">{session}</span></code>
+placeholder in the <code class="docutils literal notranslate"><span class="pre">pattern</span></code>), <code class="docutils literal notranslate"><span class="pre">manual_datetime</span></code> may be a <strong>dict keyed by
+session</strong>. Each value is either an explicit start, or <code class="docutils literal notranslate"><span class="pre">null</span></code> to <em>cumulate
+forward</em> — i.e. start where the previous session ended (assumes the sessions
+are contiguous). Only the first session needs a known time:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="nt">&quot;manual_datetime&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;_0_&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2011-06-07 16:04:14&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;_1_&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;_2_&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="p">}</span>
+</pre></div>
+</div>
+<p>Dict <strong>insertion order</strong> is the canonical chronological order. Explicit values
+act as resets; <code class="docutils literal notranslate"><span class="pre">null</span></code> only works in start-time mode.</p>
+</section>
+<section id="per-file-explicit-starts-gap-recovery">
+<h3>Per-file explicit starts (gap recovery)<a class="headerlink" href="#per-file-explicit-starts-gap-recovery" title="Link to this heading">#</a></h3>
+<p>If a session is <strong>not</strong> internally contiguous — e.g. one of its
+<code class="docutils literal notranslate"><span class="pre">Selection{index}</span></code> files is missing, leaving a gap — contiguous cumulation
+would place every later file in that session too early. Give that session a
+<strong>list</strong> of one explicit start per file (in <code class="docutils literal notranslate"><span class="pre">{index}</span></code> order); the remaining
+sessions can stay scalar or <code class="docutils literal notranslate"><span class="pre">null</span></code>:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="nt">&quot;manual_datetime&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;_0_&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;2011-06-07 16:04:14&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;2011-06-07 20:04:12&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;2011-06-08 00:04:12&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="s2">&quot;2011-06-08 08:04:13&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;2011-06-08 12:04:14&quot;</span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;_1_&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2011-06-08 15:59:48&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;_2_&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Here <code class="docutils literal notranslate"><span class="pre">_0_</span></code> is missing <code class="docutils literal notranslate"><span class="pre">Selection4</span></code>, so its fourth and fifth <em>present</em> files
+(<code class="docutils literal notranslate"><span class="pre">Selection5</span></code>/<code class="docutils literal notranslate"><span class="pre">Selection6</span></code>) are anchored at their true post-gap starts
+rather than 4 h early. The list length must equal the number of files
+discovered for that session, and entries are matched to files in <code class="docutils literal notranslate"><span class="pre">{index}</span></code>
+(natural-sort) order. A following <code class="docutils literal notranslate"><span class="pre">null</span></code> session cumulates from the last
+listed file’s end. Lists are start-time only.</p>
+<section id="full-example">
+<h4>Full Example<a class="headerlink" href="#full-example" title="Link to this heading">#</a></h4>
+<p>A complete samples JSON file with all available parameters:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;data_root&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/mnt/data/project&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;animals&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;AM3&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;genotype&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;WT&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;sex&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Male&quot;</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;AM5&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;genotype&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Het&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;sex&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Male&quot;</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">&quot;bad_channels&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;LHip&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;RHip&quot;</span><span class="p">]},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;AP3B2homo-240-M&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;genotype&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;HOMO&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;sex&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Male&quot;</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">&quot;pattern&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;{data_root}/PortA-*PortB-*/{animal}*_ColMajor_{index}.rhd&quot;</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">&quot;manual_datetime&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2025-11-27T15:39:05&quot;</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">&quot;lro_kwargs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;si&quot;</span><span class="p">},</span>
+<span class="w">         </span><span class="nt">&quot;bad_channels&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">             </span><span class="nt">&quot;Session_Nov27&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;LMot&quot;</span><span class="p">],</span>
+<span class="w">             </span><span class="nt">&quot;Session_Nov28&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;LMot&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;RAud&quot;</span><span class="p">]</span>
+<span class="w">         </span><span class="p">}}</span>
+<span class="w">    </span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;channels&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;LAud&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;0&quot;</span><span class="p">],</span><span class="w"> </span><span class="nt">&quot;RAud&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;5&quot;</span><span class="p">],</span><span class="w"> </span><span class="nt">&quot;LVis&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;1&quot;</span><span class="p">],</span><span class="w"> </span><span class="nt">&quot;RVis&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;6&quot;</span><span class="p">],</span>
+<span class="w">                 </span><span class="nt">&quot;LHip&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;2&quot;</span><span class="p">],</span><span class="w"> </span><span class="nt">&quot;RHip&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;7&quot;</span><span class="p">],</span><span class="w"> </span><span class="nt">&quot;LBar&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;3&quot;</span><span class="p">],</span><span class="w"> </span><span class="nt">&quot;RBar&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;8&quot;</span><span class="p">],</span>
+<span class="w">                 </span><span class="nt">&quot;LMot&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;4&quot;</span><span class="p">],</span><span class="w"> </span><span class="nt">&quot;RMot&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;9&quot;</span><span class="p">]}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="step-2-create-dataset-config">
+<h3>Step 2: Create Dataset Config<a class="headerlink" href="#step-2-create-dataset-config" title="Link to this heading">#</a></h3>
+<p>Create <code class="docutils literal notranslate"><span class="pre">config/datasets/mydata_nwb.yaml</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># My Data - NWB Format</span>
+
+<span class="nt">samples</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">samples_file</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;config/samples_mydata.json&quot;</span>
+
+<span class="nt">analysis</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">war_generation</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{animal}/{session}/{index}.nwb&quot;</span>
+<span class="w">    </span><span class="nt">lro_kwargs</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;si&quot;</span>
+<span class="w">      </span><span class="nt">extract_func</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;read_nwb_recording&quot;</span>
+</pre></div>
+</div>
+<p>You can override <strong>any</strong> config parameter using the same hierarchy as the main config.</p>
+</section>
+<section id="step-3-use-the-new-dataset">
+<h3>Step 3: Use the New Dataset<a class="headerlink" href="#step-3-use-the-new-dataset" title="Link to this heading">#</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">NEURODENT_DATASET</span><span class="o">=</span>mydata_nwb<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>snakemake<span class="w"> </span>--profile<span class="w"> </span>your-profile
+</pre></div>
+</div>
+</section>
+<section id="session-specific-configuration">
+<h3>Session-Specific Configuration<a class="headerlink" href="#session-specific-configuration" title="Link to this heading">#</a></h3>
+<p>Some datasets contain mixed file formats that require different processing parameters per recording session. Use the <code class="docutils literal notranslate"><span class="pre">overrides.by_session</span></code> section in your dataset config to override any parameter on a per-session basis.</p>
+<p><strong>Example:</strong> Dataset with both EDF and RHD formats</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># config/datasets/mixed_format.yaml</span>
+<span class="nt">samples</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">samples_file</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;config/samples_mixed.json&quot;</span>
+
+<span class="nt">analysis</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">war_generation</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{index}&quot;</span>
+<span class="w">    </span><span class="nt">lro_kwargs</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;si&quot;</span>
+
+<span class="nt">overrides</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">by_session</span><span class="p">:</span>
+<span class="w">    </span><span class="s">&quot;Session_EDF&quot;</span><span class="p p-Indicator">:</span>
+<span class="w">      </span><span class="s">&quot;analysis.war_generation.pattern&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;{index}.EDF&quot;</span>
+<span class="w">      </span><span class="s">&quot;analysis.war_generation.lro_kwargs.mode&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;mne&quot;</span>
+<span class="w">      </span><span class="s">&quot;analysis.war_generation.lro_kwargs.extract_func&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;read_raw_edf&quot;</span>
+<span class="w">    </span><span class="s">&quot;Session_RHD&quot;</span><span class="p p-Indicator">:</span>
+<span class="w">      </span><span class="s">&quot;analysis.war_generation.pattern&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;{index}.rhd&quot;</span>
+<span class="w">      </span><span class="s">&quot;analysis.war_generation.lro_kwargs.extract_func&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;read_intan&quot;</span>
+<span class="w">      </span><span class="s">&quot;analysis.war_generation.lro_kwargs.stream_id&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;0&quot;</span>
+</pre></div>
+</div>
+<p><strong>How it works:</strong></p>
+<ul class="simple">
+<li><p>Use dotted paths to specify which parameter to override (e.g., <code class="docutils literal notranslate"><span class="pre">&quot;analysis.war_generation.pattern&quot;</span></code>)</p></li>
+<li><p>Can override <strong>any</strong> config parameter, not just war_generation settings</p></li>
+<li><p>Overrides are applied via deep merge before session processing</p></li>
+<li><p>Falls back to global config if no override specified for a session</p></li>
+</ul>
+<p>Session-specific settings override the dataset config for that session only. This allows processing mixed formats in a single pipeline run while keeping all animals in unified analysis outputs.</p>
+</section>
+</section>
+<section id="common-use-cases">
+<h2>Common Use Cases<a class="headerlink" href="#common-use-cases" title="Link to this heading">#</a></h2>
+<section id="team-default-dataset">
+<h3>Team Default Dataset<a class="headerlink" href="#team-default-dataset" title="Link to this heading">#</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Edit config.yaml: active_dataset: &quot;sox5_bin&quot;</span>
+git<span class="w"> </span>add<span class="w"> </span>config/config.yaml
+git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;Set default to Sox5&quot;</span>
+git<span class="w"> </span>push
+</pre></div>
+</div>
+</section>
+<section id="personal-dataset-preference">
+<h3>Personal Dataset Preference<a class="headerlink" href="#personal-dataset-preference" title="Link to this heading">#</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Edit config.local.yaml: active_dataset: &quot;ap3b2_rhd&quot;</span>
+<span class="c1"># This is gitignored - won&#39;t affect team</span>
+</pre></div>
+</div>
+</section>
+<section id="cluster-batch-script">
+<h3>Cluster Batch Script<a class="headerlink" href="#cluster-batch-script" title="Link to this heading">#</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="ch">#!/bin/bash</span>
+<span class="c1">#SBATCH --job-name=neurodent</span>
+<span class="c1">#SBATCH --time=24:00:00</span>
+
+<span class="nb">export</span><span class="w"> </span><span class="nv">NEURODENT_DATASET</span><span class="o">=</span>sox5_bin
+uv<span class="w"> </span>run<span class="w"> </span>snakemake<span class="w"> </span>--profile<span class="w"> </span>slurm
+</pre></div>
+</div>
+</section>
+<section id="parallel-analysis">
+<h3>Parallel Analysis<a class="headerlink" href="#parallel-analysis" title="Link to this heading">#</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Terminal 1</span>
+<span class="nv">NEURODENT_DATASET</span><span class="o">=</span>sox5_bin<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>snakemake<span class="w"> </span>--profile<span class="w"> </span>slurm
+
+<span class="c1"># Terminal 2</span>
+<span class="nv">NEURODENT_DATASET</span><span class="o">=</span>ap3b2_rhd<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>snakemake<span class="w"> </span>--profile<span class="w"> </span>slurm
+</pre></div>
+</div>
+</section>
+</section>
+<section id="troubleshooting">
+<h2>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Link to this heading">#</a></h2>
+<section id="dataset-not-found">
+<h3>Dataset Not Found<a class="headerlink" href="#dataset-not-found" title="Link to this heading">#</a></h3>
+<p><strong>Error:</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>FileNotFoundError: Dataset config file not found:
+config/datasets/mydata.yaml
+</pre></div>
+</div>
+<p><strong>Solutions:</strong></p>
+<ul class="simple">
+<li><p>Check spelling (case-sensitive)</p></li>
+<li><p>Verify file exists: <code class="docutils literal notranslate"><span class="pre">ls</span> <span class="pre">config/datasets/</span></code></p></li>
+<li><p>Create the missing dataset config</p></li>
+</ul>
+</section>
+<section id="wrong-dataset-active">
+<h3>Wrong Dataset Active<a class="headerlink" href="#wrong-dataset-active" title="Link to this heading">#</a></h3>
+<p><strong>Check priority order:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">echo</span><span class="w"> </span><span class="nv">$NEURODENT_DATASET</span><span class="w">        </span><span class="c1"># Check env var</span>
+grep<span class="w"> </span>active_dataset<span class="w"> </span>config/config.local.yaml
+grep<span class="w"> </span>active_dataset<span class="w"> </span>config/config.yaml
+
+<span class="c1"># Clear env var if needed</span>
+<span class="nb">unset</span><span class="w"> </span>NEURODENT_DATASET
+</pre></div>
+</div>
+<p>See also: <a class="reference internal" href="snakemake_setup.html"><span class="doc">Snakemake Pipeline Setup</span></a> for pipeline setup and SLURM configuration.</p>
+</section>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="snakemake_setup.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Snakemake Pipeline Setup</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../tutorials/index.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Tutorials</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quick-start">Quick Start</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#how-it-works">How It Works</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#switching-datasets">Switching Datasets</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#method-1-environment-variable-recommended-for-cluster">Method 1: Environment Variable (Recommended for Cluster)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#method-2-edit-config-yaml">Method 2: Edit config.yaml</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#method-3-local-override">Method 3: Local Override</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#priority-order">Priority Order</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#verification">Verification</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#adding-new-datasets">Adding New Datasets</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#step-1-create-samples-json">Step 1: Create Samples JSON</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#animals-parameter-reference">Animals Parameter Reference</a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#top-level-config-keys">Top-Level Config Keys</a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#bad-channels">Bad Channels</a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#manual-datetimes">Manual Datetimes</a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#per-session-anchors-and-null-cumulation">Per-session anchors and <code class="docutils literal notranslate"><span class="pre">null</span></code> cumulation</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#per-file-explicit-starts-gap-recovery">Per-file explicit starts (gap recovery)</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#full-example">Full Example</a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#step-2-create-dataset-config">Step 2: Create Dataset Config</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#step-3-use-the-new-dataset">Step 3: Use the New Dataset</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#session-specific-configuration">Session-Specific Configuration</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#common-use-cases">Common Use Cases</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#team-default-dataset">Team Default Dataset</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#personal-dataset-preference">Personal Dataset Preference</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#cluster-batch-script">Cluster Batch Script</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#parallel-analysis">Parallel Analysis</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#troubleshooting">Troubleshooting</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#dataset-not-found">Dataset Not Found</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#wrong-dataset-active">Wrong Dataset Active</a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/quickstart/dataset_configuration.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025, Joseph Dong, Yongtaek Oh, Eric Marsh.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

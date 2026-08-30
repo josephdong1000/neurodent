@@ -1,0 +1,1254 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Spike Analysis Tutorial &#8212; Neurodent 0.4.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../_static/documentation_options.js?v=6c02275b"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/spike_analysis';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://josephdong1000.github.io/neurodent/_static/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.4.0';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner =
+            false;
+        </script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Visualization Tutorial" href="visualization.html" />
+    <link rel="prev" title="Windowed Analysis Tutorial" href="windowed_analysis.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">NeuRodent</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api/index.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../license/index.html">
+    License
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-2"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-2"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-2"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-2">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../license/index.html">
+    License
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-3"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-3"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-3"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-3">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="windowed_analysis.html">Windowed Analysis Tutorial</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Spike Analysis Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="visualization.html">Visualization Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="snakemake_pipeline.html">Running the Snakemake Pipeline</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Tutorials</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Spike Analysis Tutorial</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="spike-analysis-tutorial">
+<h1>Spike Analysis Tutorial<a class="headerlink" href="#spike-analysis-tutorial" title="Link to this heading">#</a></h1>
+<p>This tutorial covers frequency-domain spike detection and integrating the results with
+continuous EEG features in NeuRodent.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">#</a></h2>
+<p>NeuRodent detects population spikes directly from the recording using a frequency-domain
+detector (STFT + smoothed nonlinear energy operator), rather than by spike-sorting single
+units. The result is a <code class="docutils literal notranslate"><span class="pre">FrequencyDomainSpikeAnalysisResult</span></code> (FDSAR) per recording session:</p>
+<ol class="arabic simple">
+<li><p>Run frequency-domain spike detection over a recording</p></li>
+<li><p>Inspect per-channel spike counts</p></li>
+<li><p>Convert to MNE format and save/load results</p></li>
+<li><p>Analyze the EEG around detected spike times</p></li>
+<li><p>Fold spike counts back into a <code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult</span></code> for combined analysis</p></li>
+</ol>
+<p>This mirrors what the Snakemake pipeline does in <code class="docutils literal notranslate"><span class="pre">workflow/scripts/generate_wars.py</span></code>, in a
+simplified form. It runs on the example recordings bundled with the package.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">neurodent</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">AnimalOrganizer</span><span class="p">,</span>
+    <span class="n">AnimalAnalyzer</span><span class="p">,</span>
+    <span class="n">AnimalPlotter</span><span class="p">,</span>
+    <span class="n">FrequencyDomainSpikeAnalysisResult</span><span class="p">,</span>
+    <span class="n">constants</span><span class="p">,</span>
+    <span class="n">set_channel_map</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>/home/runner/work/neurodent/neurodent/.venv/lib/python3.10/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="loading-the-recording">
+<h2>1. Loading the Recording<a class="headerlink" href="#loading-the-recording" title="Link to this heading">#</a></h2>
+<p>Spike detection runs on the same <code class="docutils literal notranslate"><span class="pre">AnimalOrganizer</span></code> used for windowed analysis, so the setup
+is identical: declare the channel map and per-animal metadata, then point at the data.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">neurodent.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">sample_dataset</span>
+
+<span class="n">SAMPLE_DATA</span> <span class="o">=</span> <span class="n">sample_dataset</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="using-your-own-data">
+<h3>Using your own data<a class="headerlink" href="#using-your-own-data" title="Link to this heading">#</a></h3>
+<p>Replace <code class="docutils literal notranslate"><span class="pre">SAMPLE_DATA</span></code> with your own directory and set <code class="docutils literal notranslate"><span class="pre">extract_func</span></code> for your format.
+<a class="reference internal" href="../quickstart/data_loading.html"><span class="std std-doc">Data Loading</span></a> covers readers and patterns.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">set_channel_map</span><span class="p">({</span>
+    <span class="s2">&quot;LMot&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;C-015&quot;</span><span class="p">,</span> <span class="s2">&quot;D-015&quot;</span><span class="p">],</span>
+    <span class="s2">&quot;RMot&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;C-016&quot;</span><span class="p">,</span> <span class="s2">&quot;D-016&quot;</span><span class="p">],</span>
+    <span class="s2">&quot;LBar&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;C-014&quot;</span><span class="p">,</span> <span class="s2">&quot;D-014&quot;</span><span class="p">],</span>
+    <span class="s2">&quot;RBar&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;C-017&quot;</span><span class="p">,</span> <span class="s2">&quot;D-017&quot;</span><span class="p">],</span>
+    <span class="s2">&quot;LHip&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;C-012&quot;</span><span class="p">,</span> <span class="s2">&quot;D-012&quot;</span><span class="p">],</span>
+    <span class="s2">&quot;RHip&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;C-019&quot;</span><span class="p">,</span> <span class="s2">&quot;D-019&quot;</span><span class="p">],</span>
+    <span class="s2">&quot;LAud&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;C-009&quot;</span><span class="p">,</span> <span class="s2">&quot;D-009&quot;</span><span class="p">],</span>
+    <span class="s2">&quot;RAud&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;C-022&quot;</span><span class="p">,</span> <span class="s2">&quot;D-022&quot;</span><span class="p">],</span>
+    <span class="s2">&quot;LVis&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;C-010&quot;</span><span class="p">,</span> <span class="s2">&quot;D-010&quot;</span><span class="p">],</span>
+    <span class="s2">&quot;RVis&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;C-021&quot;</span><span class="p">,</span> <span class="s2">&quot;D-021&quot;</span><span class="p">],</span>
+<span class="p">})</span>
+
+<span class="n">constants</span><span class="o">.</span><span class="n">ANIMAL_METADATA</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;A10&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;genotype&quot;</span><span class="p">:</span> <span class="s2">&quot;WT&quot;</span><span class="p">,</span> <span class="s2">&quot;sex&quot;</span><span class="p">:</span> <span class="s2">&quot;Male&quot;</span><span class="p">},</span>
+    <span class="s2">&quot;F22&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;genotype&quot;</span><span class="p">:</span> <span class="s2">&quot;KO&quot;</span><span class="p">,</span> <span class="s2">&quot;sex&quot;</span><span class="p">:</span> <span class="s2">&quot;Female&quot;</span><span class="p">},</span>
+<span class="p">}</span>
+
+<span class="n">animal_id</span> <span class="o">=</span> <span class="s2">&quot;F22&quot;</span>
+
+<span class="n">ao</span> <span class="o">=</span> <span class="n">AnimalOrganizer</span><span class="p">(</span>
+    <span class="n">pattern</span><span class="o">=</span><span class="p">[</span>
+        <span class="nb">str</span><span class="p">(</span><span class="n">SAMPLE_DATA</span> <span class="o">/</span> <span class="s2">&quot;</span><span class="si">{animal}</span><span class="s2">&quot;</span> <span class="o">/</span> <span class="s2">&quot;*_ColMajor.bin&quot;</span><span class="p">),</span>
+        <span class="nb">str</span><span class="p">(</span><span class="n">SAMPLE_DATA</span> <span class="o">/</span> <span class="s2">&quot;</span><span class="si">{animal}</span><span class="s2">&quot;</span> <span class="o">/</span> <span class="s2">&quot;*_Meta.csv&quot;</span><span class="p">),</span>
+    <span class="p">],</span>
+    <span class="n">animal_id</span><span class="o">=</span><span class="n">animal_id</span><span class="p">,</span>
+    <span class="n">lro_kwargs</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;mode&quot;</span><span class="p">:</span> <span class="s2">&quot;si&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;extract_func&quot;</span><span class="p">:</span> <span class="s2">&quot;neurodent.readers:read_bin_csv_pair&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;manual_datetimes&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="p">(</span><span class="mi">2023</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+    <span class="p">},</span>
+<span class="p">)</span>
+
+<span class="n">analyzer</span> <span class="o">=</span> <span class="n">AnimalAnalyzer</span><span class="p">(</span><span class="n">ao</span><span class="p">)</span>
+<span class="n">analyzer</span><span class="o">.</span><span class="n">compute_bad_channels</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>INFO:root:Processing manual_datetimes configuration
+INFO:root:Processing global manual datetimes starting at 2023-12-12 02:00:00
+INFO:root:Computing continuous timeline for 1 animaldays (1 total items) starting at 2023-12-12 02:00:00
+INFO:root:Ordered items for timeline: [&#39;Cage 3 F22-0_ColMajor.bin...&#39;]
+INFO:root:Recording already at target sampling rate (1000 Hz) or unable to determine, no resampling needed
+INFO:root:Finalizing file timestamps
+INFO:root:Using manual timestamps: 1 file end times specified
+INFO:root:Item Cage 3 F22-0_ColMajor.bin...: duration = 60.0s (loaded with manual timestamp)
+INFO:root:Timeline computed: 1 items, total duration 60.0s
+INFO:root:Recording already at target sampling rate (1000 Hz) or unable to determine, no resampling needed
+INFO:root:Finalizing file timestamps
+INFO:root:Using manual timestamps: 1 file end times specified
+INFO:root:AnimalOrganizer Timeline Summary:
+LRO 0: 2023-12-12 02:00:00 -&gt; 2023-12-12 02:01:00 (duration: 60.0s, items: 1, item: Cage 3 F22-0_ColMajor.bin...)
+INFO:root:Computing bad channels for 1 recordings with threshold=None
+INFO:root:Computed n_neighbors for LOF computation: 2
+INFO:root:LOF computation successful: 10 channels
+INFO:root:Computed LOF scores for 10 channels
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="frequency-domain-spike-detection">
+<h2>2. Frequency Domain Spike Detection<a class="headerlink" href="#frequency-domain-spike-detection" title="Link to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">compute_frequency_domain_spike_analysis</span></code> runs the detector over every valid recording and
+returns one FDSAR per session. Passing <code class="docutils literal notranslate"><span class="pre">detection_params=None</span></code> uses
+<code class="docutils literal notranslate"><span class="pre">FrequencyDomainSpikeDetector.DEFAULT_PARAMS</span></code>; pass a dict to override individual values
+(bandpass, SNEO threshold percentile, clustering gap, and so on).</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Compute frequency domain spike analysis</span>
+<span class="n">fdsars</span> <span class="o">=</span> <span class="n">analyzer</span><span class="o">.</span><span class="n">compute_frequency_domain_spike_analysis</span><span class="p">(</span>
+    <span class="n">detection_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>       <span class="c1"># use FrequencyDomainSpikeDetector.DEFAULT_PARAMS</span>
+    <span class="n">multiprocess_mode</span><span class="o">=</span><span class="s1">&#39;serial&#39;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">fdsars</span><span class="p">)</span><span class="si">}</span><span class="s2"> session(s)&quot;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">fdsar</span> <span class="ow">in</span> <span class="n">fdsars</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">fdsar</span><span class="o">.</span><span class="n">animal_id</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">fdsar</span><span class="o">.</span><span class="n">genotype</span><span class="si">}</span><span class="s2">): &quot;</span>
+          <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">fdsar</span><span class="o">.</span><span class="n">get_total_spike_count</span><span class="p">()</span><span class="si">}</span><span class="s2"> spikes over </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">fdsar</span><span class="o">.</span><span class="n">channel_names</span><span class="p">)</span><span class="si">}</span><span class="s2"> channels&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Found 1 session(s)
+  F22 (KO): 7 spikes over 10 channels
+</pre></div>
+</div>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>INFO:root:Running frequency-domain spike detection on 1 recordings
+INFO:root:Detection parameters: None
+INFO:root:Detecting spikes with parameters: {&#39;bp&#39;: [3.0, 40.0], &#39;notch&#39;: 60.0, &#39;notch_q&#39;: 30.0, &#39;freq_slices&#39;: [10.0, 20.0], &#39;window_s&#39;: 0.125, &#39;sneo_percentile&#39;: 99.99, &#39;cluster_gap_ms&#39;: 80.0, &#39;search_ms&#39;: 160.0, &#39;baseline_ms&#39;: 500.0, &#39;k_sigma&#39;: 3.0, &#39;smooth_window&#39;: 7, &#39;vote_k&#39;: 2, &#39;smooth_len&#39;: 5}
+INFO:root:Step 2/4: SNEO detection found 1 candidate spikes
+INFO:root:Step 3/4: After refinement and validation: 0 spikes retained
+INFO:root:Step 4/4: Final spike count after clustering: 0 spikes
+INFO:root:Step 2/4: SNEO detection found 0 candidate spikes
+INFO:root:Step 3/4: After refinement and validation: 0 spikes retained
+INFO:root:Step 4/4: Final spike count after clustering: 0 spikes
+INFO:root:Step 2/4: SNEO detection found 1 candidate spikes
+INFO:root:Step 3/4: After refinement and validation: 0 spikes retained
+INFO:root:Step 4/4: Final spike count after clustering: 0 spikes
+INFO:root:Step 2/4: SNEO detection found 1 candidate spikes
+INFO:root:Step 3/4: After refinement and validation: 1 spikes retained
+INFO:root:Step 4/4: Final spike count after clustering: 1 spikes
+INFO:root:Step 2/4: SNEO detection found 6 candidate spikes
+INFO:root:Step 3/4: After refinement and validation: 1 spikes retained
+INFO:root:Step 4/4: Final spike count after clustering: 1 spikes
+INFO:root:Step 2/4: SNEO detection found 1 candidate spikes
+INFO:root:Step 3/4: After refinement and validation: 0 spikes retained
+INFO:root:Step 4/4: Final spike count after clustering: 0 spikes
+INFO:root:Step 2/4: SNEO detection found 5 candidate spikes
+INFO:root:Step 3/4: After refinement and validation: 2 spikes retained
+INFO:root:Step 4/4: Final spike count after clustering: 2 spikes
+INFO:root:Step 2/4: SNEO detection found 1 candidate spikes
+INFO:root:Step 3/4: After refinement and validation: 0 spikes retained
+INFO:root:Step 4/4: Final spike count after clustering: 0 spikes
+INFO:root:Step 2/4: SNEO detection found 2 candidate spikes
+INFO:root:Step 3/4: After refinement and validation: 2 spikes retained
+INFO:root:Step 4/4: Final spike count after clustering: 2 spikes
+INFO:root:Step 2/4: SNEO detection found 3 candidate spikes
+INFO:root:Step 3/4: After refinement and validation: 1 spikes retained
+INFO:root:Step 4/4: Final spike count after clustering: 1 spikes
+INFO:root:Channel names: 	[&#39;D-009&#39;, &#39;D-010&#39;, &#39;D-012&#39;, &#39;D-014&#39;, &#39;D-015&#39;, &#39;D-016&#39;, &#39;D-017&#39;, &#39;D-019&#39;, &#39;D-021&#39;, &#39;D-022&#39;]
+INFO:root:Channel abbreviations: 	[&#39;LAud&#39;, &#39;LVis&#39;, &#39;LHip&#39;, &#39;LBar&#39;, &#39;LMot&#39;, &#39;RMot&#39;, &#39;RBar&#39;, &#39;RHip&#39;, &#39;RVis&#39;, &#39;RAud&#39;]
+INFO:root:Detection parameters: 	{}
+INFO:root:Recording 1/1: Detected 7 spikes across 10 channels
+INFO:root:Completed frequency-domain spike detection. Total recordings processed: 1
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="working-with-spike-analysis-results">
+<h2>3. Working with Spike Analysis Results<a class="headerlink" href="#working-with-spike-analysis-results" title="Link to this heading">#</a></h2>
+<p>Access spike-related features:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get spike counts per channel</span>
+<span class="k">for</span> <span class="n">fdsar</span> <span class="ow">in</span> <span class="n">fdsars</span><span class="p">:</span>
+    <span class="n">counts</span> <span class="o">=</span> <span class="n">fdsar</span><span class="o">.</span><span class="n">get_spike_counts_per_channel</span><span class="p">()</span>
+    <span class="n">total</span> <span class="o">=</span> <span class="n">fdsar</span><span class="o">.</span><span class="n">get_total_spike_count</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Session </span><span class="si">{</span><span class="n">fdsar</span><span class="o">.</span><span class="n">animal_id</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">total</span><span class="si">}</span><span class="s2"> total spikes&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">ch_name</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">fdsar</span><span class="o">.</span><span class="n">channel_abbrevs</span><span class="p">,</span> <span class="n">counts</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">ch_name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2"> spikes&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Session F22: 7 total spikes
+  LAud: 0 spikes
+  LVis: 0 spikes
+  LHip: 0 spikes
+  LBar: 1 spikes
+  LMot: 1 spikes
+  RMot: 0 spikes
+  RBar: 2 spikes
+  RHip: 0 spikes
+  RVis: 2 spikes
+  RAud: 1 spikes
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="converting-to-mne-format">
+<h2>4. Converting to MNE Format<a class="headerlink" href="#converting-to-mne-format" title="Link to this heading">#</a></h2>
+<p>An FDSAR can be converted to an MNE <code class="docutils literal notranslate"><span class="pre">RawArray</span></code> with the detected spikes attached as annotations (<code class="docutils literal notranslate"><span class="pre">Spike_Ch0</span></code>, <code class="docutils literal notranslate"><span class="pre">Spike_Ch1</span></code>, …), which opens up MNE’s epoching and time-frequency tooling. <code class="docutils literal notranslate"><span class="pre">save_fif_and_json</span></code> writes that raw object plus the detection metadata.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Use a temporary directory so this tutorial does not write into the docs source tree.</span>
+<span class="n">output_root</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tempfile</span><span class="o">.</span><span class="n">mkdtemp</span><span class="p">())</span>
+
+<span class="k">for</span> <span class="n">fdsar</span> <span class="ow">in</span> <span class="n">fdsars</span><span class="p">:</span>
+    <span class="c1"># Convert to an MNE Raw object with spikes as annotations</span>
+    <span class="n">fdsar</span><span class="o">.</span><span class="n">convert_to_mne</span><span class="p">(</span><span class="n">chunk_duration_s</span><span class="o">=</span><span class="mi">60</span><span class="p">)</span>  <span class="c1"># seconds</span>
+
+    <span class="c1"># `path_safe_save_stem` slugifies animal id / genotype / day into a safe folder name</span>
+    <span class="n">output_path</span> <span class="o">=</span> <span class="n">output_root</span> <span class="o">/</span> <span class="n">fdsar</span><span class="o">.</span><span class="n">path_safe_save_stem</span>
+    <span class="n">fdsar</span><span class="o">.</span><span class="n">save_fif_and_json</span><span class="p">(</span><span class="n">output_path</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Wrote </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Creating RawArray with float64 data, n_channels=10, n_times=60000
+    Range : 0 ... 59999 =      0.000 ...    59.999 secs
+Ready.
+Writing /tmp/tmph27_bjoc/f22-ko-f22_unknown/f22-ko-f22_unknown-raw.fif
+Closing /tmp/tmph27_bjoc/f22-ko-f22_unknown/f22-ko-f22_unknown-raw.fif
+[done]
+Wrote /tmp/tmph27_bjoc/f22-ko-f22_unknown
+</pre></div>
+</div>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>INFO:root:Saved FrequencyDomainSpikeAnalysisResult to /tmp/tmph27_bjoc/f22-ko-f22_unknown
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="loading-saved-results">
+<h2>5. Loading Saved Results<a class="headerlink" href="#loading-saved-results" title="Link to this heading">#</a></h2>
+<p>Load previously saved spike analysis results:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Load FDSAR back from the saved files</span>
+<span class="n">sar_path</span> <span class="o">=</span> <span class="n">output_root</span> <span class="o">/</span> <span class="n">fdsars</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">path_safe_save_stem</span>
+<span class="n">fdsar_loaded</span> <span class="o">=</span> <span class="n">FrequencyDomainSpikeAnalysisResult</span><span class="o">.</span><span class="n">load_fif_and_json</span><span class="p">(</span><span class="n">sar_path</span><span class="p">)</span>
+
+<span class="c1"># Access the MNE raw object</span>
+<span class="n">raw</span> <span class="o">=</span> <span class="n">fdsar_loaded</span><span class="o">.</span><span class="n">result_mne</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loaded </span><span class="si">{</span><span class="n">raw</span><span class="o">.</span><span class="n">info</span><span class="p">[</span><span class="s1">&#39;nchan&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> channels, &quot;</span>
+      <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">raw</span><span class="o">.</span><span class="n">n_times</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">raw</span><span class="o">.</span><span class="n">info</span><span class="p">[</span><span class="s1">&#39;sfreq&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">s duration, &quot;</span>
+      <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">fdsar_loaded</span><span class="o">.</span><span class="n">get_total_spike_count</span><span class="p">()</span><span class="si">}</span><span class="s2"> spikes&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Opening raw data file /tmp/tmph27_bjoc/f22-ko-f22_unknown/f22-ko-f22_unknown-raw.fif...
+Isotrak not found
+    Range : 0 ... 59999 =      0.000 ...    59.999 secs
+Ready.
+Used Annotations descriptions: [np.str_(&#39;Spike_Ch3&#39;), np.str_(&#39;Spike_Ch4&#39;), np.str_(&#39;Spike_Ch6&#39;), np.str_(&#39;Spike_Ch8&#39;), np.str_(&#39;Spike_Ch9&#39;)]
+Loaded 10 channels, 60.0s duration, 7 spikes
+</pre></div>
+</div>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>INFO:root:Channel names: 	[&#39;D-009&#39;, &#39;D-010&#39;, &#39;D-012&#39;, &#39;D-014&#39;, &#39;D-015&#39;, &#39;D-016&#39;, &#39;D-017&#39;, &#39;D-019&#39;, &#39;D-021&#39;, &#39;D-022&#39;]
+INFO:root:Channel abbreviations: 	[&#39;LAud&#39;, &#39;LVis&#39;, &#39;LHip&#39;, &#39;LBar&#39;, &#39;LMot&#39;, &#39;RMot&#39;, &#39;RBar&#39;, &#39;RHip&#39;, &#39;RVis&#39;, &#39;RAud&#39;]
+INFO:root:Detection parameters: 	{}
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="peri-event-analysis-with-mne">
+<h2>6. Peri-Event Analysis with MNE<a class="headerlink" href="#peri-event-analysis-with-mne" title="Link to this heading">#</a></h2>
+<p>Analyze EEG around spike times:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">mne</span>
+
+<span class="c1"># Extract events from annotations (spike times)</span>
+<span class="n">events</span><span class="p">,</span> <span class="n">event_dict</span> <span class="o">=</span> <span class="n">mne</span><span class="o">.</span><span class="n">events_from_annotations</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">events</span><span class="p">)</span><span class="si">}</span><span class="s2"> events&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Event types: </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">event_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="c1"># Create epochs around spike times.</span>
+<span class="c1"># A population spike is often detected on several channels at the same sample, so the same</span>
+<span class="c1"># event time appears under more than one Spike_Ch* label. `event_repeated=&#39;merge&#39;` collapses</span>
+<span class="c1"># those into a single epoch instead of raising.</span>
+<span class="n">epochs</span> <span class="o">=</span> <span class="n">mne</span><span class="o">.</span><span class="n">Epochs</span><span class="p">(</span>
+    <span class="n">raw</span><span class="p">,</span>
+    <span class="n">events</span><span class="p">,</span>
+    <span class="n">event_id</span><span class="o">=</span><span class="n">event_dict</span><span class="p">,</span>
+    <span class="n">tmin</span><span class="o">=-</span><span class="mf">0.5</span><span class="p">,</span>  <span class="c1"># 500 ms before spike</span>
+    <span class="n">tmax</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>   <span class="c1"># 1 s after spike</span>
+    <span class="n">baseline</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mf">0.5</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.1</span><span class="p">),</span>
+    <span class="n">event_repeated</span><span class="o">=</span><span class="s1">&#39;merge&#39;</span><span class="p">,</span>
+    <span class="n">preload</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">epochs</span><span class="p">)</span><span class="si">}</span><span class="s2"> epochs&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Used Annotations descriptions: [np.str_(&#39;Spike_Ch3&#39;), np.str_(&#39;Spike_Ch4&#39;), np.str_(&#39;Spike_Ch6&#39;), np.str_(&#39;Spike_Ch8&#39;), np.str_(&#39;Spike_Ch9&#39;)]
+Found 7 events
+Event types: [np.str_(&#39;Spike_Ch3&#39;), np.str_(&#39;Spike_Ch4&#39;), np.str_(&#39;Spike_Ch6&#39;), np.str_(&#39;Spike_Ch8&#39;), np.str_(&#39;Spike_Ch9&#39;)]
+Not setting metadata
+7 matching events found
+Applying baseline correction (mode: mean)
+0 projection items activated
+Loading data for 7 events and 1501 original time points ...
+0 bad epochs dropped
+Created 7 epochs
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="spike-triggered-averages">
+<h2>7. Spike-Triggered Averages<a class="headerlink" href="#spike-triggered-averages" title="Link to this heading">#</a></h2>
+<p>NeuRodent ships a built-in diagnostic that averages the raw trace around every spike on a
+channel, which is what the pipeline’s FDSAR diagnostics step produces. Passing
+<code class="docutils literal notranslate"><span class="pre">save_dir=None</span></code> displays the figures inline instead of writing them to disk.</p>
+<p>The example recording only yields a handful of spikes per channel, so these averages are
+noisy. On a full recording each would be built from far more events.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># NeuRodent&#39;s built-in spike-triggered average, one figure per channel with spikes</span>
+<span class="n">counts</span> <span class="o">=</span> <span class="n">fdsar_loaded</span><span class="o">.</span><span class="n">plot_spike_averaged_traces</span><span class="p">(</span>
+    <span class="n">tmin</span><span class="o">=-</span><span class="mf">0.5</span><span class="p">,</span>
+    <span class="n">tmax</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+    <span class="n">save_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>      <span class="c1"># None -&gt; show inline instead of saving</span>
+    <span class="n">save_epoch</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Spikes averaged per channel: </span><span class="si">{</span><span class="n">counts</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="c1"># The same thing via MNE, averaging across all channels and spike events</span>
+<span class="n">evoked</span> <span class="o">=</span> <span class="n">epochs</span><span class="o">.</span><span class="n">average</span><span class="p">()</span>
+<span class="n">evoked</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">gfp</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Used Annotations descriptions: [np.str_(&#39;Spike_Ch3&#39;), np.str_(&#39;Spike_Ch4&#39;), np.str_(&#39;Spike_Ch6&#39;), np.str_(&#39;Spike_Ch8&#39;), np.str_(&#39;Spike_Ch9&#39;)]
+Not setting metadata
+1 matching events found
+No baseline correction applied
+0 projection items activated
+Loading data for 1 events and 1001 original time points ...
+0 bad epochs dropped
+Not setting metadata
+1 matching events found
+No baseline correction applied
+0 projection items activated
+combining channels using &quot;mean&quot;
+Not setting metadata
+1 matching events found
+No baseline correction applied
+0 projection items activated
+Loading data for 1 events and 1001 original time points ...
+0 bad epochs dropped
+Not setting metadata
+1 matching events found
+No baseline correction applied
+0 projection items activated
+combining channels using &quot;mean&quot;
+Not setting metadata
+2 matching events found
+No baseline correction applied
+0 projection items activated
+Loading data for 2 events and 1001 original time points ...
+0 bad epochs dropped
+Not setting metadata
+2 matching events found
+No baseline correction applied
+0 projection items activated
+combining channels using &quot;mean&quot;
+Not setting metadata
+2 matching events found
+No baseline correction applied
+0 projection items activated
+Loading data for 2 events and 1001 original time points ...
+0 bad epochs dropped
+Not setting metadata
+2 matching events found
+No baseline correction applied
+0 projection items activated
+combining channels using &quot;mean&quot;
+Not setting metadata
+1 matching events found
+No baseline correction applied
+0 projection items activated
+Loading data for 1 events and 1001 original time points ...
+0 bad epochs dropped
+Not setting metadata
+1 matching events found
+No baseline correction applied
+0 projection items activated
+combining channels using &quot;mean&quot;
+Spikes averaged per channel: {0: 0, 1: 0, 2: 0, 3: 1, 4: 1, 5: 0, 6: 2, 7: 0, 8: 2, 9: 1}
+</pre></div>
+</div>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>/home/runner/work/neurodent/neurodent/src/neurodent/results/frequency_domain_results.py:501: RuntimeWarning: Only one channel in group &quot;eeg&quot;; cannot combine by method &quot;mean&quot;.
+  fig = epochs.plot_image(
+/home/runner/work/neurodent/neurodent/src/neurodent/results/frequency_domain_results.py:501: RuntimeWarning: Only 1 channel in &quot;picks&quot;; cannot combine by method &quot;mean&quot;.
+  fig = epochs.plot_image(
+/home/runner/work/neurodent/neurodent/src/neurodent/results/frequency_domain_results.py:501: RuntimeWarning: Only one channel in group &quot;eeg&quot;; cannot combine by method &quot;mean&quot;.
+  fig = epochs.plot_image(
+/home/runner/work/neurodent/neurodent/src/neurodent/results/frequency_domain_results.py:501: RuntimeWarning: Only 1 channel in &quot;picks&quot;; cannot combine by method &quot;mean&quot;.
+  fig = epochs.plot_image(
+/home/runner/work/neurodent/neurodent/src/neurodent/results/frequency_domain_results.py:501: RuntimeWarning: Only one channel in group &quot;eeg&quot;; cannot combine by method &quot;mean&quot;.
+  fig = epochs.plot_image(
+/home/runner/work/neurodent/neurodent/src/neurodent/results/frequency_domain_results.py:501: RuntimeWarning: Only 1 channel in &quot;picks&quot;; cannot combine by method &quot;mean&quot;.
+  fig = epochs.plot_image(
+/home/runner/work/neurodent/neurodent/src/neurodent/results/frequency_domain_results.py:501: RuntimeWarning: Only one channel in group &quot;eeg&quot;; cannot combine by method &quot;mean&quot;.
+  fig = epochs.plot_image(
+/home/runner/work/neurodent/neurodent/src/neurodent/results/frequency_domain_results.py:501: RuntimeWarning: Only 1 channel in &quot;picks&quot;; cannot combine by method &quot;mean&quot;.
+  fig = epochs.plot_image(
+/home/runner/work/neurodent/neurodent/src/neurodent/results/frequency_domain_results.py:501: RuntimeWarning: Only one channel in group &quot;eeg&quot;; cannot combine by method &quot;mean&quot;.
+  fig = epochs.plot_image(
+/home/runner/work/neurodent/neurodent/src/neurodent/results/frequency_domain_results.py:501: RuntimeWarning: Only 1 channel in &quot;picks&quot;; cannot combine by method &quot;mean&quot;.
+  fig = epochs.plot_image(
+</pre></div>
+</div>
+<img alt="../_images/eb6e0daecb7d05012c318e54c0b772db528bbdc6060f248a9a1bcf11a21513a8.png" src="../_images/eb6e0daecb7d05012c318e54c0b772db528bbdc6060f248a9a1bcf11a21513a8.png" />
+<img alt="../_images/3df6aa5e4ea0f678131fca2c7ee6882b90558972d0ffbf8f55dc1e82782622d1.png" src="../_images/3df6aa5e4ea0f678131fca2c7ee6882b90558972d0ffbf8f55dc1e82782622d1.png" />
+<img alt="../_images/d4710064ae55112e5fbb542a838f1befbbc210d7583e6719a9409ede2f082565.png" src="../_images/d4710064ae55112e5fbb542a838f1befbbc210d7583e6719a9409ede2f082565.png" />
+<img alt="../_images/b1435ba57f6ab3c85253bdfa4a595f3b7fee9ab09415c9eb22ab0b567a6b6a9d.png" src="../_images/b1435ba57f6ab3c85253bdfa4a595f3b7fee9ab09415c9eb22ab0b567a6b6a9d.png" />
+<img alt="../_images/c1b130e95ae5b5af6dc4b291023fe3c0148b77aff9b999d2c90b9056f3fa8ad5.png" src="../_images/c1b130e95ae5b5af6dc4b291023fe3c0148b77aff9b999d2c90b9056f3fa8ad5.png" />
+<img alt="../_images/2ade6930e4543c6cdc9df41b70bd6ec0f168dccf1f4c81e5797136b78b2f93ba.png" src="../_images/2ade6930e4543c6cdc9df41b70bd6ec0f168dccf1f4c81e5797136b78b2f93ba.png" />
+</div>
+</div>
+</section>
+<section id="time-frequency-analysis">
+<h2>8. Time-Frequency Analysis<a class="headerlink" href="#time-frequency-analysis" title="Link to this heading">#</a></h2>
+<p>Analyze oscillations around spike times:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Compute time-frequency representation</span>
+<span class="n">freqs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># 1-50 Hz</span>
+<span class="n">n_cycles</span> <span class="o">=</span> <span class="n">freqs</span> <span class="o">/</span> <span class="mi">2</span>  <span class="c1"># Number of cycles increases with frequency</span>
+
+<span class="c1"># Compute TFR using Morlet wavelets</span>
+<span class="n">power</span> <span class="o">=</span> <span class="n">epochs</span><span class="o">.</span><span class="n">compute_tfr</span><span class="p">(</span>
+    <span class="n">method</span><span class="o">=</span><span class="s1">&#39;morlet&#39;</span><span class="p">,</span>
+    <span class="n">freqs</span><span class="o">=</span><span class="n">freqs</span><span class="p">,</span>
+    <span class="n">n_cycles</span><span class="o">=</span><span class="n">n_cycles</span><span class="p">,</span>
+    <span class="n">use_fft</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">average</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+
+<span class="c1"># Plot TFR</span>
+<span class="n">power</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+    <span class="n">picks</span><span class="o">=</span><span class="s1">&#39;eeg&#39;</span><span class="p">,</span>
+    <span class="n">baseline</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mf">0.5</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.1</span><span class="p">),</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;percent&#39;</span><span class="p">,</span>
+    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Peri-Spike Time-Frequency&quot;</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Applying baseline correction (mode: percent)
+</pre></div>
+</div>
+<img alt="../_images/4edbd291ddf09a7880ca85b28cd82bec42996f7647fc63b2b82fea66da8df0f3.png" src="../_images/4edbd291ddf09a7880ca85b28cd82bec42996f7647fc63b2b82fea66da8df0f3.png" />
+<img alt="../_images/3a19119c9e9a99c8b8e4fc8047ad0775c89a6be4455d0ec48e64c1ceab60788a.png" src="../_images/3a19119c9e9a99c8b8e4fc8047ad0775c89a6be4455d0ec48e64c1ceab60788a.png" />
+<img alt="../_images/b3f0032032b2a0d65d0eb4b7838ada7060700e6b4441655eca7246573a444b48.png" src="../_images/b3f0032032b2a0d65d0eb4b7838ada7060700e6b4441655eca7246573a444b48.png" />
+<img alt="../_images/e32b26d9530d64ad20419f6b6a6f5c49d6f5fdcd4be5da3fb61da1c0cffd7fcb.png" src="../_images/e32b26d9530d64ad20419f6b6a6f5c49d6f5fdcd4be5da3fb61da1c0cffd7fcb.png" />
+<img alt="../_images/9b166fcfa4795336212e557f2b9f9b8c43efd551f964f0e80a58051a9f4240cb.png" src="../_images/9b166fcfa4795336212e557f2b9f9b8c43efd551f964f0e80a58051a9f4240cb.png" />
+<img alt="../_images/2e3183d708500373166c00907ad5646dfee03c55398829b240d182e1947f4fa9.png" src="../_images/2e3183d708500373166c00907ad5646dfee03c55398829b240d182e1947f4fa9.png" />
+<img alt="../_images/668d54c34f21640d3e0f9993d42b05c4d42275755b208adebd885137bb026214.png" src="../_images/668d54c34f21640d3e0f9993d42b05c4d42275755b208adebd885137bb026214.png" />
+<img alt="../_images/cf8f812979e7c0ae1065b4bc53aa5de5ed362246d849801a3d4d22d90c48836b.png" src="../_images/cf8f812979e7c0ae1065b4bc53aa5de5ed362246d849801a3d4d22d90c48836b.png" />
+<img alt="../_images/00c867adb3683aa1c75d2e3b9d5ff2693b3016d934c1d96850db7f04ae27c933.png" src="../_images/00c867adb3683aa1c75d2e3b9d5ff2693b3016d934c1d96850db7f04ae27c933.png" />
+<img alt="../_images/b379f25a1bede8d77e301f8a4960540266dde3639c3ec5c41edc4a20decf2f6f.png" src="../_images/b379f25a1bede8d77e301f8a4960540266dde3639c3ec5c41edc4a20decf2f6f.png" />
+</div>
+</div>
+</section>
+<section id="spike-lfp-phase-locking">
+<h2>9. Spike-LFP Phase Locking<a class="headerlink" href="#spike-lfp-phase-locking" title="Link to this heading">#</a></h2>
+<p>Analyze phase relationships between spikes and LFP oscillations:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Filter for specific frequency band (e.g., theta: 4-8 Hz)</span>
+<span class="n">epochs_filtered</span> <span class="o">=</span> <span class="n">epochs</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+    <span class="n">l_freq</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+    <span class="n">h_freq</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+    <span class="n">method</span><span class="o">=</span><span class="s1">&#39;iir&#39;</span>
+<span class="p">)</span>
+
+<span class="c1"># Apply Hilbert transform to get instantaneous phase</span>
+<span class="n">epochs_hilbert</span> <span class="o">=</span> <span class="n">epochs_filtered</span><span class="o">.</span><span class="n">apply_hilbert</span><span class="p">()</span>
+
+<span class="c1"># Extract phase at spike time (t=0)</span>
+<span class="n">spike_phases</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">angle</span><span class="p">(</span><span class="n">epochs_hilbert</span><span class="o">.</span><span class="n">get_data</span><span class="p">()[:,</span> <span class="p">:,</span> <span class="n">epochs</span><span class="o">.</span><span class="n">time_as_index</span><span class="p">(</span><span class="mi">0</span><span class="p">)[</span><span class="mi">0</span><span class="p">]])</span>
+
+<span class="c1"># Plot phase distribution</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">spike_phases</span><span class="o">.</span><span class="n">flatten</span><span class="p">(),</span> <span class="n">bins</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">density</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Phase (radians)&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Density&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s2">&quot;Spike Phase Distribution&quot;</span><span class="p">)</span>
+
+<span class="c1"># Polar plot</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">projection</span><span class="o">=</span><span class="s1">&#39;polar&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">spike_phases</span><span class="o">.</span><span class="n">flatten</span><span class="p">(),</span> <span class="n">bins</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">density</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s2">&quot;Spike Phase (Polar)&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Setting up band-pass filter from 4 - 8 Hz
+IIR filter parameters
+---------------------
+Butterworth bandpass zero-phase (two-pass forward and reverse) non-causal filter:
+- Filter order 16 (effective, after forward-backward)
+- Cutoffs at 4.00, 8.00 Hz: -6.02, -6.02 dB
+</pre></div>
+</div>
+<img alt="../_images/930315187d58b4bd57a6688df22e0032e4641f1294d4c8fc1130446c9890e880.png" src="../_images/930315187d58b4bd57a6688df22e0032e4641f1294d4c8fc1130446c9890e880.png" />
+</div>
+</div>
+</section>
+<section id="integrating-with-war">
+<h2>10. Integrating with WAR<a class="headerlink" href="#integrating-with-war" title="Link to this heading">#</a></h2>
+<p>Spike counts become an ordinary WAR feature via <code class="docutils literal notranslate"><span class="pre">read_sars_spikes</span></code>, which bins each
+session’s spike times into the WAR’s existing time windows and fills in <code class="docutils literal notranslate"><span class="pre">nspike</span></code> and
+<code class="docutils literal notranslate"><span class="pre">lognspike</span></code>.</p>
+<p>Asking <code class="docutils literal notranslate"><span class="pre">compute_windowed_analysis</span></code> for <code class="docutils literal notranslate"><span class="pre">nspike</span></code> on its own does <strong>not</strong> do this (it will return an all-NaN placeholder). The counts only arrive through <code class="docutils literal notranslate"><span class="pre">read_sars_spikes</span></code>.</p>
+<p>Note that <code class="docutils literal notranslate"><span class="pre">read_sars_spikes</span></code> must run on an unfiltered WAR, since dropping rows first shifts the window edges and misassigns counts.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Compute the windowed analysis, then fold in the detected spikes</span>
+<span class="n">war</span> <span class="o">=</span> <span class="n">analyzer</span><span class="o">.</span><span class="n">compute_windowed_analysis</span><span class="p">(</span>
+    <span class="n">features</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;rms&#39;</span><span class="p">,</span> <span class="s1">&#39;psdband&#39;</span><span class="p">],</span>
+    <span class="n">multiprocess_mode</span><span class="o">=</span><span class="s1">&#39;serial&#39;</span>
+<span class="p">)</span>
+<span class="n">war</span> <span class="o">=</span> <span class="n">war</span><span class="o">.</span><span class="n">read_sars_spikes</span><span class="p">(</span><span class="n">fdsars</span><span class="p">,</span> <span class="n">read_mode</span><span class="o">=</span><span class="s1">&#39;sa&#39;</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># nspike holds one count per channel for each time window</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">war</span><span class="o">.</span><span class="n">get_result</span><span class="p">([</span><span class="s1">&#39;nspike&#39;</span><span class="p">])</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Windows: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Spike counts in the first window: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;nspike&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total binned spikes: </span><span class="si">{</span><span class="n">np</span><span class="o">.</span><span class="n">nansum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;nspike&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()))</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="c1"># Plot spike counts over time</span>
+<span class="n">ap</span> <span class="o">=</span> <span class="n">AnimalPlotter</span><span class="p">(</span><span class="n">war</span><span class="p">)</span>
+<span class="n">ap</span><span class="o">.</span><span class="n">plot_linear_temporal</span><span class="p">(</span><span class="n">features</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;nspike&#39;</span><span class="p">])</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Windows: 12
+Spike counts in the first window: [0. 0. 0. 0. 0. 0. 0. 0. 1. 0.]
+Total binned spikes: 7
+</pre></div>
+</div>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>INFO:root:Computing windowed analysis for Cage 3 F22-0_ColMajor.bin...
+Processing rows:   0%|          | 0/12 [00:00&lt;?, ?it/s]
+Processing rows: 100%|██████████| 12/12 [00:00&lt;00:00, 204.45it/s]
+
+INFO:root:Added LOF scores for F22 KO Dec-12-2023: 10 channels
+INFO:root:Total LOF scores collected: 1 animal days
+INFO:root:Channel names: 	[&#39;D-009&#39;, &#39;D-010&#39;, &#39;D-012&#39;, &#39;D-014&#39;, &#39;D-015&#39;, &#39;D-016&#39;, &#39;D-017&#39;, &#39;D-019&#39;, &#39;D-021&#39;, &#39;D-022&#39;]
+INFO:root:Channel abbreviations: 	[&#39;LAud&#39;, &#39;LVis&#39;, &#39;LHip&#39;, &#39;LBar&#39;, &#39;LMot&#39;, &#39;RMot&#39;, &#39;RBar&#39;, &#39;RHip&#39;, &#39;RVis&#39;, &#39;RAud&#39;]
+/home/runner/work/neurodent/neurodent/src/neurodent/results/war_spikes.py:166: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  spike_counts = grouped.apply(
+</pre></div>
+</div>
+<img alt="../_images/7e219aea8f70a67f8d976f4415234345d9308662575a6a043024b3e8d9442e78.png" src="../_images/7e219aea8f70a67f8d976f4415234345d9308662575a6a043024b3e8d9442e78.png" />
+</div>
+</div>
+</section>
+<section id="next-steps">
+<h2>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><strong><a class="reference internal" href="visualization.html"><span class="std std-doc">Visualization Tutorial</span></a></strong>: Advanced plotting for spike data</p></li>
+<li><p><strong><a class="reference internal" href="windowed_analysis.html"><span class="std std-doc">Windowed Analysis Tutorial</span></a></strong>: Combine spike counts with other features</p></li>
+</ul>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="windowed_analysis.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Windowed Analysis Tutorial</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="visualization.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Visualization Tutorial</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#overview">Overview</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#loading-the-recording">1. Loading the Recording</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#using-your-own-data">Using your own data</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#frequency-domain-spike-detection">2. Frequency Domain Spike Detection</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#working-with-spike-analysis-results">3. Working with Spike Analysis Results</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#converting-to-mne-format">4. Converting to MNE Format</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#loading-saved-results">5. Loading Saved Results</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#peri-event-analysis-with-mne">6. Peri-Event Analysis with MNE</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#spike-triggered-averages">7. Spike-Triggered Averages</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#time-frequency-analysis">8. Time-Frequency Analysis</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#spike-lfp-phase-locking">9. Spike-LFP Phase Locking</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#integrating-with-war">10. Integrating with WAR</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#next-steps">Next Steps</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/tutorials/spike_analysis.ipynb.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025, Joseph Dong, Yongtaek Oh, Eric Marsh.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

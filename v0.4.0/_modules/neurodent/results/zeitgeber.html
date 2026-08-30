@@ -1,0 +1,1181 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>neurodent.results.zeitgeber &#8212; Neurodent 0.4.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../_static/documentation_options.js?v=6c02275b"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/neurodent/results/zeitgeber';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://josephdong1000.github.io/neurodent/_static/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.4.0';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner =
+            false;
+        </script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">NeuRodent</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../license/index.html">
+    License
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-2"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-2"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-2"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-2">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../license/index.html">
+    License
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-3"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-3"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-3"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-3">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">neurodent.results.zeitgeber</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for neurodent.results.zeitgeber</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Zeitgeber Time (ZT) Analysis Module</span>
+<span class="sd">===================================</span>
+<span class="sd">This module provides functionality for processing and analyzing data in Zeitgeber Time (ZT).</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neurodent</span><span class="w"> </span><span class="kn">import</span> <span class="n">constants</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neurodent.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">metadata</span> <span class="k">as</span> <span class="n">metadata_module</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neurodent.core.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">normalize_value_from_aliases</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">get_expanded_feature_names</span><span class="p">(</span><span class="n">base_features</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Expand base feature names into their full column names (e.g. bands, matrix features).</span>
+<span class="sd">    </span>
+<span class="sd">    Uses neurodent.constants to determine expansion rules.</span>
+<span class="sd">    </span>
+<span class="sd">    - BAND_FEATURES and BANDED_MATRIX_FEATURES get expanded to per-band columns (e.g. zcohere_delta)</span>
+<span class="sd">    - SIMPLE_MATRIX_FEATURES, LINEAR_FEATURES, and HIST_FEATURES remain as single columns (e.g. zpcorr)</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        base_features (list[str]): List of base feature names (e.g. [&#39;logpsdband&#39;, &#39;rms&#39;, &#39;zpcorr&#39;]).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list[str]: List of expanded column names.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">neurodent</span><span class="w"> </span><span class="kn">import</span> <span class="n">constants</span>
+    
+    <span class="n">expanded_features</span> <span class="o">=</span> <span class="p">[]</span>
+    
+    <span class="k">for</span> <span class="n">feature</span> <span class="ow">in</span> <span class="n">base_features</span><span class="p">:</span>
+        <span class="n">ftype</span> <span class="o">=</span> <span class="n">constants</span><span class="o">.</span><span class="n">FEATURE_TYPES</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">feature</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">ftype</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">ftype</span><span class="o">.</span><span class="n">is_dict_stored</span><span class="p">:</span>
+            <span class="c1"># Expand into per-band features (e.g. zcohere -&gt; zcohere_delta, zcohere_theta, ...)</span>
+            <span class="k">for</span> <span class="n">band</span> <span class="ow">in</span> <span class="n">constants</span><span class="o">.</span><span class="n">BAND_NAMES</span><span class="p">:</span>
+                <span class="n">expanded_features</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">feature</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">band</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># LINEAR, SIMPLE_MATRIX, HIST, and unknown features remain as single columns</span>
+            <span class="n">expanded_features</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">feature</span><span class="p">)</span>
+            
+    <span class="k">return</span> <span class="n">expanded_features</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_load_war_for_zeitgeber</span><span class="p">(</span><span class="n">war_path_info</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Load a fragment-filtered WAR and extract channel-averaged features for zeitgeber analysis.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        war_path_info (tuple): Tuple containing:</span>
+<span class="sd">            - war_parquet_path (Path): Path to the WAR parquet file.</span>
+<span class="sd">            - war_json_path (Path): Path to the WAR JSON metadata file.</span>
+<span class="sd">            - features_to_extract (list[str]): List of features to extract.</span>
+<span class="sd">            - animal_name (str): Identifier for the animal.</span>
+<span class="sd">            - pipeline_config (dict): Configuration for the zeitgeber pipeline.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: DataFrame containing channel-averaged features and animal identifier.</span>
+<span class="sd">                      The DataFrame will have columns for each extracted feature and an &#39;animal&#39; column.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">war_parquet_path</span><span class="p">,</span> <span class="n">war_json_path</span><span class="p">,</span> <span class="n">features_to_extract</span><span class="p">,</span> <span class="n">animal_name</span><span class="p">,</span> <span class="n">pipeline_config</span> <span class="o">=</span> <span class="n">war_path_info</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading </span><span class="si">{</span><span class="n">animal_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># lazy: avoids loading WAR at module import</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.window_analysis_result</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowAnalysisResult</span>
+
+        <span class="n">war</span> <span class="o">=</span> <span class="n">WindowAnalysisResult</span><span class="o">.</span><span class="n">load_parquet_and_json</span><span class="p">(</span>
+            <span class="n">folder_path</span><span class="o">=</span><span class="n">war_parquet_path</span><span class="o">.</span><span class="n">parent</span><span class="p">,</span>
+            <span class="n">parquet_name</span><span class="o">=</span><span class="n">war_parquet_path</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+            <span class="n">json_name</span><span class="o">=</span><span class="n">war_json_path</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+        <span class="p">)</span>
+        
+        <span class="c1"># Wrap with ZeitgeberAnalysisResult to apply pipeline on the fly</span>
+        <span class="n">zar</span> <span class="o">=</span> <span class="n">ZeitgeberAnalysisResult</span><span class="p">(</span><span class="n">war</span><span class="p">,</span> <span class="o">**</span><span class="n">pipeline_config</span><span class="p">)</span>
+
+        <span class="n">df</span> <span class="o">=</span> <span class="n">zar</span><span class="o">.</span><span class="n">get_channel_averaged_result</span><span class="p">(</span><span class="n">features</span><span class="o">=</span><span class="n">features_to_extract</span><span class="p">)</span>
+        <span class="n">df</span><span class="p">[</span><span class="s2">&quot;animal&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">animal_name</span>
+        <span class="k">del</span> <span class="n">war</span>
+        <span class="k">del</span> <span class="n">zar</span>
+        <span class="k">return</span> <span class="n">df</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to process </span><span class="si">{</span><span class="n">animal_name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">raise</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_compute_daynight</span><span class="p">(</span><span class="n">zt_minutes</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return ``&quot;Day&quot;``/``&quot;Night&quot;`` labels for each ZT minute.</span>
+
+<span class="sd">    Single source of truth for the day/night phase boundary, used by</span>
+<span class="sd">    :func:`shift_to_zeitgeber_reference`, :func:`transform_time_axis`, and</span>
+<span class="sd">    :func:`expand_zt_axis` so the rule never drifts across call sites.</span>
+
+<span class="sd">    ``&quot;Day&quot;`` corresponds to ZT 0:00–11:59 (light phase, ``zt_minutes %</span>
+<span class="sd">    1440 &lt; 720``); ``&quot;Night&quot;`` to ZT 12:00–23:59 (dark phase).  The</span>
+<span class="sd">    ``% 1440`` lets this work over multi-day expansions (e.g. ZT 1500 -&gt;</span>
+<span class="sd">    &quot;Day&quot; because 1500 % 1440 = 60).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">zt_minutes</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">arr</span> <span class="o">%</span> <span class="mi">1440</span> <span class="o">&lt;</span> <span class="mi">720</span><span class="p">,</span> <span class="s2">&quot;Day&quot;</span><span class="p">,</span> <span class="s2">&quot;Night&quot;</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">add_zeitgeber_time_columns</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">interval_minutes</span><span class="o">=</span><span class="mi">60</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert timestamps to zeitgeber time representation with specified binning interval.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        df (pd.DataFrame): DataFrame containing a &#39;timestamp&#39; column.</span>
+<span class="sd">            Required columns:</span>
+<span class="sd">            * &#39;timestamp&#39;: datetime64[ns] series representing the absolute time.</span>
+<span class="sd">        interval_minutes (int, optional): Binning interval in minutes. Defaults to 60.</span>
+<span class="sd">            Must evenly divide 1440 (24 hours).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: DataFrame with added time columns:</span>
+<span class="sd">            * &#39;hour&#39; (int): Hour of the day (0-23).</span>
+<span class="sd">            * &#39;minute&#39; (int): Minute of the hour (0-59).</span>
+<span class="sd">            * &#39;zt_minutes&#39; (float): Minutes-of-day, binned to the nearest</span>
+<span class="sd">              ``interval_minutes``.  **Initially populated from raw clock</span>
+<span class="sd">              time** (= hour * 60 + minute); call</span>
+<span class="sd">              :func:`shift_to_zeitgeber_reference` afterwards to convert</span>
+<span class="sd">              this column to true zeitgeber-time minutes from lights-on.</span>
+<span class="sd">              The ``daynight`` companion column is added at that point.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If interval_minutes does not evenly divide 24 hours (1440 minutes).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">df</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">df</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">df</span>
+
+    <span class="k">if</span> <span class="mi">1440</span> <span class="o">%</span> <span class="n">interval_minutes</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;interval_minutes (</span><span class="si">{</span><span class="n">interval_minutes</span><span class="si">}</span><span class="s2">) must evenly divide 24 hours (1440 minutes).&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Adding binned zeitgeber time columns with </span><span class="si">{</span><span class="n">interval_minutes</span><span class="si">}</span><span class="s2">min bins&quot;</span><span class="p">)</span>
+
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;hour&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">hour</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;minute&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">minute</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="n">raw_minutes</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;hour&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="mi">60</span> <span class="o">+</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;minute&quot;</span><span class="p">]</span>
+    <span class="n">binned_minutes</span> <span class="o">=</span> <span class="n">interval_minutes</span> <span class="o">*</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">raw_minutes</span> <span class="o">/</span> <span class="n">interval_minutes</span><span class="p">))</span>
+
+    <span class="c1"># Modulo 1440 to handle wraparound (e.g., 23:59 rounding up to 24:00 -&gt; 0:00)</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;zt_minutes&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">binned_minutes</span> <span class="o">%</span> <span class="mi">1440</span>
+
+    <span class="k">return</span> <span class="n">df</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">subtract_zeitgeber_baseline</span><span class="p">(</span>
+    <span class="n">df</span><span class="p">,</span> <span class="n">baseline_hours</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">baseline_window</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">exclude_from_baseline</span><span class="o">=</span><span class="kc">None</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Subtract baseline from numeric features in the dataframe.</span>
+
+<span class="sd">    Baseline is calculated as the mean value within a specified window of time (ZT).</span>
+<span class="sd">    Requires &#39;zt_minutes&#39; column to be present (usually added by add_zeitgeber_time_columns).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        df (pd.DataFrame): DataFrame containing features and &#39;zt_minutes&#39;.</span>
+<span class="sd">        baseline_hours (int, optional): Number of hours from start of ZT0 to use as baseline.</span>
+<span class="sd">            Defaults to 12. Ignored if baseline_window is set.</span>
+<span class="sd">        baseline_window (tuple | str, optional): Explicit window for baseline.</span>
+<span class="sd">            Overrides baseline_hours. Defaults to None. Options:</span>
+<span class="sd">            * tuple: (start_hour, end_hour)</span>
+<span class="sd">            * &quot;day&quot;: (0, 12)</span>
+<span class="sd">            * &quot;night&quot;: (12, 24)</span>
+<span class="sd">        exclude_from_baseline (list[str], optional): Columns to exclude. Defaults to None.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: DataFrame with new columns per feature: &#39;{feature}_nobase&#39;</span>
+<span class="sd">            representing the baseline-corrected values.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">df</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">df</span>
+
+    <span class="k">if</span> <span class="n">exclude_from_baseline</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">exclude_from_baseline</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">if</span> <span class="n">baseline_window</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">baseline_window</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">baseline_window</span> <span class="o">==</span> <span class="s2">&quot;day&quot;</span><span class="p">:</span>
+                <span class="n">start_min</span><span class="p">,</span> <span class="n">end_min</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">12</span> <span class="o">*</span> <span class="mi">60</span>
+            <span class="k">elif</span> <span class="n">baseline_window</span> <span class="o">==</span> <span class="s2">&quot;night&quot;</span><span class="p">:</span>
+                <span class="n">start_min</span><span class="p">,</span> <span class="n">end_min</span> <span class="o">=</span> <span class="mi">12</span> <span class="o">*</span> <span class="mi">60</span><span class="p">,</span> <span class="mi">24</span> <span class="o">*</span> <span class="mi">60</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown baseline_window alias: </span><span class="si">{</span><span class="n">baseline_window</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">baseline_window</span><span class="p">,</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="nb">list</span><span class="p">))</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">baseline_window</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">start_min</span><span class="p">,</span> <span class="n">end_min</span> <span class="o">=</span> <span class="n">baseline_window</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="mi">60</span><span class="p">,</span> <span class="n">baseline_window</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="mi">60</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;baseline_window must be &#39;day&#39;, &#39;night&#39;, or a (start, end) tuple.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Using explicit baseline window: </span><span class="si">{</span><span class="n">baseline_window</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">start_min</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">end_min</span><span class="si">}</span><span class="s2"> min)&quot;</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">start_min</span><span class="p">,</span> <span class="n">end_min</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">baseline_hours</span> <span class="o">*</span> <span class="mi">60</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Using default baseline: first </span><span class="si">{</span><span class="n">baseline_hours</span><span class="si">}</span><span class="s2"> hours (</span><span class="si">{</span><span class="n">start_min</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">end_min</span><span class="si">}</span><span class="s2"> min)&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="s2">&quot;zt_minutes&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Skipping baseline subtraction: &#39;zt_minutes&#39; not found.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">df</span>
+
+    <span class="n">numeric_cols</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">select_dtypes</span><span class="p">(</span><span class="n">include</span><span class="o">=</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">number</span><span class="p">])</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+    <span class="n">skip_cols</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="s2">&quot;hour&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;minute&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;zt_minutes&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;animal_idx&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;day_idx&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;epoch_idx&quot;</span><span class="p">,</span>
+    <span class="p">]</span> <span class="o">+</span> <span class="n">exclude_from_baseline</span>
+
+    <span class="n">features_to_correct</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">numeric_cols</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">skip_cols</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">c</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;_nobase&quot;</span><span class="p">)</span>
+    <span class="p">]</span>
+
+    <span class="n">group_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;animal&quot;</span><span class="p">,</span> <span class="s2">&quot;sex&quot;</span><span class="p">,</span> <span class="s2">&quot;genotype&quot;</span><span class="p">]</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">]</span>
+
+    <span class="n">result_df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="k">for</span> <span class="n">feature</span> <span class="ow">in</span> <span class="n">features_to_correct</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">group_cols</span><span class="p">:</span>
+
+            <span class="k">def</span><span class="w"> </span><span class="nf">get_group_mean</span><span class="p">(</span><span class="n">g</span><span class="p">):</span>
+                <span class="n">vals</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
+                    <span class="n">g</span><span class="p">[</span><span class="s2">&quot;zt_minutes&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">between</span><span class="p">(</span><span class="n">start_min</span><span class="p">,</span> <span class="n">end_min</span><span class="p">,</span> <span class="n">inclusive</span><span class="o">=</span><span class="s2">&quot;left&quot;</span><span class="p">),</span>
+                    <span class="n">feature</span><span class="p">,</span>
+                <span class="p">]</span>
+                <span class="k">return</span> <span class="n">vals</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">vals</span><span class="o">.</span><span class="n">empty</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+
+            <span class="n">group_means</span> <span class="o">=</span> <span class="n">result_df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">group_cols</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span>
+                <span class="n">get_group_mean</span><span class="p">,</span> <span class="n">include_groups</span><span class="o">=</span><span class="kc">False</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Note: set_index matches rows to the group index</span>
+            <span class="n">aligned_means</span> <span class="o">=</span> <span class="n">result_df</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="n">group_cols</span><span class="p">)</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">group_means</span><span class="p">)</span>
+
+            <span class="n">result_df</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">feature</span><span class="si">}</span><span class="s2">_nobase&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">result_df</span><span class="p">[</span><span class="n">feature</span><span class="p">]</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+                <span class="n">aligned_means</span>
+            <span class="p">)</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">baseline_data</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
+                <span class="n">df</span><span class="p">[</span><span class="s2">&quot;zt_minutes&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">between</span><span class="p">(</span><span class="n">start_min</span><span class="p">,</span> <span class="n">end_min</span><span class="p">,</span> <span class="n">inclusive</span><span class="o">=</span><span class="s2">&quot;left&quot;</span><span class="p">),</span>
+                <span class="n">feature</span><span class="p">,</span>
+            <span class="p">]</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">baseline_data</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+                <span class="n">mean_val</span> <span class="o">=</span> <span class="n">baseline_data</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+                <span class="n">result_df</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">feature</span><span class="si">}</span><span class="s2">_nobase&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">result_df</span><span class="p">[</span><span class="n">feature</span><span class="p">]</span> <span class="o">-</span> <span class="n">mean_val</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;No data found in baseline window for feature </span><span class="si">{</span><span class="n">feature</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+                <span class="n">result_df</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">feature</span><span class="si">}</span><span class="s2">_nobase&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+
+    <span class="k">return</span> <span class="n">result_df</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">transform_time_axis</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">time_range</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">24</span><span class="p">),</span> <span class="n">shift</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Transform time axis for plotting: enrichment, optional time shift, and sorting.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        df (pd.DataFrame): Input dataframe.</span>
+<span class="sd">            Expected format:</span>
+<span class="sd">            * &#39;genotype&#39; (str, optional): Genotype label (e.g., &#39;WT&#39;, &#39;KO&#39;).</span>
+<span class="sd">            * &#39;sex&#39; (str, optional): &#39;Male&#39;/&#39;Female&#39;. Both &#39;genotype&#39; and &#39;sex&#39;</span>
+<span class="sd">              are expected to already be present (added by enrich_metadata).</span>
+<span class="sd">            * &#39;zt_minutes&#39; (numeric): Zeitgeber-time minutes (0-1440).</span>
+<span class="sd">        time_range (tuple, optional): No-op since the data layer no longer</span>
+<span class="sd">            duplicates rows for multi-day plotting.  Kept for backward</span>
+<span class="sd">            compatibility with callers that still pass it.  Multi-day</span>
+<span class="sd">            expansion is now the plotter&#39;s job — use</span>
+<span class="sd">            :func:`expand_zt_axis` to get a 48h/72h/... view at render</span>
+<span class="sd">            time.  Defaults to (0, 24).</span>
+<span class="sd">        shift (float, optional): Hours to shift the time axis. Defaults to 0.</span>
+<span class="sd">            - **Negative shift** moves times earlier: a data point at 6:00 with shift=-6</span>
+<span class="sd">              becomes 0:00. Use this when your data starts at clock time 6:00 but you</span>
+<span class="sd">              want it to appear at hour 0 on the plot.</span>
+<span class="sd">            - **Positive shift** moves times later: a data point at 0:00 with shift=6</span>
+<span class="sd">              becomes 6:00.</span>
+<span class="sd">            - Common use: shift=-6 aligns &quot;lights on at 6am&quot; to hour 0 (Zeitgeber Time).</span>
+<span class="sd">            When non-zero, also recomputes ``daynight`` so the labels stay</span>
+<span class="sd">            consistent with the shifted ``zt_minutes``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: Processed dataframe ready for plotting.</span>
+<span class="sd">            Adds temporary sorting columns (genotype_order/sex_order) if applicable.</span>
+<span class="sd">            Row count is unchanged — call :func:`expand_zt_axis` to</span>
+<span class="sd">            duplicate rows across multiple ZT cycles.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If time_range[0] &gt;= time_range[1].</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">time_range</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">time_range</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;time_range start (</span><span class="si">{</span><span class="n">time_range</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">) must be less than end (</span><span class="si">{</span><span class="n">time_range</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="c1"># Apply time shift.  When non-zero, recompute daynight so labels stay</span>
+    <span class="c1"># consistent with the new zt_minutes.</span>
+    <span class="k">if</span> <span class="n">shift</span> <span class="o">!=</span> <span class="mi">0</span> <span class="ow">and</span> <span class="s2">&quot;zt_minutes&quot;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">df</span><span class="p">[</span><span class="s2">&quot;zt_minutes&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;zt_minutes&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="n">shift</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span> <span class="o">%</span> <span class="mi">1440</span>
+        <span class="k">if</span> <span class="s2">&quot;daynight&quot;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">df</span><span class="p">[</span><span class="s2">&quot;daynight&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_compute_daynight</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;zt_minutes&quot;</span><span class="p">])</span>
+
+    <span class="n">sort_cols</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="s2">&quot;genotype&quot;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">genotype_order</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;WT&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;Het&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;KO&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;Mut&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">}</span>
+        <span class="n">df</span><span class="p">[</span><span class="s2">&quot;genotype_order&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;genotype&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">genotype_order</span><span class="p">)</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">99</span><span class="p">)</span>
+        <span class="n">sort_cols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;genotype_order&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="s2">&quot;sex&quot;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">sex_order</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Male&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;Female&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}</span>
+        <span class="n">df</span><span class="p">[</span><span class="s2">&quot;sex_order&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;sex&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">sex_order</span><span class="p">)</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">99</span><span class="p">)</span>
+        <span class="c1"># Sort by sex first</span>
+        <span class="n">sort_cols</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;sex_order&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">sort_cols</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">sort_cols</span><span class="p">)</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">sort_cols</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">df</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">enrich_genotype_metadata</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">genotype_pattern</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sex_mapper</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">genotype_aliases</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">animal_metadata</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    DEPRECATED: Use neurodent.core.metadata.enrich_metadata instead.</span>
+<span class="sd">    </span>
+<span class="sd">    This function is kept for backward compatibility but will be removed in a future version.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+        <span class="s2">&quot;enrich_genotype_metadata is deprecated. Use neurodent.core.metadata.enrich_metadata instead.&quot;</span><span class="p">,</span>
+        <span class="ne">DeprecationWarning</span><span class="p">,</span>
+        <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span>
+    <span class="p">)</span>
+    
+    <span class="c1"># If new-style animal_metadata is provided, use the new module</span>
+    <span class="k">if</span> <span class="n">animal_metadata</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">metadata_module</span><span class="o">.</span><span class="n">enrich_metadata</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">animal_metadata</span><span class="p">)</span>
+    
+    <span class="c1"># Legacy fallback: use old logic with genotype_aliases</span>
+    <span class="c1"># This is a simplified pass-through for backward compat</span>
+    <span class="k">if</span> <span class="n">genotype_aliases</span> <span class="ow">and</span> <span class="s2">&quot;animal&quot;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="c1"># Build reverse map</span>
+        <span class="n">animal_to_genotype</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">genotype_group</span><span class="p">,</span> <span class="n">animals</span> <span class="ow">in</span> <span class="n">genotype_aliases</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">for</span> <span class="n">animal</span> <span class="ow">in</span> <span class="n">animals</span><span class="p">:</span>
+                <span class="n">animal_to_genotype</span><span class="p">[</span><span class="n">animal</span><span class="p">]</span> <span class="o">=</span> <span class="n">genotype_group</span>
+        
+        <span class="c1"># Convert to new format</span>
+        <span class="n">animal_metadata_converted</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">animal_id</span><span class="p">,</span> <span class="n">genotype_key</span> <span class="ow">in</span> <span class="n">animal_to_genotype</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="c1"># Parse genotype key to extract sex and genotype</span>
+            <span class="k">if</span> <span class="s2">&quot;_&quot;</span> <span class="ow">in</span> <span class="n">genotype_key</span><span class="p">:</span>
+                <span class="n">parts</span> <span class="o">=</span> <span class="n">genotype_key</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+                <span class="n">sex_char</span><span class="p">,</span> <span class="n">genotype</span> <span class="o">=</span> <span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">parts</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">genotype_key</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">genotype_key</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;M&quot;</span><span class="p">,</span> <span class="s2">&quot;F&quot;</span><span class="p">):</span>
+                <span class="n">sex_char</span><span class="p">,</span> <span class="n">genotype</span> <span class="o">=</span> <span class="n">genotype_key</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">genotype_key</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">sex_char</span><span class="p">,</span> <span class="n">genotype</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">genotype_key</span>
+
+            <span class="n">sex</span> <span class="o">=</span> <span class="n">normalize_value_from_aliases</span><span class="p">(</span><span class="n">sex_char</span><span class="p">,</span> <span class="n">constants</span><span class="o">.</span><span class="n">SEX_MAP</span><span class="p">)</span> <span class="k">if</span> <span class="n">sex_char</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="n">animal_metadata_converted</span><span class="p">[</span><span class="n">animal_id</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;sex&quot;</span><span class="p">:</span> <span class="n">sex</span><span class="p">,</span> <span class="s2">&quot;genotype&quot;</span><span class="p">:</span> <span class="n">genotype</span><span class="p">}</span>
+        
+        <span class="k">return</span> <span class="n">metadata_module</span><span class="o">.</span><span class="n">enrich_metadata</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">animal_metadata_converted</span><span class="p">)</span>
+    
+    <span class="c1"># No metadata provided, return as-is</span>
+    <span class="k">return</span> <span class="n">df</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">shift_to_zeitgeber_reference</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">shift_hours</span><span class="o">=</span><span class="mi">6</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Shift ``zt_minutes`` to start at ZT0 and add the ``daynight`` label.</span>
+
+<span class="sd">    Typically, the experimental clock starts at a certain time (e.g. 6:00 AM).</span>
+<span class="sd">    ZT0 corresponds to &quot;Lights On&quot; which is often 6:00 AM.</span>
+<span class="sd">    So Clock 6:00 -&gt; ZT 0.</span>
+
+<span class="sd">    Formula: ``(zt_minutes - shift_hours * 60) % 1440``</span>
+
+<span class="sd">    After the shift the values represent true zeitgeber-time minutes from</span>
+<span class="sd">    lights-on, so this is also where the ``daynight`` companion column is</span>
+<span class="sd">    populated (``&quot;Day&quot;`` for ZT 0:00–11:59, ``&quot;Night&quot;`` for ZT 12:00–23:59).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        df (pd.DataFrame): DataFrame with ``zt_minutes``.</span>
+<span class="sd">        shift_hours (int, float): Diff between Clock 0:00 and ZT0 in hours.</span>
+<span class="sd">                                  Defaults to 6 (so 06:00 -&gt; ZT0).</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: DataFrame with shifted ``zt_minutes`` and a fresh</span>
+<span class="sd">        ``daynight`` column.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="s2">&quot;zt_minutes&quot;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">df</span><span class="p">[</span><span class="s2">&quot;zt_minutes&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;zt_minutes&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="nb">int</span><span class="p">(</span><span class="n">shift_hours</span> <span class="o">*</span> <span class="mi">60</span><span class="p">))</span> <span class="o">%</span> <span class="mi">1440</span>
+        <span class="n">df</span><span class="p">[</span><span class="s2">&quot;daynight&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_compute_daynight</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;zt_minutes&quot;</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">df</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">expand_zt_axis</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">n_days</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Duplicate *df* across *n_days* ZT cycles for multi-day plotting.</span>
+
+<span class="sd">    Each copy&#39;s ``zt_minutes`` is offset by ``1440 * i``; the ``daynight``</span>
+<span class="sd">    column is recomputed so day/night labels stay correct in the expanded</span>
+<span class="sd">    range.  Used by ``ZeitgeberPlotter`` (and any other plotter that</span>
+<span class="sd">    wants a multi-day view) — the persisted zeitgeber CSV stays a clean</span>
+<span class="sd">    24 h on disk; this helper materialises the wider view only at render</span>
+<span class="sd">    time.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        df (pd.DataFrame): DataFrame with ``zt_minutes``.  Should already</span>
+<span class="sd">            be ZT-aligned (i.e. produced after</span>
+<span class="sd">            :func:`shift_to_zeitgeber_reference`).</span>
+<span class="sd">        n_days (int): Number of ZT cycles to span.  Defaults to ``2``</span>
+<span class="sd">            (today&#39;s 48h plot behaviour).  Must be ``&gt;= 1``; ``n_days=1``</span>
+<span class="sd">            is a no-op pass-through.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: New dataframe with ``len(df) * n_days`` rows.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``n_days &lt; 1``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">n_days</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;n_days must be &gt;= 1, got </span><span class="si">{</span><span class="n">n_days</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">&quot;zt_minutes&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">n_days</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">copies</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_days</span><span class="p">):</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">c</span><span class="p">[</span><span class="s2">&quot;zt_minutes&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">c</span><span class="p">[</span><span class="s2">&quot;zt_minutes&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1440</span> <span class="o">*</span> <span class="n">i</span>
+        <span class="n">copies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">copies</span><span class="p">,</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">out</span><span class="p">[</span><span class="s2">&quot;daynight&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_compute_daynight</span><span class="p">(</span><span class="n">out</span><span class="p">[</span><span class="s2">&quot;zt_minutes&quot;</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">out</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">run_zeitgeber_pipeline</span><span class="p">(</span>
+    <span class="n">df</span><span class="p">,</span>
+    <span class="n">baseline_hours</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+    <span class="n">baseline_window</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">exclude_from_baseline</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">interval_minutes</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>
+    <span class="n">zeitgeber_shift_hours</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span>
+    <span class="n">shift_for_48h</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">animal_metadata</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="c1"># Deprecated params (kept for backward compat)</span>
+    <span class="n">genotype_pattern</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">sex_mapper</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">genotype_aliases</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Main orchestration function for processing zeitgeber data.</span>
+
+<span class="sd">    The pipeline performs the following steps:</span>
+<span class="sd">    1. Enrich metadata (sex, genotype) from ANIMAL_METADATA.</span>
+<span class="sd">    2. Shift to Zeitgeber Time (ZT) reference (also adds ``daynight``).</span>
+<span class="sd">    3. Subtract baseline.</span>
+<span class="sd">    4. Sort + sex/genotype enrichment for plot readiness.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        df (pd.DataFrame): Input dataframe with &#39;zt_minutes&#39;, &#39;animal&#39;.</span>
+<span class="sd">        baseline_hours (int): Baseline duration from ZT0. Default 12.</span>
+<span class="sd">        baseline_window (tuple | str): Explicit baseline window. Override.</span>
+<span class="sd">        exclude_from_baseline (list): Columns to skip.</span>
+<span class="sd">        interval_minutes (int): Binning interval.</span>
+<span class="sd">        zeitgeber_shift_hours (int): Shift applied to align Clock Time to ZT. Default 6.</span>
+<span class="sd">        shift_for_48h (bool, optional): **DEPRECATED no-op.**  Multi-day</span>
+<span class="sd">            expansion has moved out of the data layer to</span>
+<span class="sd">            :func:`expand_zt_axis`, called by plotters at render time.</span>
+<span class="sd">            Kept in the signature for backward compatibility; ignored.</span>
+<span class="sd">        animal_metadata (dict, optional): Dict of animal_id -&gt; {sex, genotype} from load_animal_metadata().</span>
+<span class="sd">        genotype_pattern (str, optional): DEPRECATED.</span>
+<span class="sd">        sex_mapper (dict, optional): DEPRECATED.</span>
+<span class="sd">        genotype_aliases (dict, optional): DEPRECATED. Use animal_metadata instead.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: Fully processed 24h dataframe.  Row count equals</span>
+<span class="sd">            input row count — plotters that want a multi-day view call</span>
+<span class="sd">            :func:`expand_zt_axis` on the result.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Running zeitgeber analysis pipeline...&quot;</span><span class="p">)</span>
+
+    <span class="n">df_processed</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="c1"># 1. Enrich Metadata</span>
+    <span class="k">if</span> <span class="n">animal_metadata</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">df_processed</span> <span class="o">=</span> <span class="n">metadata_module</span><span class="o">.</span><span class="n">enrich_metadata</span><span class="p">(</span><span class="n">df_processed</span><span class="p">,</span> <span class="n">animal_metadata</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">genotype_aliases</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Legacy path</span>
+        <span class="n">df_processed</span> <span class="o">=</span> <span class="n">enrich_genotype_metadata</span><span class="p">(</span>
+            <span class="n">df_processed</span><span class="p">,</span>
+            <span class="n">genotype_pattern</span><span class="o">=</span><span class="n">genotype_pattern</span><span class="p">,</span>
+            <span class="n">sex_mapper</span><span class="o">=</span><span class="n">sex_mapper</span><span class="p">,</span>
+            <span class="n">genotype_aliases</span><span class="o">=</span><span class="n">genotype_aliases</span>
+        <span class="p">)</span>
+
+    <span class="c1"># 2. Shift to ZT (also adds the daynight column).</span>
+    <span class="n">df_processed</span> <span class="o">=</span> <span class="n">shift_to_zeitgeber_reference</span><span class="p">(</span>
+        <span class="n">df_processed</span><span class="p">,</span> <span class="n">shift_hours</span><span class="o">=</span><span class="n">zeitgeber_shift_hours</span>
+    <span class="p">)</span>
+
+    <span class="c1"># 3. Baseline Subtraction</span>
+    <span class="n">df_processed</span> <span class="o">=</span> <span class="n">subtract_zeitgeber_baseline</span><span class="p">(</span>
+        <span class="n">df_processed</span><span class="p">,</span>
+        <span class="n">baseline_hours</span><span class="o">=</span><span class="n">baseline_hours</span><span class="p">,</span>
+        <span class="n">baseline_window</span><span class="o">=</span><span class="n">baseline_window</span><span class="p">,</span>
+        <span class="n">exclude_from_baseline</span><span class="o">=</span><span class="n">exclude_from_baseline</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># 4. Sort + sex/genotype enrichment.  No multi-day expansion here — the</span>
+    <span class="c1"># data layer stays 24h; plotters use expand_zt_axis() at render time.</span>
+    <span class="n">df_final</span> <span class="o">=</span> <span class="n">transform_time_axis</span><span class="p">(</span><span class="n">df_processed</span><span class="p">,</span> <span class="n">shift</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="s2">&quot;animal&quot;</span> <span class="ow">in</span> <span class="n">df_final</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processed data for </span><span class="si">{</span><span class="n">df_final</span><span class="p">[</span><span class="s1">&#39;animal&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span><span class="si">}</span><span class="s2"> unique animals&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">df_final</span>
+
+
+<div class="viewcode-block" id="ZeitgeberAnalysisResult">
+<a class="viewcode-back" href="../../../api/core/zeitgeber.html#neurodent.results.ZeitgeberAnalysisResult">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ZeitgeberAnalysisResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Proxy wrapper for WindowAnalysisResult that applies Zeitgeber processing on the fly.</span>
+
+<span class="sd">    Duck-types WindowAnalysisResult to be compatible with ExperimentPlotter and AnimalPlotter,</span>
+<span class="sd">    intercepting data retrieval methods to inject the ZT pipeline.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        war (WindowAnalysisResult): The implementation-specific analysis result object.</span>
+<span class="sd">        **pipeline_config: Keywords arguments passed to `run_zeitgeber_pipeline`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="ZeitgeberAnalysisResult.__init__">
+<a class="viewcode-back" href="../../../api/core/zeitgeber.html#neurodent.results.ZeitgeberAnalysisResult.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">war</span><span class="p">,</span> <span class="o">**</span><span class="n">pipeline_config</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">war</span> <span class="o">=</span> <span class="n">war</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">config</span> <span class="o">=</span> <span class="n">pipeline_config</span></div>
+
+
+<div class="viewcode-block" id="ZeitgeberAnalysisResult.__getattr__">
+<a class="viewcode-back" href="../../../api/core/zeitgeber.html#neurodent.results.ZeitgeberAnalysisResult.__getattr__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Delegate attribute access to the underlying WAR object.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">war</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_pipeline</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Helper to apply ZT pipeline to a dataframe.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">df</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">df</span>
+
+        <span class="c1"># Ensure zt_minutes exists (requires &#39;timestamp&#39;)</span>
+        <span class="k">if</span> <span class="s2">&quot;zt_minutes&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="c1"># Try to add it if timestamp exists</span>
+            <span class="k">if</span> <span class="s2">&quot;timestamp&quot;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="c1"># Use interval from config if present, else default</span>
+                <span class="n">interval</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;interval_minutes&quot;</span><span class="p">,</span> <span class="mi">60</span><span class="p">)</span>
+                <span class="n">df</span> <span class="o">=</span> <span class="n">add_zeitgeber_time_columns</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">interval_minutes</span><span class="o">=</span><span class="n">interval</span><span class="p">)</span>
+
+        <span class="c1"># Filter config to only include valid kwargs for run_zeitgeber_pipeline</span>
+        <span class="n">sig</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">signature</span><span class="p">(</span><span class="n">run_zeitgeber_pipeline</span><span class="p">)</span>
+        <span class="n">valid_kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">sig</span><span class="o">.</span><span class="n">parameters</span> <span class="k">if</span> <span class="n">p</span> <span class="o">!=</span> <span class="s1">&#39;df&#39;</span><span class="p">}</span>
+        <span class="n">filtered_config</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">valid_kwargs</span><span class="p">}</span>
+
+        <span class="k">return</span> <span class="n">run_zeitgeber_pipeline</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="o">**</span><span class="n">filtered_config</span><span class="p">)</span>
+
+<div class="viewcode-block" id="ZeitgeberAnalysisResult.get_result">
+<a class="viewcode-back" href="../../../api/core/zeitgeber.html#neurodent.results.ZeitgeberAnalysisResult.get_result">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_result</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Intercepts get_result and applies ZT pipeline.&quot;&quot;&quot;</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">war</span><span class="o">.</span><span class="n">get_result</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_pipeline</span><span class="p">(</span><span class="n">df</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ZeitgeberAnalysisResult.get_grouprows_result">
+<a class="viewcode-back" href="../../../api/core/zeitgeber.html#neurodent.results.ZeitgeberAnalysisResult.get_grouprows_result">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_grouprows_result</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Intercepts get_grouprows_result and applies ZT pipeline.&quot;&quot;&quot;</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">war</span><span class="o">.</span><span class="n">get_grouprows_result</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_pipeline</span><span class="p">(</span><span class="n">df</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ZeitgeberAnalysisResult.get_groupavg_result">
+<a class="viewcode-back" href="../../../api/core/zeitgeber.html#neurodent.results.ZeitgeberAnalysisResult.get_groupavg_result">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_groupavg_result</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Intercepts get_groupavg_result and applies ZT pipeline.&quot;&quot;&quot;</span>
+        <span class="c1"># Note: If aggregation removes time information (timestamp/zt_minutes),</span>
+        <span class="c1"># the ZT pipeline will gracefully skip time-dependent steps like shifting</span>
+        <span class="c1"># and baseline subtraction.</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">war</span><span class="o">.</span><span class="n">get_groupavg_result</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_pipeline</span><span class="p">(</span><span class="n">df</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ZeitgeberAnalysisResult.get_channel_averaged_result">
+<a class="viewcode-back" href="../../../api/core/zeitgeber.html#neurodent.results.ZeitgeberAnalysisResult.get_channel_averaged_result">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_channel_averaged_result</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Intercepts get_channel_averaged_result and applies ZT pipeline.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">war</span><span class="p">,</span> <span class="s2">&quot;get_channel_averaged_result&quot;</span><span class="p">):</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">war</span><span class="o">.</span><span class="n">get_channel_averaged_result</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_pipeline</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+                <span class="s2">&quot;Underlying WAR does not support get_channel_averaged_result&quot;</span>
+            <span class="p">)</span></div>
+</div>
+
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025, Joseph Dong, Yongtaek Oh, Eric Marsh.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

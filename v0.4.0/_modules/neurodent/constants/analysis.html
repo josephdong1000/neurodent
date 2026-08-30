@@ -1,0 +1,842 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>neurodent.constants.analysis &#8212; Neurodent 0.4.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../_static/documentation_options.js?v=6c02275b"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/neurodent/constants/analysis';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://josephdong1000.github.io/neurodent/_static/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.4.0';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner =
+            false;
+        </script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">NeuRodent</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../license/index.html">
+    License
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-2"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-2"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-2"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-2">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../license/index.html">
+    License
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-3"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-3"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-3"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-3">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">neurodent.constants.analysis</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for neurodent.constants.analysis</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+
+
+<div class="viewcode-block" id="FeatureType">
+<a class="viewcode-back" href="../../../api/constants/analysis.html#neurodent.constants.analysis.FeatureType">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FeatureType</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Enumeration of feature data shapes.</span>
+
+<span class="sd">    Each feature in the system has exactly one :class:`FeatureType` that describes</span>
+<span class="sd">    how its data is stored and how common operations (averaging, filtering,</span>
+<span class="sd">    channel remapping, plotting) should handle it.</span>
+
+<span class="sd">    Using :func:`classify_feature` with this enum eliminates the need for</span>
+<span class="sd">    scattered ``match`` / ``if`` blocks that hard-code feature name strings.</span>
+
+<span class="sd">    Canonical extracted shapes (after stacking W windows via ``extract_*``):</span>
+
+<span class="sd">    .. code-block:: text</span>
+
+<span class="sd">        Type              Extracted shape       Axis semantics</span>
+<span class="sd">        ──────────────    ────────────────      ──────────────────────────</span>
+<span class="sd">        LINEAR            (W, C)                windows, channels</span>
+<span class="sd">        LINEAR_2D         (W, C, K)             windows, channels, components</span>
+<span class="sd">        BAND              (W, C, B)             windows, channels, bands</span>
+<span class="sd">        SIMPLE_MATRIX     (W, C, C)             windows, ch_row, ch_col</span>
+<span class="sd">        BANDED_MATRIX     (W, C, C, B)          windows, ch_row, ch_col, bands</span>
+<span class="sd">        HIST              (W, C, F)             windows, channels, freq_bins</span>
+
+<span class="sd">    **Convention**: ``W`` is always axis 0.  Channel axes (``C``) always come</span>
+<span class="sd">    next (axis 1, and axis 2 for matrix types).  Feature-specific semantic</span>
+<span class="sd">    dimensions (bands ``B``, components ``K``, frequency bins ``F``) are last.</span>
+
+<span class="sd">    This means:</span>
+
+<span class="sd">    - **Channel collapse** is always ``axis=1`` (or ``axis=(1, 2)`` for matrices).</span>
+<span class="sd">    - ``vals[:, ch_idx]`` gives one channel&#39;s data for every feature type.</span>
+<span class="sd">    - Matches per-cell storage order: LINEAR stores ``(C,)``, matrices store</span>
+<span class="sd">      ``(C, C)``, so stacking windows on axis 0 produces the canonical shape.</span>
+
+<span class="sd">    Example::</span>
+
+<span class="sd">        from neurodent.constants import FeatureType, classify_feature</span>
+
+<span class="sd">        ftype = classify_feature(&quot;rms&quot;)</span>
+<span class="sd">        assert ftype is FeatureType.LINEAR</span>
+<span class="sd">        assert ftype.extracted_shape == &quot;W, C&quot;</span>
+<span class="sd">        assert ftype.channel_axes == (1,)</span>
+<span class="sd">        assert not ftype.is_dict_stored</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">LINEAR</span> <span class="o">=</span> <span class="s2">&quot;linear&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Scalar per channel.  Stored as a list of floats (one per channel).&quot;&quot;&quot;</span>
+
+    <span class="n">LINEAR_2D</span> <span class="o">=</span> <span class="s2">&quot;linear_2d&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Multi-component per channel.  Stored as a 2-D array ``(n_channels, n_components)``.&quot;&quot;&quot;</span>
+
+    <span class="n">BAND</span> <span class="o">=</span> <span class="s2">&quot;band&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Dict keyed by frequency-band name, values are per-channel arrays.&quot;&quot;&quot;</span>
+
+    <span class="n">BANDED_MATRIX</span> <span class="o">=</span> <span class="s2">&quot;banded_matrix&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Dict keyed by frequency-band name, values are 2-D (channel × channel) matrices.&quot;&quot;&quot;</span>
+
+    <span class="n">SIMPLE_MATRIX</span> <span class="o">=</span> <span class="s2">&quot;simple_matrix&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;2-D (channel × channel) matrix without a frequency-band dimension.&quot;&quot;&quot;</span>
+
+    <span class="n">HIST</span> <span class="o">=</span> <span class="s2">&quot;hist&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Histogram / spectral data stored as a ``(frequencies, values)`` tuple.&quot;&quot;&quot;</span>
+
+    <span class="c1"># -- shape metadata properties -----------------------------------------------</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extracted_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Symbolic shape string after extraction (e.g. ``&#39;W, C, B&#39;``).&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">FEATURE_SHAPES</span><span class="p">[</span><span class="bp">self</span><span class="p">][</span><span class="s2">&quot;extracted_shape&quot;</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">channel_axes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Axis indices corresponding to channel dimensions.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">FEATURE_SHAPES</span><span class="p">[</span><span class="bp">self</span><span class="p">][</span><span class="s2">&quot;channel_axes&quot;</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">semantic_axes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Mapping of semantic dimension name to axis index.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">FEATURE_SHAPES</span><span class="p">[</span><span class="bp">self</span><span class="p">][</span><span class="s2">&quot;semantic_axes&quot;</span><span class="p">]</span>
+
+    <span class="c1"># -- convenience predicates --------------------------------------------------</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_linear</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;``True`` for per-channel features (scalar or multi-component).&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span> <span class="ow">in</span> <span class="p">(</span><span class="n">FeatureType</span><span class="o">.</span><span class="n">LINEAR</span><span class="p">,</span> <span class="n">FeatureType</span><span class="o">.</span><span class="n">LINEAR_2D</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_matrix</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;``True`` for features stored as channel × channel matrices.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span> <span class="ow">in</span> <span class="p">(</span><span class="n">FeatureType</span><span class="o">.</span><span class="n">BANDED_MATRIX</span><span class="p">,</span> <span class="n">FeatureType</span><span class="o">.</span><span class="n">SIMPLE_MATRIX</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_dict_stored</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;``True`` for features stored as dicts keyed by frequency band.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span> <span class="ow">in</span> <span class="p">(</span><span class="n">FeatureType</span><span class="o">.</span><span class="n">BAND</span><span class="p">,</span> <span class="n">FeatureType</span><span class="o">.</span><span class="n">BANDED_MATRIX</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Canonical shape registry  (defined after FeatureType so members are available)</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<span class="n">FEATURE_SHAPES</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">FeatureType</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">FeatureType</span><span class="o">.</span><span class="n">LINEAR</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;extracted_shape&quot;</span><span class="p">:</span> <span class="s2">&quot;W, C&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;cell_shape&quot;</span><span class="p">:</span> <span class="s2">&quot;C&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;channel_axes&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,),</span>
+        <span class="s2">&quot;semantic_axes&quot;</span><span class="p">:</span> <span class="p">{},</span>
+        <span class="s2">&quot;description&quot;</span><span class="p">:</span> <span class="s2">&quot;Scalar per channel (e.g. rms, ampvar)&quot;</span><span class="p">,</span>
+    <span class="p">},</span>
+    <span class="n">FeatureType</span><span class="o">.</span><span class="n">LINEAR_2D</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;extracted_shape&quot;</span><span class="p">:</span> <span class="s2">&quot;W, C, K&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;cell_shape&quot;</span><span class="p">:</span> <span class="s2">&quot;C, K&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;channel_axes&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,),</span>
+        <span class="s2">&quot;semantic_axes&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;components&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span>
+        <span class="s2">&quot;description&quot;</span><span class="p">:</span> <span class="s2">&quot;K components per channel (e.g. psdslope)&quot;</span><span class="p">,</span>
+    <span class="p">},</span>
+    <span class="n">FeatureType</span><span class="o">.</span><span class="n">BAND</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;extracted_shape&quot;</span><span class="p">:</span> <span class="s2">&quot;W, C, B&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;cell_shape&quot;</span><span class="p">:</span> <span class="s2">&quot;{band: (C,)}&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;channel_axes&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,),</span>
+        <span class="s2">&quot;semantic_axes&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;bands&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span>
+        <span class="s2">&quot;description&quot;</span><span class="p">:</span> <span class="s2">&quot;One value per band per channel (e.g. psdband, logpsdband)&quot;</span><span class="p">,</span>
+    <span class="p">},</span>
+    <span class="n">FeatureType</span><span class="o">.</span><span class="n">SIMPLE_MATRIX</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;extracted_shape&quot;</span><span class="p">:</span> <span class="s2">&quot;W, C, C&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;cell_shape&quot;</span><span class="p">:</span> <span class="s2">&quot;C, C&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;channel_axes&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+        <span class="s2">&quot;semantic_axes&quot;</span><span class="p">:</span> <span class="p">{},</span>
+        <span class="s2">&quot;description&quot;</span><span class="p">:</span> <span class="s2">&quot;Channel x channel matrix (e.g. pcorr, zpcorr)&quot;</span><span class="p">,</span>
+    <span class="p">},</span>
+    <span class="n">FeatureType</span><span class="o">.</span><span class="n">BANDED_MATRIX</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;extracted_shape&quot;</span><span class="p">:</span> <span class="s2">&quot;W, C, C, B&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;cell_shape&quot;</span><span class="p">:</span> <span class="s2">&quot;{band: (C, C)}&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;channel_axes&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+        <span class="s2">&quot;semantic_axes&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;bands&quot;</span><span class="p">:</span> <span class="mi">3</span><span class="p">},</span>
+        <span class="s2">&quot;description&quot;</span><span class="p">:</span> <span class="s2">&quot;Channel x channel matrix per band (e.g. cohere, zcohere)&quot;</span><span class="p">,</span>
+    <span class="p">},</span>
+    <span class="n">FeatureType</span><span class="o">.</span><span class="n">HIST</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;extracted_shape&quot;</span><span class="p">:</span> <span class="s2">&quot;W, C, F&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;cell_shape&quot;</span><span class="p">:</span> <span class="s2">&quot;(F,), (C, F)&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;channel_axes&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,),</span>
+        <span class="s2">&quot;semantic_axes&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;freq_bins&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span>
+        <span class="s2">&quot;description&quot;</span><span class="p">:</span> <span class="s2">&quot;Spectral histogram per channel (e.g. psd)&quot;</span><span class="p">,</span>
+    <span class="p">},</span>
+<span class="p">}</span>
+<span class="sd">&quot;&quot;&quot;Canonical shape metadata for each :class:`FeatureType`.</span>
+
+<span class="sd">Keys per entry:</span>
+
+<span class="sd">- ``extracted_shape``: Symbolic shape after stacking W windows.</span>
+<span class="sd">- ``cell_shape``: Shape of a single cell in the WAR DataFrame.</span>
+<span class="sd">- ``channel_axes``: Tuple of axis indices that are channel dimensions.</span>
+<span class="sd">- ``semantic_axes``: Dict mapping semantic dimension names to axis indices.</span>
+<span class="sd">- ``description``: Human-readable description.</span>
+
+<span class="sd">**Shape convention**: ``(W, C, [C₂], ...semantic)``.</span>
+<span class="sd">Windows (W) is always axis 0.  Channel axes (C) always follow immediately.</span>
+<span class="sd">Semantic dimensions (bands, components, freq bins) are trailing.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+
+<span class="n">LINEAR_FEATURES</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;rms&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;ampvar&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;psdtotal&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;nspike&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;logrms&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;logampvar&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;logpsdtotal&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;lognspike&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+<span class="sd">&quot;&quot;&quot;List of linear (scalar) feature names computed per channel.&quot;&quot;&quot;</span>
+
+<span class="n">LINEAR_2D_FEATURES</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;psdslope&quot;</span><span class="p">]</span>
+<span class="sd">&quot;&quot;&quot;List of multi-component linear features (stored as 2-D arrays per channel).&quot;&quot;&quot;</span>
+
+<span class="n">BAND_FEATURES</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;psdband&quot;</span><span class="p">,</span> <span class="s2">&quot;psdfrac&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="s2">&quot;logpsdband&quot;</span><span class="p">,</span> <span class="s2">&quot;logpsdfrac&quot;</span><span class="p">]</span>
+<span class="sd">&quot;&quot;&quot;List of frequency-band feature names (one value per band).&quot;&quot;&quot;</span>
+
+<span class="n">MATRIX_FEATURES</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;cohere&quot;</span><span class="p">,</span> <span class="s2">&quot;zcohere&quot;</span><span class="p">,</span> <span class="s2">&quot;imcoh&quot;</span><span class="p">,</span> <span class="s2">&quot;zimcoh&quot;</span><span class="p">,</span> <span class="s2">&quot;pcorr&quot;</span><span class="p">,</span> <span class="s2">&quot;zpcorr&quot;</span><span class="p">]</span>
+<span class="sd">&quot;&quot;&quot;List of connectivity/matrix feature names (channel pairs).&quot;&quot;&quot;</span>
+
+<span class="n">BANDED_MATRIX_FEATURES</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;cohere&quot;</span><span class="p">,</span> <span class="s2">&quot;zcohere&quot;</span><span class="p">,</span> <span class="s2">&quot;imcoh&quot;</span><span class="p">,</span> <span class="s2">&quot;zimcoh&quot;</span><span class="p">]</span>
+<span class="sd">&quot;&quot;&quot;Matrix features with frequency band dimension (stored as dict with band keys).&quot;&quot;&quot;</span>
+
+<span class="n">SIMPLE_MATRIX_FEATURES</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;pcorr&quot;</span><span class="p">,</span> <span class="s2">&quot;zpcorr&quot;</span><span class="p">]</span>
+<span class="sd">&quot;&quot;&quot;Matrix features without frequency bands (single 2D correlation matrix).&quot;&quot;&quot;</span>
+
+
+<span class="n">HIST_FEATURES</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;psd&quot;</span><span class="p">]</span>
+<span class="sd">&quot;&quot;&quot;List of histogram/spectral feature names.&quot;&quot;&quot;</span>
+
+<span class="n">FEATURES</span> <span class="o">=</span> <span class="n">LINEAR_FEATURES</span> <span class="o">+</span> <span class="n">LINEAR_2D_FEATURES</span> <span class="o">+</span> <span class="n">BAND_FEATURES</span> <span class="o">+</span> <span class="n">MATRIX_FEATURES</span> <span class="o">+</span> <span class="n">HIST_FEATURES</span>
+<span class="sd">&quot;&quot;&quot;Complete list of all available features.&quot;&quot;&quot;</span>
+
+<span class="n">WAR_FEATURES</span> <span class="o">=</span> <span class="p">[</span><span class="n">f</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">FEATURES</span> <span class="k">if</span> <span class="s2">&quot;nspike&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">f</span><span class="p">]</span>
+<span class="sd">&quot;&quot;&quot;Features available in WindowAnalysisResult (excludes spike-related).&quot;&quot;&quot;</span>
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Centralised feature-name → FeatureType mapping</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<span class="n">FEATURE_TYPES</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">FeatureType</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="o">**</span><span class="p">{</span><span class="n">f</span><span class="p">:</span> <span class="n">FeatureType</span><span class="o">.</span><span class="n">LINEAR</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">LINEAR_FEATURES</span><span class="p">},</span>
+    <span class="o">**</span><span class="p">{</span><span class="n">f</span><span class="p">:</span> <span class="n">FeatureType</span><span class="o">.</span><span class="n">LINEAR_2D</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">LINEAR_2D_FEATURES</span><span class="p">},</span>
+    <span class="o">**</span><span class="p">{</span><span class="n">f</span><span class="p">:</span> <span class="n">FeatureType</span><span class="o">.</span><span class="n">BAND</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">BAND_FEATURES</span><span class="p">},</span>
+    <span class="o">**</span><span class="p">{</span><span class="n">f</span><span class="p">:</span> <span class="n">FeatureType</span><span class="o">.</span><span class="n">BANDED_MATRIX</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">BANDED_MATRIX_FEATURES</span><span class="p">},</span>
+    <span class="o">**</span><span class="p">{</span><span class="n">f</span><span class="p">:</span> <span class="n">FeatureType</span><span class="o">.</span><span class="n">SIMPLE_MATRIX</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">SIMPLE_MATRIX_FEATURES</span><span class="p">},</span>
+    <span class="o">**</span><span class="p">{</span><span class="n">f</span><span class="p">:</span> <span class="n">FeatureType</span><span class="o">.</span><span class="n">HIST</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">HIST_FEATURES</span><span class="p">},</span>
+<span class="p">}</span>
+<span class="sd">&quot;&quot;&quot;Mapping from every known feature name to its :class:`FeatureType`.&quot;&quot;&quot;</span>
+
+
+<div class="viewcode-block" id="classify_feature">
+<a class="viewcode-back" href="../../../api/constants/analysis.html#neurodent.constants.analysis.classify_feature">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">classify_feature</span><span class="p">(</span><span class="n">feature_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FeatureType</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the :class:`FeatureType` for a given feature name.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        feature_name: Name of the feature (e.g. ``&#39;rms&#39;``, ``&#39;psdband&#39;``, ``&#39;cohere&#39;``).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The corresponding :class:`FeatureType` enum member.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If *feature_name* is not a recognised feature.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">FEATURE_TYPES</span><span class="p">[</span><span class="n">feature_name</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Unknown feature &#39;</span><span class="si">{</span><span class="n">feature_name</span><span class="si">}</span><span class="s2">&#39;. &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Known features: </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">FEATURE_TYPES</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span></div>
+
+
+<span class="n">FREQ_BANDS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;delta&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+    <span class="s2">&quot;theta&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">8</span><span class="p">),</span>
+    <span class="s2">&quot;alpha&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">13</span><span class="p">),</span>
+    <span class="s2">&quot;beta&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">13</span><span class="p">,</span> <span class="mi">25</span><span class="p">),</span>
+    <span class="s2">&quot;gamma&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">25</span><span class="p">,</span> <span class="mi">40</span><span class="p">),</span>
+<span class="p">}</span>
+<span class="sd">&quot;&quot;&quot;Dictionary mapping frequency band names to (min_hz, max_hz) tuples.</span>
+
+<span class="sd">Delta band adjusted to 1-4 Hz (changed from 0.1-4 Hz) for reliable coherence</span>
+<span class="sd">estimation with short epochs and to avoid insufficient cycles warnings.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="n">BAND_NAMES</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">FREQ_BANDS</span><span class="o">.</span><span class="n">items</span><span class="p">()]</span>
+<span class="sd">&quot;&quot;&quot;Ordered list of frequency band names: [&#39;delta&#39;, &#39;theta&#39;, &#39;alpha&#39;, &#39;beta&#39;, &#39;gamma&#39;].&quot;&quot;&quot;</span>
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Semantic dimension labels</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<span class="n">COMPONENT_LABELS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;psdslope&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;slope&quot;</span><span class="p">,</span> <span class="s2">&quot;intercept&quot;</span><span class="p">],</span>
+<span class="p">}</span>
+<span class="sd">&quot;&quot;&quot;Mapping of feature names to their component dimension labels.</span>
+
+<span class="sd">For LINEAR_2D features that have multiple components (e.g., psdslope has slope</span>
+<span class="sd">and intercept), this provides human-readable labels for each component.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Frequency band parameters</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<span class="n">FREQ_BAND_TOTAL</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">40</span><span class="p">)</span>
+<span class="sd">&quot;&quot;&quot;Total frequency range covered by all bands (min, max) in Hz.&quot;&quot;&quot;</span>
+
+<span class="n">FREQ_MINS</span> <span class="o">=</span> <span class="p">[</span><span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">FREQ_BANDS</span><span class="o">.</span><span class="n">items</span><span class="p">()]</span>
+<span class="sd">&quot;&quot;&quot;List of minimum frequencies for each band.&quot;&quot;&quot;</span>
+
+<span class="n">FREQ_MAXS</span> <span class="o">=</span> <span class="p">[</span><span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">FREQ_BANDS</span><span class="o">.</span><span class="n">items</span><span class="p">()]</span>
+<span class="sd">&quot;&quot;&quot;List of maximum frequencies for each band.&quot;&quot;&quot;</span>
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025, Joseph Dong, Yongtaek Oh, Eric Marsh.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

@@ -1,0 +1,1911 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Utilities &#8212; Neurodent 0.4.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../_static/documentation_options.js?v=6c02275b"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'api/core/utils';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://josephdong1000.github.io/neurodent/_static/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.4.0';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner =
+            false;
+        </script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Visualization Module" href="../visualization/index.html" />
+    <link rel="prev" title="ZeitgeberAnalysisResult" href="zeitgeber.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">NeuRodent</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../license/index.html">
+    License
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-2"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-2"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-2"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-2">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../license/index.html">
+    License
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-3"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-3"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-3"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-3">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Core Module</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="recording_metadata.html">RecordingMetadata</a></li>
+<li class="toctree-l2"><a class="reference internal" href="long_recording_organizer.html">LongRecordingOrganizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="long_recording_analyzer.html">LongRecordingAnalyzer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="animal_analyzer.html">AnimalAnalyzer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fragment_analyzer.html">FragmentAnalyzer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="frequency_domain_spike_detector.html">FrequencyDomainSpikeDetector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="zeitgeber.html">ZeitgeberAnalysisResult</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Utilities</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../visualization/index.html">Visualization Module</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../visualization/animal_organizer.html">AnimalOrganizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../visualization/window_analysis_result.html">WindowAnalysisResult</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../visualization/frequency_domain_spike_analysis_result.html">FrequencyDomainSpikeAnalysisResult</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../visualization/animal_plotter.html">AnimalPlotter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../visualization/experiment_plotter.html">ExperimentPlotter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../visualization/zeitgeber_plotter.html">ZeitgeberPlotter</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../constants/index.html">Constants</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../constants/analysis.html">Analysis Constants</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../constants/config.html">Configuration Constants</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../constants/mappings.html">Mapping Constants</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../constants/plotting.html">Plotting Constants</a></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../index.html" class="nav-link">API Reference</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Core Module</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Utilities</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="utilities">
+<h1>Utilities<a class="headerlink" href="#utilities" title="Link to this heading">#</a></h1>
+<p>Utility functions for the core module.</p>
+<section id="module-neurodent.core.utils">
+<span id="functions"></span><h2>Functions<a class="headerlink" href="#module-neurodent.core.utils" title="Link to this heading">#</a></h2>
+<p>Shared low-level utility functions.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.convert_units_to_multiplier">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">convert_units_to_multiplier</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">current_units</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_units</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'µV'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/units.html#convert_units_to_multiplier"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.convert_units_to_multiplier" title="Link to this definition">#</a></dt>
+<dd><p>Convert between different voltage units and return the multiplication factor.</p>
+<p>This function calculates the conversion factor needed to transform values
+from one voltage unit to another (e.g., from mV to µV).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>current_units</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – The current unit of the values. Must be one of: ‘µV’, ‘mV’, ‘V’, ‘nV’.</p></li>
+<li><p><strong>target_units</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str,</span> <span class="pre">optional</span></code>) – The target unit to convert to. Defaults to ‘µV’.
+Must be one of: ‘µV’, ‘mV’, ‘V’, ‘nV’.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>The multiplication factor to convert from current_units to target_units.</dt><dd><p>To convert values, multiply your data by this factor.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>AssertionError</strong> – If current_units or target_units are not supported.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">convert_units_to_multiplier</span><span class="p">(</span><span class="s2">&quot;mV&quot;</span><span class="p">,</span> <span class="s2">&quot;µV&quot;</span><span class="p">)</span>
+<span class="go">1000.0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">convert_units_to_multiplier</span><span class="p">(</span><span class="s2">&quot;V&quot;</span><span class="p">,</span> <span class="s2">&quot;mV&quot;</span><span class="p">)</span>
+<span class="go">1000.0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">convert_units_to_multiplier</span><span class="p">(</span><span class="s2">&quot;µV&quot;</span><span class="p">,</span> <span class="s2">&quot;V&quot;</span><span class="p">)</span>
+<span class="go">1e-06</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.extract_mne_unit_info">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">extract_mne_unit_info</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_info</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/units.html#extract_mne_unit_info"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.extract_mne_unit_info" title="Link to this definition">#</a></dt>
+<dd><p>Extract unit information from MNE Raw info object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>raw_info</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code>) – MNE Raw.info object containing channel information</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>(unit_name, mult_to_uV) where unit_name</dt><dd><p>is the consistent unit across all channels
+and mult_to_uV is the conversion factor to µV</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple[str | None, float | None]</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If channel units are inconsistent across channels</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.log_transform">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">log_transform</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/units.html#log_transform"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.log_transform" title="Link to this definition">#</a></dt>
+<dd><p>Log transform the signal</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>rec</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">np.ndarray</span></code>) – The signal to log transform.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>ln(rec + 1)</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.is_day">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">is_day</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dt</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">datetime</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sunrise</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">6</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sunset</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">18</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/core/utils/time.html#is_day"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.is_day" title="Link to this definition">#</a></dt>
+<dd><p>Check if a datetime object is during the day.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dt</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">datetime</span></code>) – Datetime object to check</p></li>
+<li><p><strong>sunrise</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int,</span> <span class="pre">optional</span></code>) – Sunrise hour (0-23). Defaults to 6.</p></li>
+<li><p><strong>sunset</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int,</span> <span class="pre">optional</span></code>) – Sunset hour (0-23). Defaults to 18.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True if the datetime is during the day, False otherwise</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>TypeError</strong> – If dt is not a datetime object</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.parse_str_to_day">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">parse_str_to_day</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">sep</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">parse_params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">parse_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'full'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'split'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'window'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'all'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'split'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">date_patterns</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">datetime</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/time.html#parse_str_to_day"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.parse_str_to_day" title="Link to this definition">#</a></dt>
+<dd><p>DEPRECATED: Use FileDiscoverer with {session} placeholder in pattern instead.</p>
+<p>Parses the filename of a binfolder to get the day.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>string</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – String to parse.</p></li>
+<li><p><strong>sep</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str,</span> <span class="pre">optional</span></code>) – Separator to split string by. If None, split by whitespace. Defaults to None.</p></li>
+<li><p><strong>parse_params</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict,</span> <span class="pre">optional</span></code>) – Parameters to pass to dateutil.parser.parse. Defaults to {‘fuzzy’:True}.</p></li>
+<li><p><strong>parse_mode</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Literal[&quot;full&quot;,</span> <span class="pre">&quot;split&quot;,</span> <span class="pre">&quot;window&quot;,</span> <span class="pre">&quot;all&quot;],</span> <span class="pre">optional</span></code>) – Mode for parsing the string. Defaults to “split”.
+“full”: Try parsing the entire cleaned string only
+“split”: Try parsing individual tokens only
+“window”: Try parsing sliding windows of tokens (2-4 tokens) only
+“all”: Use all three approaches in the order “full”, “split”, “window</p></li>
+<li><p><strong>date_patterns</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list[tuple[str,</span> <span class="pre">str]],</span> <span class="pre">optional</span></code>) – List of (regex_pattern, strptime_format) tuples
+to try before falling back to token-based parsing. This allows users to specify
+exact formats to handle ambiguous cases like MM/DD/YYYY vs DD/MM/YYYY.
+Only used in “split” and “all” modes. Defaults to None (no regex patterns).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Datetime object corresponding to the day of the binfolder.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>datetime</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>ValueError</strong> – If no valid date token is found in the string.</p></li>
+<li><p><strong>TypeError</strong> – If date_patterns is not a list of tuples.</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># Handle ambiguous date formats with explicit patterns</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">patterns</span> <span class="o">=</span> <span class="p">[(</span><span class="sa">r</span><span class="s1">&#39;(19\d</span><span class="si">{2}</span><span class="s1">|20\d</span><span class="si">{2}</span><span class="s1">)-(\d{1,2})-(\d{1,2})&#39;</span><span class="p">,</span> <span class="s1">&#39;%Y-%m-</span><span class="si">%d</span><span class="s1">&#39;</span><span class="p">)]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">parse_str_to_day</span><span class="p">(</span><span class="s1">&#39;2001_2023-07-04_data&#39;</span><span class="p">,</span> <span class="n">date_patterns</span><span class="o">=</span><span class="n">patterns</span><span class="p">)</span>
+<span class="go">datetime.datetime(2023, 7, 4, 0, 0)</span>
+</pre></div>
+</div>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># European format pattern</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">patterns</span> <span class="o">=</span> <span class="p">[(</span><span class="sa">r</span><span class="s1">&#39;(\d{1,2})/(\d{1,2})/(19\d</span><span class="si">{2}</span><span class="s1">|20\d</span><span class="si">{2}</span><span class="s1">)&#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">%d</span><span class="s1">/%m/%Y&#39;</span><span class="p">)]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">parse_str_to_day</span><span class="p">(</span><span class="s1">&#39;04/07/2023_data&#39;</span><span class="p">,</span> <span class="n">date_patterns</span><span class="o">=</span><span class="n">patterns</span><span class="p">)</span>
+<span class="go">datetime.datetime(2023, 7, 4, 0, 0)  # July 4th, not April 7th</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When date_patterns is provided, users have full control over date interpretation.
+Without date_patterns, the function falls back to token-based parsing which may
+be ambiguous for formats like MM/DD/YYYY vs DD/MM/YYYY.</p>
+</div>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="neurodent.core.utils.TimestampMapper">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">TimestampMapper</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">file_end_datetimes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">datetime</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">file_durations</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/core/utils/time.html#TimestampMapper"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.TimestampMapper" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Map each fragment to its source file’s timestamp.</p>
+<p>This class provides functionality to map data fragments back to their original
+file timestamps when data has been concatenated from multiple files with
+different recording times.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Variables<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>file_end_datetimes</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list[datetime]</span></code>) – The end datetimes of each source file.</p></li>
+<li><p><strong>file_durations</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list[float]</span></code>) – The durations of each source file in seconds.</p></li>
+<li><p><strong>file_start_datetimes</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list[datetime]</span></code>) – Computed start datetimes of each file.</p></li>
+<li><p><strong>cumulative_durations</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">np.ndarray</span></code>) – Cumulative sum of file durations.</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Set up files with known end times and durations</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">end_times</span> <span class="o">=</span> <span class="p">[</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2023</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">datetime</span><span class="p">(</span><span class="mi">2023</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">13</span><span class="p">,</span> <span class="mi">0</span><span class="p">)]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">durations</span> <span class="o">=</span> <span class="p">[</span><span class="mf">3600.0</span><span class="p">,</span> <span class="mf">1800.0</span><span class="p">]</span>  <span class="c1"># 1 hour, 30 minutes</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mapper</span> <span class="o">=</span> <span class="n">TimestampMapper</span><span class="p">(</span><span class="n">end_times</span><span class="p">,</span> <span class="n">durations</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Get timestamp for fragment at index 2 with 60s fragments</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">timestamp</span> <span class="o">=</span> <span class="n">mapper</span><span class="o">.</span><span class="n">get_fragment_timestamp</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mf">60.0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">timestamp</span><span class="p">)</span>
+<span class="go">2023-01-01 11:02:00</span>
+</pre></div>
+</div>
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.core.utils.TimestampMapper.get_fragment_timestamp">
+<span class="sig-name descname"><span class="pre">get_fragment_timestamp</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">fragment_idx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">fragment_len_s</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">datetime</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/time.html#TimestampMapper.get_fragment_timestamp"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.TimestampMapper.get_fragment_timestamp" title="Link to this definition">#</a></dt>
+<dd><p>Get the timestamp for a specific fragment based on its index and length.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fragment_idx</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>) – The index of the fragment (0-based).</p></li>
+<li><p><strong>fragment_len_s</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>) – The length of each fragment in seconds.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The timestamp corresponding to the start of the specified fragment.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>datetime</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># Get timestamp for the 5th fragment (index 4) with 30-second fragments</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">timestamp</span> <span class="o">=</span> <span class="n">mapper</span><span class="o">.</span><span class="n">get_fragment_timestamp</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mf">30.0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># This returns the timestamp 2 minutes into the first file</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.validate_timestamps">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">validate_timestamps</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">timestamps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">datetime</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">gap_threshold_seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">60</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">datetime</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/time.html#validate_timestamps"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.validate_timestamps" title="Link to this definition">#</a></dt>
+<dd><p>Validate that timestamps are in chronological order and check for large gaps.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>timestamps</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list[datetime]</span></code>) – List of timestamps to validate</p></li>
+<li><p><strong>gap_threshold_seconds</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float,</span> <span class="pre">optional</span></code>) – Threshold in seconds for warning about large gaps. Defaults to 60.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The validated timestamps in chronological order</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list[datetime]</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If no valid timestamps are provided</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.resolve_channel">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">resolve_channel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">channel_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/naming.html#resolve_channel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.resolve_channel" title="Link to this definition">#</a></dt>
+<dd><p>Resolve a raw channel name to its canonical channel abbreviation by <strong>exact lookup</strong>.</p>
+<p>Resolution is explicit and never inferred: (1) the (stripped) name is already a
+canonical abbreviation (<code class="xref py py-data docutils literal notranslate"><span class="pre">neurodent.constants.CHANNEL_ABBREVS</span></code>); (2) it is an
+exact key in <code class="xref py py-data docutils literal notranslate"><span class="pre">neurodent.constants.CHANNEL_ABBREV_BY_RAW</span></code> (the per-dataset
+<code class="docutils literal notranslate"><span class="pre">raw</span> <span class="pre">name</span> <span class="pre">-&gt;</span> <span class="pre">abbrev</span></code> map). Anything else <strong>raises loudly</strong> — there is no fuzzy,
+substring, or number-based guessing.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>channel_name</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Raw channel name from the data.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Canonical channel abbreviation.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – When the name is not in the configured channel map. Configure the exact
+    raw name under its abbreviation (<code class="docutils literal notranslate"><span class="pre">channels</span></code> in the samples config, or
+    <code class="xref py py-func docutils literal notranslate"><span class="pre">neurodent.set_channel_map()</span></code>).</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">resolve_channel</span><span class="p">(</span><span class="s2">&quot;LMot&quot;</span><span class="p">)</span>          <span class="c1"># already canonical</span>
+<span class="go">&#39;LMot&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">resolve_channel</span><span class="p">(</span><span class="s2">&quot;L Motor Ctx&quot;</span><span class="p">)</span>   <span class="c1"># configured raw name -&gt; abbrev</span>
+<span class="go">&#39;LMot&#39;</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.resolve_channels">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">resolve_channels</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/naming.html#resolve_channels"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.resolve_channels" title="Link to this definition">#</a></dt>
+<dd><p>Abbreviate a list of raw channel names via exact lookup.</p>
+<p>Unmappable names are <strong>warned about loudly</strong> (and kept as-is so callers comparing
+channel sets still get a value) rather than silently swallowed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>names</strong> – List of raw channel name strings.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>List of canonical abbreviations (same length as input); an unmappable entry is
+returned unchanged after a warning.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.parse_str_to_animal">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">parse_str_to_animal</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">animal_param</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">(0,</span> <span class="pre">None)</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/naming.html#parse_str_to_animal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.parse_str_to_animal" title="Link to this definition">#</a></dt>
+<dd><p>DEPRECATED: Use FileDiscoverer with {animal} placeholder in pattern instead.</p>
+<p>Parses the filename of a binfolder to get the animal id.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>string</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – String to parse.</p></li>
+<li><p><strong>animal_param</strong> – Parameter specifying how to parse the animal ID:
+tuple[int, str]: (index, separator) for simple split and index. Not recommended for inconsistent naming conventions.
+str: regex pattern to extract ID. Most general use case. If multiple matches are found, returns the first match.
+list[str]: list of possible animal IDs to match against. Returns first match in list order, case-sensitive, ignoring empty strings.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Animal id.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p># Tuple format: (index, separator)
+&gt;&gt;&gt; parse_str_to_animal(“WT_A10_2023-01-01_data.bin”, (1, “_”))
+‘A10’
+&gt;&gt;&gt; parse_str_to_animal(“A10_WT_recording.bin”, (0, “_”))
+‘A10’</p>
+<p># Regex pattern format
+&gt;&gt;&gt; parse_str_to_animal(“WT_A10_2023-01-01_data.bin”, r”A\d+”)
+‘A10’
+&gt;&gt;&gt; parse_str_to_animal(“subject_123_data.bin”, r”\d+”)
+‘123’</p>
+<p># List format: possible IDs to match
+&gt;&gt;&gt; parse_str_to_animal(“WT_A10_2023-01-01_data.bin”, [“A10”, “A11”, “A12”])
+‘A10’
+&gt;&gt;&gt; parse_str_to_animal(“WT_A10_data.bin”, [“B15”, “C20”])  # No match
+ValueError: No matching ID found in WT_A10_data.bin from possible IDs: [‘B15’, ‘C20’]</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.normalize_value_from_aliases">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">normalize_value_from_aliases</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alias_dict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/naming.html#normalize_value_from_aliases"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.normalize_value_from_aliases" title="Link to this definition">#</a></dt>
+<dd><p>Normalize a value to its canonical form using a value map.</p>
+<p>Performs <strong>exact</strong> matching: the value must equal one of the accepted spellings
+listed for a canonical label. Used for normalizing standalone configuration values
+against an exact <code class="docutils literal notranslate"><span class="pre">_MAP</span></code> (e.g. <code class="xref py py-data docutils literal notranslate"><span class="pre">SEX_MAP</span></code>,
+<code class="xref py py-data docutils literal notranslate"><span class="pre">GENOTYPE_MAP</span></code>).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>value</strong> – The raw value to normalize (e.g., <code class="docutils literal notranslate"><span class="pre">&quot;M&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;female&quot;</span></code>).</p></li>
+<li><p><strong>alias_dict</strong> – Dictionary of <code class="docutils literal notranslate"><span class="pre">{canonical_key:</span> <span class="pre">[accepted</span> <span class="pre">spellings]}</span></code>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The canonical key if <em>value</em> matches any spelling, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if no match.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.rename_mne_channels">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">rename_mne_channels</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mne_obj</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/core/utils/naming.html#rename_mne_channels"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.rename_mne_channels" title="Link to this definition">#</a></dt>
+<dd><p>Rename an MNE object’s channels in place to canonical abbreviations.</p>
+<p>Applies <a class="reference internal" href="#neurodent.core.utils.resolve_channel" title="neurodent.core.utils.resolve_channel"><code class="xref py py-func docutils literal notranslate"><span class="pre">resolve_channel()</span></code></a> (exact lookup) to every entry of
+<code class="docutils literal notranslate"><span class="pre">mne_obj.info['ch_names']</span></code>. Format-agnostic — works on any MNE object
+whose raw channel names are declared in <code class="xref py py-data docutils literal notranslate"><span class="pre">CHANNEL_MAP</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>mne_obj</strong> – An MNE object exposing <code class="docutils literal notranslate"><span class="pre">info['ch_names']</span></code> (e.g. a <code class="docutils literal notranslate"><span class="pre">RawArray</span></code>).</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The same <code class="docutils literal notranslate"><span class="pre">mne_obj</span></code>, with channel names replaced by their canonical abbreviations.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.slugify">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">slugify</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allow_unicode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/core/utils/naming.html#slugify"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.slugify" title="Link to this definition">#</a></dt>
+<dd><p>Convert a string to a URL-friendly slug.</p>
+<p>Converts to ASCII (unless <em>allow_unicode</em> is <code class="docutils literal notranslate"><span class="pre">True</span></code>), lowercases,
+removes non-alphanumeric characters (except hyphens and underscores),
+and converts spaces and repeated dashes to single dashes.</p>
+<p>Drop-in replacement for <code class="docutils literal notranslate"><span class="pre">django.utils.text.slugify</span></code> using only the
+standard library.</p>
+<dl>
+<dt><strong>Path-safety convention.</strong></dt><dd><p>This is the canonical helper for converting display-friendly identifiers
+(animal IDs, animaldays, genotype strings) into filesystem-safe path
+components.  Any code that constructs a <code class="docutils literal notranslate"><span class="pre">Path</span></code> or filename from one of
+these strings <strong>must</strong> route the value through <code class="docutils literal notranslate"><span class="pre">slugify(...)</span></code> directly,
+or through one of the <code class="docutils literal notranslate"><span class="pre">path_safe_*</span></code> accessors on
+<a class="reference internal" href="../visualization/window_analysis_result.html#neurodent.results.WindowAnalysisResult" title="neurodent.results.WindowAnalysisResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">WindowAnalysisResult</span></code></a>,
+<code class="xref py py-class docutils literal notranslate"><span class="pre">LazyWindowAnalysisResult</span></code>, or
+<a class="reference internal" href="../visualization/frequency_domain_spike_analysis_result.html#neurodent.results.FrequencyDomainSpikeAnalysisResult" title="neurodent.results.FrequencyDomainSpikeAnalysisResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">FrequencyDomainSpikeAnalysisResult</span></code></a>.</p>
+<p>Display strings — which may contain <code class="docutils literal notranslate"><span class="pre">/</span></code>, <code class="docutils literal notranslate"><span class="pre">;</span></code>, parens, spaces, etc.
+(e.g. the real arxrosa genotype <code class="docutils literal notranslate"><span class="pre">Arx(F/y);</span> <span class="pre">Rosa(+/wt)</span></code>) — are correct
+domain notation and stay unchanged on the public attributes
+(<code class="docutils literal notranslate"><span class="pre">animal_id</span></code>, <code class="docutils literal notranslate"><span class="pre">animaldays</span></code>, <code class="docutils literal notranslate"><span class="pre">genotype</span></code>).  They’re the source of
+truth for what humans see in logs and plot labels.  Only the
+<code class="docutils literal notranslate"><span class="pre">path_safe_*</span></code> accessors return the slugified form.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>value</strong> – The string to slugify.</p></li>
+<li><p><strong>allow_unicode</strong> – If <code class="docutils literal notranslate"><span class="pre">True</span></code>, keep Unicode characters instead of
+transliterating to ASCII.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A URL-safe slug string.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.get_feature_label">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">get_feature_label</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">feature_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/naming.html#get_feature_label"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.get_feature_label" title="Link to this definition">#</a></dt>
+<dd><p>Convert a feature column name to a human-readable label.</p>
+<p>Handles:
+- Base features: “rms” -&gt; “RMS”
+- Banded features: “logpsdband_delta” -&gt; “Log Band Power - Delta”
+- Baseline-subtracted: “logrms_nobase” -&gt; “Log(RMS) - Baseline”</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>feature_name</strong> – Column name (e.g., “logpsdband_delta_nobase”)</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Human-readable label. Falls back to the original name if not found.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">get_feature_label</span><span class="p">(</span><span class="s2">&quot;logpsdband_delta&quot;</span><span class="p">)</span>
+<span class="go">&#39;Log Band Power (Delta)&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">get_feature_label</span><span class="p">(</span><span class="s2">&quot;alphadelta&quot;</span><span class="p">)</span>
+<span class="go">&#39;Alpha/Delta Ratio&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">get_feature_label</span><span class="p">(</span><span class="s2">&quot;logrms_nobase&quot;</span><span class="p">)</span>
+<span class="go">&#39;Log(RMS) - Baseline&#39;</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.set_temp_directory">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">set_temp_directory</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/paths.html#set_temp_directory"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.set_temp_directory" title="Link to this definition">#</a></dt>
+<dd><p>Set the temporary directory for NeuRodent operations.</p>
+<p>This function configures the temporary directory used by NeuRodent for intermediate
+files and operations. The directory will be created if it doesn’t exist.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>path</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span> <span class="pre">|</span> <span class="pre">Path</span></code>) – Path to the temporary directory. Will be created if it doesn’t exist.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">set_temp_directory</span><span class="p">(</span><span class="s2">&quot;/tmp/neurodent_temp&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">set_temp_directory</span><span class="p">(</span><span class="n">Path</span><span class="o">.</span><span class="n">home</span><span class="p">()</span> <span class="o">/</span> <span class="s2">&quot;neurodent_workspace&quot;</span> <span class="o">/</span> <span class="s2">&quot;temp&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This function modifies the TMPDIR environment variable, which affects
+the behavior of other temporary file operations in the process.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.get_temp_directory">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">get_temp_directory</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Path</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/paths.html#get_temp_directory"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.get_temp_directory" title="Link to this definition">#</a></dt>
+<dd><p>Get the current temporary directory used by NeuRodent.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Path object representing the current temporary directory.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Path</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">temp_dir</span> <span class="o">=</span> <span class="n">get_temp_directory</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Current temp directory: </span><span class="si">{</span><span class="n">temp_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="go">Current temp directory: /tmp/neurodent_temp</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>KeyError</strong> – If TMPDIR environment variable is not set.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.safe_unlink">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">safe_unlink</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/paths.html#safe_unlink"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.safe_unlink" title="Link to this definition">#</a></dt>
+<dd><p>Delete a file if it exists, ignoring a missing file.</p>
+<p>Used for self-healing cache deletion: a corrupt cache file is removed so it
+can be regenerated, and a concurrently-removed file is not an error.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>path</strong> – Path to the file to delete.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.is_si_recording_folder">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">is_si_recording_folder</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/paths.html#is_si_recording_folder"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.is_si_recording_folder" title="Link to this definition">#</a></dt>
+<dd><p>Return True if <code class="docutils literal notranslate"><span class="pre">path</span></code> looks like a SpikeInterface recording output folder.</p>
+<p>Recognizes the two formats written by <code class="xref py py-meth docutils literal notranslate"><span class="pre">LongRecording.save()</span></code> as well as
+folders written by NeuRodent’s own <code class="xref py py-meth docutils literal notranslate"><span class="pre">LongRecordingOrganizer.save_recording()</span></code>.
+This is a safety gate so destructive overwrites only ever target folders we
+actually produced — never an arbitrary user directory.</p>
+<p>A folder qualifies when it is a directory and any of the following hold:</p>
+<ul class="simple">
+<li><p><strong>Zarr</strong>: the folder ends in <code class="docutils literal notranslate"><span class="pre">.zarr</span></code> and contains zarr group metadata
+(<code class="docutils literal notranslate"><span class="pre">.zattrs</span></code>, <code class="docutils literal notranslate"><span class="pre">.zmetadata</span></code>, or <code class="docutils literal notranslate"><span class="pre">zarr.json</span></code>).</p></li>
+<li><p><strong>Binary</strong>: the folder contains SpikeInterface’s recognition marker
+<code class="docutils literal notranslate"><span class="pre">si_folder.json</span></code> (or <code class="docutils literal notranslate"><span class="pre">binary.json</span></code>).</p></li>
+<li><p><strong>NeuRodent</strong>: the folder contains our own sidecar
+(<code class="xref py py-data docutils literal notranslate"><span class="pre">NEURODENT_SIDECAR_NAME</span></code>).</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>path</strong> – Path to inspect.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True if <code class="docutils literal notranslate"><span class="pre">path</span></code> is a recognized recording output folder.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.safe_rmtree">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">safe_rmtree</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">require_marker</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/paths.html#safe_rmtree"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.safe_rmtree" title="Link to this definition">#</a></dt>
+<dd><p>Recursively delete a directory tree, refusing unrecognized targets.</p>
+<p>A guarded counterpart to <a class="reference internal" href="#neurodent.core.utils.safe_unlink" title="neurodent.core.utils.safe_unlink"><code class="xref py py-func docutils literal notranslate"><span class="pre">safe_unlink()</span></code></a> for directories. By default it
+will only delete a directory that <a class="reference internal" href="#neurodent.core.utils.is_si_recording_folder" title="neurodent.core.utils.is_si_recording_folder"><code class="xref py py-func docutils literal notranslate"><span class="pre">is_si_recording_folder()</span></code></a> recognizes,
+so a mistyped or malicious path can never wipe an arbitrary data directory.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> – Directory to remove.</p></li>
+<li><p><strong>require_marker</strong> – When True (default), raise <code class="xref py py-class docutils literal notranslate"><span class="pre">ValueError</span></code> unless the
+target is a recognized SpikeInterface/NeuRodent recording folder.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If <code class="docutils literal notranslate"><span class="pre">require_marker</span></code> is True and the target is not a
+    recognized recording folder.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.atomic_output_path">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">atomic_output_path</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">final_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/core/utils/paths.html#atomic_output_path"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.atomic_output_path" title="Link to this definition">#</a></dt>
+<dd><p>Context manager yielding a temporary sibling path for an atomic write.</p>
+<p>The caller writes to the yielded temporary path. On clean exit the temp file
+is atomically moved into place with <code class="xref py py-func docutils literal notranslate"><span class="pre">os.replace()</span></code>; on exception the temp
+file is removed and the original error re-raised. Because the temp file lives
+in the same directory as <code class="docutils literal notranslate"><span class="pre">final_path</span></code> (same filesystem), <code class="docutils literal notranslate"><span class="pre">os.replace</span></code> is
+atomic, so a crash mid-write can never leave a partial file at <code class="docutils literal notranslate"><span class="pre">final_path</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>final_path</strong> – The destination path the content should end up at.</p>
+</dd>
+<dt class="field-even">Yields<span class="colon">:</span></dt>
+<dd class="field-even"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">Path</span></code> – A temporary path in the same directory to write to.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="n">atomic_output_path</span><span class="p">(</span><span class="s2">&quot;out.bin&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">tmp</span><span class="p">:</span>  
+<span class="gp">... </span>    <span class="n">data</span><span class="o">.</span><span class="n">tofile</span><span class="p">(</span><span class="n">tmp</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.atomic_write_json">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">atomic_write_json</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">obj</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">indent</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/paths.html#atomic_write_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.atomic_write_json" title="Link to this definition">#</a></dt>
+<dd><p>Atomically write <code class="docutils literal notranslate"><span class="pre">obj</span></code> to <code class="docutils literal notranslate"><span class="pre">path</span></code> as JSON.</p>
+<p>Serializes to a temporary sibling file and atomically renames it into place,
+so an interrupted write never leaves a partial/corrupt JSON file at <code class="docutils literal notranslate"><span class="pre">path</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> – Destination JSON file path.</p></li>
+<li><p><strong>obj</strong> – JSON-serializable object to write.</p></li>
+<li><p><strong>indent</strong> – Indentation passed to <code class="xref py py-func docutils literal notranslate"><span class="pre">json.dump()</span></code>.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.filepath_to_index">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">filepath_to_index</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filepath</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/paths.html#filepath_to_index"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.filepath_to_index" title="Link to this definition">#</a></dt>
+<dd><p>Extract the index number from a filepath.</p>
+<p>This function extracts the last number found in a filepath after removing common suffixes
+and file extensions. For example, from “/path/to/data_ColMajor_001.bin” it returns 1.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filepath</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span> <span class="pre">|</span> <span class="pre">Path</span></code>) – Path to the file to extract index from.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The extracted index number, or 0 if no number is found in the filename.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">filepath_to_index</span><span class="p">(</span><span class="s2">&quot;/path/to/data_ColMajor_001.bin&quot;</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">filepath_to_index</span><span class="p">(</span><span class="s2">&quot;/path/to/data_2023_015_ColMajor.bin&quot;</span><span class="p">)</span>
+<span class="go">15</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">filepath_to_index</span><span class="p">(</span><span class="s2">&quot;/path/to/data_Meta_010.json&quot;</span><span class="p">)</span>
+<span class="go">10</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.get_file_stem">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">get_file_stem</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filepath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/paths.html#get_file_stem"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.get_file_stem" title="Link to this definition">#</a></dt>
+<dd><p>Get the true stem for files, handling double extensions like .npy.gz.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.cache_fragments_to_zarr">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">cache_fragments_to_zarr</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">np_fragments</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">n_fragments</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">tmpdir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">chunk_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">zarr.Array</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/caching.html#cache_fragments_to_zarr"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.cache_fragments_to_zarr" title="Link to this definition">#</a></dt>
+<dd><p>Cache numpy fragments array to zarr format for efficient memory management.</p>
+<p>This function converts a numpy array of recording fragments to a zarr array stored
+in a temporary location. This allows better memory management and garbage collection
+by avoiding keeping large numpy arrays in memory for extended periods.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>np_fragments</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">np.ndarray</span></code>) – Numpy array of shape (n_fragments, n_samples, n_channels)
+containing the recording fragments to cache.</p></li>
+<li><p><strong>n_fragments</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>) – Number of fragments to cache (allows for subset caching).</p></li>
+<li><p><strong>tmpdir</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str,</span> <span class="pre">optional</span></code>) – Directory path for temporary zarr storage. If None,
+uses get_temp_directory(). Defaults to None.</p></li>
+<li><p><strong>chunk_size</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int,</span> <span class="pre">optional</span></code>) – Number of fragments per zarr chunk along the first
+axis. Controls the read/write granularity when accessing the zarr array.
+Smaller values reduce memory overhead per chunk; larger values improve
+sequential throughput. When None, defaults to <code class="docutils literal notranslate"><span class="pre">min(100,</span> <span class="pre">n_fragments)</span></code>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A tuple containing:</dt><dd><ul class="simple">
+<li><p>str: Path to the temporary zarr file</p></li>
+<li><p>zarr.Array: The zarr array object for accessing cached data</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple[str, zarr.Array]</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>ImportError</strong> – If zarr is not available</p></li>
+<li><p><strong>ValueError</strong> – If <code class="docutils literal notranslate"><span class="pre">chunk_size</span></code> is not None and is less than 1</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.stream_fragments_to_zarr">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">stream_fragments_to_zarr</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">get_fragment_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">n_fragments</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">fragment_shape</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">fragment_dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dtype</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">chunk_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">tmpdir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/caching.html#stream_fragments_to_zarr"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.stream_fragments_to_zarr" title="Link to this definition">#</a></dt>
+<dd><p>Stream recording fragments to a zarr store in memory-bounded batches.</p>
+<p>Unlike <a class="reference internal" href="#neurodent.core.utils.cache_fragments_to_zarr" title="neurodent.core.utils.cache_fragments_to_zarr"><code class="xref py py-func docutils literal notranslate"><span class="pre">cache_fragments_to_zarr()</span></code></a>, this function never holds more than
+<code class="docutils literal notranslate"><span class="pre">chunk_size</span></code> fragments in RAM at once.  It calls <code class="docutils literal notranslate"><span class="pre">get_fragment_fn</span></code> one
+batch at a time, writes each batch to the zarr store, and immediately frees
+the batch buffer — so peak RAM is proportional to <code class="docutils literal notranslate"><span class="pre">chunk_size</span></code> rather than
+<code class="docutils literal notranslate"><span class="pre">n_fragments</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>get_fragment_fn</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Callable[[int],</span> <span class="pre">np.ndarray]</span></code>) – A callable that accepts a
+fragment index (0-based) and returns the corresponding fragment as a
+NumPy array of shape <code class="docutils literal notranslate"><span class="pre">fragment_shape</span></code>.</p></li>
+<li><p><strong>n_fragments</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>) – Total number of fragments to stream.</p></li>
+<li><p><strong>fragment_shape</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code>) – Shape of a single fragment (e.g. <code class="docutils literal notranslate"><span class="pre">(n_samples,</span>
+<span class="pre">n_channels)</span></code>).</p></li>
+<li><p><strong>fragment_dtype</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">np.dtype</span></code>) – Data-type of the fragment arrays.</p></li>
+<li><p><strong>chunk_size</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>) – Number of fragments to buffer per batch.  Must be &gt;= 1.
+Larger values improve sequential write throughput; smaller values
+reduce peak RAM.</p></li>
+<li><p><strong>tmpdir</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str,</span> <span class="pre">optional</span></code>) – Directory for the temporary zarr file.  If
+<code class="docutils literal notranslate"><span class="pre">None</span></code>, uses <a class="reference internal" href="#neurodent.core.utils.get_temp_directory" title="neurodent.core.utils.get_temp_directory"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_temp_directory()</span></code></a>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Path to the temporary zarr file on disk.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>ValueError</strong> – If <code class="docutils literal notranslate"><span class="pre">chunk_size</span></code> &lt; 1.</p></li>
+<li><p><strong>ImportError</strong> – If zarr is not available.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.stream_recording_to_zarr">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">stream_recording_to_zarr</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">recording</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">n_fragments</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">n_samples_per_frag</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">n_frag_per_chunk</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">tmpdir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/caching.html#stream_recording_to_zarr"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.stream_recording_to_zarr" title="Link to this definition">#</a></dt>
+<dd><p>Stream a SpikeInterface recording to a zarr store in memory-bounded batches.</p>
+<p>Reads chunk-sized slices from <code class="docutils literal notranslate"><span class="pre">recording.get_traces()</span></code>, reshapes each
+chunk to <code class="docutils literal notranslate"><span class="pre">(n_frags_in_chunk,</span> <span class="pre">n_samples_per_frag,</span> <span class="pre">n_channels)</span></code>, and
+writes it to a zarr store.  Peak RAM is proportional to <code class="docutils literal notranslate"><span class="pre">n_frag_per_chunk</span></code>
+rather than <code class="docutils literal notranslate"><span class="pre">n_fragments</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>recording</strong> – A SpikeInterface <code class="docutils literal notranslate"><span class="pre">BaseRecording</span></code> object (may be a lazy
+wrapper such as a <code class="docutils literal notranslate"><span class="pre">NotchFilterRecording</span></code>).</p></li>
+<li><p><strong>n_fragments</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>) – Total number of fragments to stream.</p></li>
+<li><p><strong>n_samples_per_frag</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>) – Number of samples in each fragment.</p></li>
+<li><p><strong>n_frag_per_chunk</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>) – Number of fragments to buffer per batch.
+Must be &gt;= 1.  Larger values improve sequential write throughput;
+smaller values reduce peak RAM.</p></li>
+<li><p><strong>tmpdir</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str,</span> <span class="pre">optional</span></code>) – Directory for the temporary zarr file.  If
+<code class="docutils literal notranslate"><span class="pre">None</span></code>, uses <a class="reference internal" href="#neurodent.core.utils.get_temp_directory" title="neurodent.core.utils.get_temp_directory"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_temp_directory()</span></code></a>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Path to the temporary zarr file on disk.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>ValueError</strong> – If <code class="docutils literal notranslate"><span class="pre">n_frag_per_chunk</span></code> &lt; 1.</p></li>
+<li><p><strong>ImportError</strong> – If zarr is not available.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.should_use_cached_file">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">should_use_cached_file</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">cache_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">source_paths</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">use_cached</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'auto'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'always'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'never'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'error'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'auto'</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/caching.html#should_use_cached_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.should_use_cached_file" title="Link to this definition">#</a></dt>
+<dd><p>Determine whether to use a cached intermediate file based on caching policy and file timestamps.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cache_path</strong> – Path to the cached intermediate file</p></li>
+<li><p><strong>source_paths</strong> – List of source file paths that the cache depends on</p></li>
+<li><p><strong>use_cached</strong> – Caching policy
+- “auto”: Use cached if exists and newer than all sources (default)
+- “always”: Always use cached if it exists
+- “never”: Never use cached (always regenerate)
+- “error”: Raise error if cached doesn’t exist</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True if cached file should be used, False if it should be regenerated</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>FileNotFoundError</strong> – When use_cached=”error” and cache doesn’t exist</p></li>
+<li><p><strong>ValueError</strong> – For invalid use_cached values</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.get_cache_status_message">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">get_cache_status_message</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cache_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_cached</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/caching.html#get_cache_status_message"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.get_cache_status_message" title="Link to this definition">#</a></dt>
+<dd><p>Generate a descriptive message about cache usage for logging.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.should_use_cache_unified">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">should_use_cache_unified</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">cache_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">source_paths</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">cache_policy</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'auto'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'always'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'force_regenerate'</span></span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/caching.html#should_use_cache_unified"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.should_use_cache_unified" title="Link to this definition">#</a></dt>
+<dd><p>Unified cache decision logic for all intermediate files.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cache_path</strong> – Path to the cache file</p></li>
+<li><p><strong>source_paths</strong> – List of source file paths to check timestamps against</p></li>
+<li><p><strong>cache_policy</strong> – Caching policy:
+- “auto”: Use cache if exists and newer than sources, regenerate with logging if missing/invalid
+- “always”: Use cache if exists, raise error if missing/invalid
+- “force_regenerate”: Always regenerate and overwrite existing cache</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True if cache should be used, False if should regenerate</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If cache_policy is invalid</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.nanaverage">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">nanaverage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">A</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weights</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/dataframe.html#nanaverage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.nanaverage" title="Link to this definition">#</a></dt>
+<dd><p>Compute weighted average of an array, ignoring NaN values.</p>
+<p>This function computes a weighted average along the specified axis while
+properly handling NaN values by masking them out of the calculation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>A</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">np.ndarray</span></code>) – Input array containing the values to average.</p></li>
+<li><p><strong>weights</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">np.ndarray</span></code>) – Array of weights corresponding to the values in A.
+Must be broadcastable with A along the specified axis.</p></li>
+<li><p><strong>axis</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int,</span> <span class="pre">optional</span></code>) – Axis along which to compute the average. Defaults to -1 (last axis).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Weighted average with NaN values properly handled. If all values</dt><dd><p>along an axis are NaN, the result will be NaN for that position.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">A</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">],</span> <span class="p">[</span><span class="mf">4.0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">]])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">weights</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">nanaverage</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">weights</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="go">array([1.66666667, 5.        ])</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Be careful with zero or negative weights as they may produce unexpected results.
+The function uses numpy’s masked array functionality for robust NaN handling.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.nanmean_series_of_np">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">nanmean_series_of_np</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Series</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/dataframe.html#nanmean_series_of_np"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.nanmean_series_of_np" title="Link to this definition">#</a></dt>
+<dd><p>Efficiently compute NaN-aware mean of a pandas Series containing numpy arrays.</p>
+<p>This function is optimized for computing the mean across a Series where each element
+is a numpy array. It uses different strategies based on the size of the Series
+for optimal performance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">pd.Series</span></code>) – Series containing numpy arrays as elements.</p></li>
+<li><p><strong>axis</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int,</span> <span class="pre">optional</span></code>) – Axis along which to compute the mean. Defaults to 0.
+- axis=0: Mean across the Series elements (most common)
+- axis=1: Mean within each array element</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Array containing the computed means with NaN values properly handled.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Create a Series of numpy arrays</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">arrays</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">]),</span>
+<span class="gp">... </span>          <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">4.0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">]),</span>
+<span class="gp">... </span>          <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">7.0</span><span class="p">,</span> <span class="mf">8.0</span><span class="p">,</span> <span class="mf">9.0</span><span class="p">])]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">series</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">arrays</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">nanmean_series_of_np</span><span class="p">(</span><span class="n">series</span><span class="p">)</span>
+<span class="go">array([4. , 5. , 7.5])</span>
+</pre></div>
+</div>
+<dl class="simple">
+<dt>Performance Notes:</dt><dd><ul class="simple">
+<li><p>For Series with more than 1000 elements containing numpy arrays,
+uses <code class="xref py py-obj docutils literal notranslate"><span class="pre">np.stack()</span></code> for better performance</p></li>
+<li><p>Falls back to list conversion for smaller Series or mixed types</p></li>
+<li><p>Handles shape mismatches gracefully by falling back to the slower method</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.sort_dataframe_by_plot_order">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">sort_dataframe_by_plot_order</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">df_sort_order</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/dataframe.html#sort_dataframe_by_plot_order"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.sort_dataframe_by_plot_order" title="Link to this definition">#</a></dt>
+<dd><p>Sort DataFrame columns according to predefined orders.</p>
+<section id="parameters">
+<h3>Parameters<a class="headerlink" href="#parameters" title="Link to this heading">#</a></h3>
+<dl class="simple">
+<dt>df<span class="classifier">pd.DataFrame</span></dt><dd><p>DataFrame to sort</p>
+</dd>
+<dt>df_sort_order<span class="classifier">dict</span></dt><dd><p>Dictionary mapping column names to the order of the values in the column.</p>
+</dd>
+</dl>
+</section>
+<section id="returns">
+<h3>Returns<a class="headerlink" href="#returns" title="Link to this heading">#</a></h3>
+<dl class="simple">
+<dt>pd.DataFrame</dt><dd><p>Sorted DataFrame</p>
+</dd>
+</dl>
+</section>
+<section id="raises">
+<h3>Raises<a class="headerlink" href="#raises" title="Link to this heading">#</a></h3>
+<dl class="simple">
+<dt>ValueError</dt><dd><p>If df_sort_order is not a valid dictionary or contains invalid categories</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="neurodent.core.utils.Natural_Neighbor">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">Natural_Neighbor</span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/neighbors.html#Natural_Neighbor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.Natural_Neighbor" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Natural Neighbor algorithm implementation for finding natural neighbors in a dataset.</p>
+<p>This class implements the Natural Neighbor algorithm which finds mutual neighbors
+in a dataset by iteratively expanding the neighborhood radius until convergence.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.core.utils.Natural_Neighbor.load">
+<span class="sig-name descname"><span class="pre">load</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/core/utils/neighbors.html#Natural_Neighbor.load"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.Natural_Neighbor.load" title="Link to this definition">#</a></dt>
+<dd><p>Load dataset from a CSV file, separating attributes and classes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Path to the CSV file containing the dataset</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.core.utils.Natural_Neighbor.read">
+<span class="sig-name descname"><span class="pre">read</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/core/utils/neighbors.html#Natural_Neighbor.read"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.Natural_Neighbor.read" title="Link to this definition">#</a></dt>
+<dd><p>Load data directly from a numpy array.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>data</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">np.ndarray</span></code>) – Input data array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.core.utils.Natural_Neighbor.read_distance_matrix">
+<span class="sig-name descname"><span class="pre">read_distance_matrix</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">distance_matrix</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/core/utils/neighbors.html#Natural_Neighbor.read_distance_matrix"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.Natural_Neighbor.read_distance_matrix" title="Link to this definition">#</a></dt>
+<dd><p>Load a precomputed distance matrix for neighbor search.</p>
+<p>When a distance matrix is provided, <a class="reference internal" href="#neurodent.core.utils.Natural_Neighbor.algorithm" title="neurodent.core.utils.Natural_Neighbor.algorithm"><code class="xref py py-meth docutils literal notranslate"><span class="pre">algorithm()</span></code></a> uses
+argsort-based neighbor lookup instead of a KDTree, avoiding the
+need to hold the raw high-dimensional data in memory.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>distance_matrix</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">np.ndarray</span></code>) – Symmetric (n, n) distance matrix.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.core.utils.Natural_Neighbor.asserts">
+<span class="sig-name descname"><span class="pre">asserts</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/core/utils/neighbors.html#Natural_Neighbor.asserts"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.Natural_Neighbor.asserts" title="Link to this definition">#</a></dt>
+<dd><p>Initialize data structures for the algorithm.</p>
+<p>Sets up the necessary data structures including:
+- nan_edges as an empty set
+- knn, nan_num, and repeat dictionaries for each instance</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.core.utils.Natural_Neighbor.count">
+<span class="sig-name descname"><span class="pre">count</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/core/utils/neighbors.html#Natural_Neighbor.count"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.Natural_Neighbor.count" title="Link to this definition">#</a></dt>
+<dd><p>Count the number of instances that have no natural neighbors.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Number of instances with zero natural neighbors</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.core.utils.Natural_Neighbor.findKNN">
+<span class="sig-name descname"><span class="pre">findKNN</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">inst</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tree</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/core/utils/neighbors.html#Natural_Neighbor.findKNN"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.Natural_Neighbor.findKNN" title="Link to this definition">#</a></dt>
+<dd><p>Find the indices of the k nearest neighbors.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>inst</strong> – Instance to find neighbors for</p></li>
+<li><p><strong>r</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>) – Radius/parameter for neighbor search</p></li>
+<li><p><strong>tree</strong> – KDTree object for efficient neighbor search</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Array of neighbor indices (excluding the instance itself)</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.core.utils.Natural_Neighbor.algorithm">
+<span class="sig-name descname"><span class="pre">algorithm</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/core/utils/neighbors.html#Natural_Neighbor.algorithm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.Natural_Neighbor.algorithm" title="Link to this definition">#</a></dt>
+<dd><p>Execute the Natural Neighbor algorithm.</p>
+<p>The algorithm iteratively expands the neighborhood radius until convergence,
+finding mutual neighbors between instances.</p>
+<p>When a precomputed distance matrix is available (see
+<a class="reference internal" href="#neurodent.core.utils.Natural_Neighbor.read_distance_matrix" title="neurodent.core.utils.Natural_Neighbor.read_distance_matrix"><code class="xref py py-meth docutils literal notranslate"><span class="pre">read_distance_matrix()</span></code></a>), neighbor lookup is performed via
+argsort instead of a KDTree, which avoids holding the raw
+high-dimensional data in memory.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The final radius value when convergence is reached</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.chunked_channel_distance_matrix">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">chunked_channel_distance_matrix</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">get_traces_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">n_channels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">n_samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">chunk_samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/neighbors.html#chunked_channel_distance_matrix"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.chunked_channel_distance_matrix" title="Link to this definition">#</a></dt>
+<dd><p>Compute pairwise Euclidean distance matrix between channels in chunks.</p>
+<p>Instead of loading the full <code class="docutils literal notranslate"><span class="pre">(n_samples,</span> <span class="pre">n_channels)</span></code> trace matrix at
+once, this function reads <code class="docutils literal notranslate"><span class="pre">chunk_samples</span></code> frames at a time and
+accumulates squared distances using the identity</p>
+<blockquote>
+<div><p>||c_i - c_j||^2 = ||c_i||^2 + ||c_j||^2 - 2 * c_i · c_j</p>
+</div></blockquote>
+<p>so that peak RAM is proportional to <code class="docutils literal notranslate"><span class="pre">chunk_samples</span> <span class="pre">*</span> <span class="pre">n_channels</span></code>
+rather than <code class="docutils literal notranslate"><span class="pre">n_samples</span> <span class="pre">*</span> <span class="pre">n_channels</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>get_traces_fn</strong> – <code class="docutils literal notranslate"><span class="pre">fn(start_frame,</span> <span class="pre">end_frame)</span> <span class="pre">-&gt;</span> <span class="pre">np.ndarray</span></code> with
+shape <code class="docutils literal notranslate"><span class="pre">(frames,</span> <span class="pre">n_channels)</span></code>.  Typically
+<code class="docutils literal notranslate"><span class="pre">recording.get_traces(start_frame=...,</span> <span class="pre">end_frame=...,</span>
+<span class="pre">return_scaled=True)</span></code>.</p></li>
+<li><p><strong>n_channels</strong> – Number of channels.</p></li>
+<li><p><strong>n_samples</strong> – Total number of samples in the recording.</p></li>
+<li><p><strong>chunk_samples</strong> – Number of samples to read per chunk.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Symmetric <code class="docutils literal notranslate"><span class="pre">(n_channels,</span> <span class="pre">n_channels)</span></code> Euclidean
+distance matrix.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.core.utils.parse_truncate">
+<span class="sig-prename descclassname"><span class="pre">neurodent.core.utils.</span></span><span class="sig-name descname"><span class="pre">parse_truncate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">truncate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bool</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="../../_modules/neurodent/core/utils/misc.html#parse_truncate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.core.utils.parse_truncate" title="Link to this definition">#</a></dt>
+<dd><p>Parse the truncate parameter to determine how many characters to truncate.</p>
+<p>If truncate is a boolean, returns 10 if True and 0 if False.
+If truncate is an integer, returns that integer value directly.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>truncate</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span> <span class="pre">|</span> <span class="pre">bool</span></code>) – If bool, True=10 chars and False=0 chars.
+If int, specifies exact number of chars.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Number of characters to truncate (0 means no truncation)</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If truncate is not a boolean or integer</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="zeitgeber.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">ZeitgeberAnalysisResult</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../visualization/index.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Visualization Module</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-neurodent.core.utils">Functions</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.convert_units_to_multiplier"><code class="docutils literal notranslate"><span class="pre">convert_units_to_multiplier()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.extract_mne_unit_info"><code class="docutils literal notranslate"><span class="pre">extract_mne_unit_info()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.log_transform"><code class="docutils literal notranslate"><span class="pre">log_transform()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.is_day"><code class="docutils literal notranslate"><span class="pre">is_day()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.parse_str_to_day"><code class="docutils literal notranslate"><span class="pre">parse_str_to_day()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.TimestampMapper"><code class="docutils literal notranslate"><span class="pre">TimestampMapper</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.TimestampMapper.get_fragment_timestamp"><code class="docutils literal notranslate"><span class="pre">TimestampMapper.get_fragment_timestamp()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.validate_timestamps"><code class="docutils literal notranslate"><span class="pre">validate_timestamps()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.resolve_channel"><code class="docutils literal notranslate"><span class="pre">resolve_channel()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.resolve_channels"><code class="docutils literal notranslate"><span class="pre">resolve_channels()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.parse_str_to_animal"><code class="docutils literal notranslate"><span class="pre">parse_str_to_animal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.normalize_value_from_aliases"><code class="docutils literal notranslate"><span class="pre">normalize_value_from_aliases()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.rename_mne_channels"><code class="docutils literal notranslate"><span class="pre">rename_mne_channels()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.slugify"><code class="docutils literal notranslate"><span class="pre">slugify()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.get_feature_label"><code class="docutils literal notranslate"><span class="pre">get_feature_label()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.set_temp_directory"><code class="docutils literal notranslate"><span class="pre">set_temp_directory()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.get_temp_directory"><code class="docutils literal notranslate"><span class="pre">get_temp_directory()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.safe_unlink"><code class="docutils literal notranslate"><span class="pre">safe_unlink()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.is_si_recording_folder"><code class="docutils literal notranslate"><span class="pre">is_si_recording_folder()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.safe_rmtree"><code class="docutils literal notranslate"><span class="pre">safe_rmtree()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.atomic_output_path"><code class="docutils literal notranslate"><span class="pre">atomic_output_path()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.atomic_write_json"><code class="docutils literal notranslate"><span class="pre">atomic_write_json()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.filepath_to_index"><code class="docutils literal notranslate"><span class="pre">filepath_to_index()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.get_file_stem"><code class="docutils literal notranslate"><span class="pre">get_file_stem()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.cache_fragments_to_zarr"><code class="docutils literal notranslate"><span class="pre">cache_fragments_to_zarr()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.stream_fragments_to_zarr"><code class="docutils literal notranslate"><span class="pre">stream_fragments_to_zarr()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.stream_recording_to_zarr"><code class="docutils literal notranslate"><span class="pre">stream_recording_to_zarr()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.should_use_cached_file"><code class="docutils literal notranslate"><span class="pre">should_use_cached_file()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.get_cache_status_message"><code class="docutils literal notranslate"><span class="pre">get_cache_status_message()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.should_use_cache_unified"><code class="docutils literal notranslate"><span class="pre">should_use_cache_unified()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.nanaverage"><code class="docutils literal notranslate"><span class="pre">nanaverage()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.nanmean_series_of_np"><code class="docutils literal notranslate"><span class="pre">nanmean_series_of_np()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.sort_dataframe_by_plot_order"><code class="docutils literal notranslate"><span class="pre">sort_dataframe_by_plot_order()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.Natural_Neighbor"><code class="docutils literal notranslate"><span class="pre">Natural_Neighbor</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.Natural_Neighbor.load"><code class="docutils literal notranslate"><span class="pre">Natural_Neighbor.load()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.Natural_Neighbor.read"><code class="docutils literal notranslate"><span class="pre">Natural_Neighbor.read()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.Natural_Neighbor.read_distance_matrix"><code class="docutils literal notranslate"><span class="pre">Natural_Neighbor.read_distance_matrix()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.Natural_Neighbor.asserts"><code class="docutils literal notranslate"><span class="pre">Natural_Neighbor.asserts()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.Natural_Neighbor.count"><code class="docutils literal notranslate"><span class="pre">Natural_Neighbor.count()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.Natural_Neighbor.findKNN"><code class="docutils literal notranslate"><span class="pre">Natural_Neighbor.findKNN()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.Natural_Neighbor.algorithm"><code class="docutils literal notranslate"><span class="pre">Natural_Neighbor.algorithm()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.chunked_channel_distance_matrix"><code class="docutils literal notranslate"><span class="pre">chunked_channel_distance_matrix()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.core.utils.parse_truncate"><code class="docutils literal notranslate"><span class="pre">parse_truncate()</span></code></a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/api/core/utils.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025, Joseph Dong, Yongtaek Oh, Eric Marsh.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

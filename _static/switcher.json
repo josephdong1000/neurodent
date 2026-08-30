@@ -1,0 +1,53 @@
+[
+  {
+    "name": "main (dev)",
+    "version": "main",
+    "url": "https://josephdong1000.github.io/neurodent/main/"
+  },
+  {
+    "name": "v0.4.0 (stable)",
+    "version": "v0.4.0",
+    "url": "https://josephdong1000.github.io/neurodent/v0.4.0/",
+    "preferred": true
+  },
+  {
+    "name": "v0.3.0",
+    "version": "v0.3.0",
+    "url": "https://josephdong1000.github.io/neurodent/v0.3.0/"
+  },
+  {
+    "name": "v0.3.0a1",
+    "version": "v0.3.0a1",
+    "url": "https://josephdong1000.github.io/neurodent/v0.3.0a1/"
+  },
+  {
+    "name": "v0.2.4",
+    "version": "v0.2.4",
+    "url": "https://josephdong1000.github.io/neurodent/v0.2.4/"
+  },
+  {
+    "name": "v0.2.3",
+    "version": "v0.2.3",
+    "url": "https://josephdong1000.github.io/neurodent/v0.2.3/"
+  },
+  {
+    "name": "v0.2.1",
+    "version": "v0.2.1",
+    "url": "https://josephdong1000.github.io/neurodent/v0.2.1/"
+  },
+  {
+    "name": "v0.2.0",
+    "version": "v0.2.0",
+    "url": "https://josephdong1000.github.io/neurodent/v0.2.0/"
+  },
+  {
+    "name": "v0.1.1",
+    "version": "v0.1.1",
+    "url": "https://josephdong1000.github.io/neurodent/v0.1.1/"
+  },
+  {
+    "name": "v0.1.0",
+    "version": "v0.1.0",
+    "url": "https://josephdong1000.github.io/neurodent/v0.1.0/"
+  }
+]

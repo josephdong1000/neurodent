@@ -1,0 +1,898 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>neurodent.loading.long_recording_organizer &#8212; Neurodent 0.4.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../_static/documentation_options.js?v=6c02275b"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/neurodent/loading/long_recording_organizer';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://josephdong1000.github.io/neurodent/_static/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.4.0';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner =
+            false;
+        </script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">NeuRodent</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../license/index.html">
+    License
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-2"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-2"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-2"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-2">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../license/index.html">
+    License
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-3"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-3"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-3"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-3">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">neurodent.loading.long_recording_organizer</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for neurodent.loading.long_recording_organizer</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Long recording loader for the loading stage.</span>
+
+<span class="sd">``LongRecordingOrganizer`` builds a single long recording from disk (or an</span>
+<span class="sd">in-memory recording) and exposes fragment access, timestamps, quality, persistence,</span>
+<span class="sd">and split/merge. Its behavior is composed from the ``lro_*`` mixins in this package;</span>
+<span class="sd">this module keeps the base methods (including the name-mangled index helpers and</span>
+<span class="sd">their fragment-accessor callers), the class declaration, and ``split_recording``.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">mne</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">neurodent.core.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">parse_truncate</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.recording_metadata</span><span class="w"> </span><span class="kn">import</span> <span class="n">RecordingMetadata</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.lro_loading</span><span class="w"> </span><span class="kn">import</span> <span class="n">LroLoadingMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.lro_timestamps</span><span class="w"> </span><span class="kn">import</span> <span class="n">LroTimestampsMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.lro_fragments</span><span class="w"> </span><span class="kn">import</span> <span class="n">LroFragmentsMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.lro_quality</span><span class="w"> </span><span class="kn">import</span> <span class="n">LroQualityMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.lro_persistence</span><span class="w"> </span><span class="kn">import</span> <span class="n">LroPersistenceMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.lro_merge</span><span class="w"> </span><span class="kn">import</span> <span class="n">LroMergeMixin</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">split_recording</span><span class="p">(</span>
+    <span class="n">input_path</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">],</span>
+    <span class="n">groups</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span>
+    <span class="n">output_base</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">mode</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;si&quot;</span><span class="p">,</span> <span class="s2">&quot;mne&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;si&quot;</span><span class="p">,</span>
+    <span class="nb">format</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;zarr&quot;</span><span class="p">,</span> <span class="s2">&quot;binary&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;zarr&quot;</span><span class="p">,</span>
+    <span class="n">save</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">persist</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">lro_kwargs</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="s2">&quot;LongRecordingOrganizer&quot;</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Split a multi-animal recording file into separate per-animal recordings.</span>
+
+<span class="sd">    This is a standalone convenience function that creates an LRO, splits it,</span>
+<span class="sd">    and optionally saves the results to disk.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        input_path (Union[str, Path]): Path to the input recording file/folder.</span>
+<span class="sd">        groups (dict[str, list[str]]): Dictionary mapping group names to channel lists.</span>
+<span class="sd">            Example: {&quot;AnimalA&quot;: [&quot;Ch1&quot;, &quot;Ch2&quot;], &quot;AnimalB&quot;: [&quot;Ch3&quot;, &quot;Ch4&quot;]}</span>
+<span class="sd">        output_base (Union[str, Path], optional): Base directory for output. Required if save=True.</span>
+<span class="sd">        mode (Literal[&quot;si&quot;, &quot;mne&quot;], optional): Mode for loading input. Defaults to &quot;si&quot;.</span>
+<span class="sd">        format (Literal[&quot;zarr&quot;, &quot;binary&quot;], optional): Output format. Defaults to &quot;zarr&quot;.</span>
+<span class="sd">        save (bool, optional): If True, save splits to disk via</span>
+<span class="sd">            :meth:`LongRecordingOrganizer.save_recording`. Defaults to True.</span>
+<span class="sd">        overwrite (bool, optional): Passed to ``save_recording``; if True, replace an</span>
+<span class="sd">            existing (recognized) recording folder. Defaults to False.</span>
+<span class="sd">        persist (bool, optional): Deprecated alias for ``save``. If provided (not None),</span>
+<span class="sd">            it overrides ``save`` and emits a :class:`DeprecationWarning`.</span>
+<span class="sd">        **lro_kwargs: Additional arguments passed to LongRecordingOrganizer.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict[str, LongRecordingOrganizer]: Dictionary mapping group names to LRO instances.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; from neurodent.loading import split_recording</span>
+<span class="sd">        &gt;&gt;&gt; splits = split_recording(</span>
+<span class="sd">        ...     &quot;/path/to/session.bin&quot;,</span>
+<span class="sd">        ...     groups={&quot;AnimalA&quot;: [&quot;Ch1&quot;, &quot;Ch2&quot;], &quot;AnimalB&quot;: [&quot;Ch3&quot;, &quot;Ch4&quot;]},</span>
+<span class="sd">        ...     output_base=&quot;/path/to/output&quot;,</span>
+<span class="sd">        ... )</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">persist</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="s2">&quot;The &#39;persist&#39; argument of split_recording() is deprecated; use &#39;save&#39;.&quot;</span><span class="p">,</span>
+            <span class="ne">DeprecationWarning</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">save</span> <span class="o">=</span> <span class="n">persist</span>
+
+    <span class="c1"># Load the input recording</span>
+    <span class="n">lro</span> <span class="o">=</span> <span class="n">LongRecordingOrganizer</span><span class="p">(</span><span class="n">input_path</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span> <span class="o">**</span><span class="n">lro_kwargs</span><span class="p">)</span>
+
+    <span class="c1"># Split into in-memory LROs</span>
+    <span class="n">splits</span> <span class="o">=</span> <span class="n">lro</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">groups</span><span class="p">)</span>
+
+    <span class="c1"># Save if requested</span>
+    <span class="k">if</span> <span class="n">save</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">output_base</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;output_base is required when save=True&quot;</span><span class="p">)</span>
+        <span class="n">output_base</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">output_base</span><span class="p">)</span>
+        <span class="n">output_base</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">group_name</span><span class="p">,</span> <span class="n">child_lro</span> <span class="ow">in</span> <span class="n">splits</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">output_dir</span> <span class="o">=</span> <span class="n">output_base</span> <span class="o">/</span> <span class="n">group_name</span>
+            <span class="n">child_lro</span><span class="o">.</span><span class="n">save_recording</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="nb">format</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">splits</span>
+
+
+<div class="viewcode-block" id="LongRecordingOrganizer">
+<a class="viewcode-back" href="../../../api/core/long_recording_organizer.html#neurodent.loading.LongRecordingOrganizer">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">LongRecordingOrganizer</span><span class="p">(</span>
+    <span class="n">LroLoadingMixin</span><span class="p">,</span>
+    <span class="n">LroTimestampsMixin</span><span class="p">,</span>
+    <span class="n">LroFragmentsMixin</span><span class="p">,</span>
+    <span class="n">LroQualityMixin</span><span class="p">,</span>
+    <span class="n">LroPersistenceMixin</span><span class="p">,</span>
+    <span class="n">LroMergeMixin</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Construct a long recording from various file formats or an existing recording object.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        item (str | Path | list[str] | DiscoveredFile | None): Input data specification.</span>
+<span class="sd">            - str/Path: Single file or directory path</span>
+<span class="sd">            - list[str]: Multiple files to concatenate</span>
+<span class="sd">            - DiscoveredFile: File(s) discovered by FileDiscoverer (single or multi-file)</span>
+<span class="sd">            - None: Used when initializing from an existing recording object</span>
+<span class="sd">        mode (Literal[&#39;si&#39;, &#39;mne&#39;, None], optional): Data loading mode. Defaults to &#39;si&#39;.</span>
+<span class="sd">            - &#39;si&#39;: Use SpikeInterface extractors</span>
+<span class="sd">            - &#39;mne&#39;: Use MNE-Python extractors (creates intermediate file)</span>
+<span class="sd">            - None: No data loading (item must be None, recording must be provided)</span>
+<span class="sd">        truncate (bool | int, optional): If True, truncate to first 10 files.</span>
+<span class="sd">            If an integer, truncate to first n files. Defaults to False.</span>
+<span class="sd">        cache_policy (Literal[&#39;auto&#39;, &#39;always&#39;, &#39;force_regenerate&#39;], optional):</span>
+<span class="sd">            Cache policy for intermediate files. Defaults to &#39;auto&#39;.</span>
+<span class="sd">        multiprocess_mode (Literal[&#39;dask&#39;, &#39;serial&#39;], optional): Processing mode for</span>
+<span class="sd">            parallel operations when loading multiple files. Defaults to &#39;serial&#39;.</span>
+<span class="sd">        extract_func (Callable | str, optional): Function to extract data.</span>
+<span class="sd">            - If str: name of SpikeInterface or MNE extractor (e.g., &#39;read_intan&#39;, &#39;read_raw_edf&#39;)</span>
+<span class="sd">            - If Callable: custom extraction function</span>
+<span class="sd">            - If None: defaults to si.load for SI mode</span>
+<span class="sd">        manual_datetimes (datetime | list[datetime], optional): Manually provided timestamps.</span>
+<span class="sd">        datetimes_are_start (bool, optional): If True (default), manual_datetimes are start times.</span>
+<span class="sd">        n_jobs (int, optional): Number of parallel jobs for MNE resampling. Defaults to 1.</span>
+<span class="sd">        recording (si.BaseRecording, optional): Existing SpikeInterface recording object</span>
+<span class="sd">            for in-memory initialization. Use this when creating LRO wrappers around split recordings.</span>
+<span class="sd">        **kwargs: Additional arguments passed to the data loading functions.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        LongRecording (si.BaseRecording): The SpikeInterface recording object.</span>
+<span class="sd">        meta (RecordingMetadata): Technical metadata (sampling rate, channels, etc.).</span>
+<span class="sd">        channel_names (list[str]): List of channel names.</span>
+<span class="sd">        file_durations (list[float]): Duration of each individual file in seconds.</span>
+<span class="sd">        cumulative_file_durations (list[float]): Cumulative duration timestamps for file boundaries.</span>
+<span class="sd">        temppaths (list[str]): Paths to temporary files created during processing.</span>
+<span class="sd">        bad_channel_names (list[str]): List of channels identified as bad/noisy.</span>
+<span class="sd">        _is_in_memory (bool): True if this LRO was created from an in-memory recording (via split()).</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If no data files are found, if the folder contains mixed file types,</span>
+<span class="sd">            or if manual time parameters are invalid.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="LongRecordingOrganizer.__init__">
+<a class="viewcode-back" href="../../../api/core/long_recording_organizer.html#neurodent.loading.LongRecordingOrganizer.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">item</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="s2">&quot;DiscoveredFile&quot;</span><span class="p">],</span>
+        <span class="n">mode</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;si&quot;</span><span class="p">,</span> <span class="s2">&quot;mne&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;si&quot;</span><span class="p">,</span>
+        <span class="n">truncate</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">cache_policy</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;auto&quot;</span><span class="p">,</span> <span class="s2">&quot;always&quot;</span><span class="p">,</span> <span class="s2">&quot;force_regenerate&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;auto&quot;</span><span class="p">,</span>
+        <span class="n">multiprocess_mode</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;dask&quot;</span><span class="p">,</span> <span class="s2">&quot;serial&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;serial&quot;</span><span class="p">,</span>
+        <span class="n">extract_func</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
+            <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="s2">&quot;si.BaseRecording&quot;</span><span class="p">],</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">mne</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">Raw</span><span class="p">],</span> <span class="nb">str</span>
+        <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">manual_datetimes</span><span class="p">:</span> <span class="n">datetime</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">datetimes_are_start</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">n_jobs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="n">recording</span><span class="p">:</span> <span class="s2">&quot;si.BaseRecording&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="c1"># Import DiscoveredFile here to avoid circular imports</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.discovery</span><span class="w"> </span><span class="kn">import</span> <span class="n">DiscoveredFile</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">DiscoveredFile</span><span class="p">):</span>
+            <span class="c1"># DiscoveredFile: handle both single and multi-file cases</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data_files</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">item</span> <span class="o">=</span> <span class="n">item</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
+            <span class="c1"># List of files: will be concatenated individually</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data_files</span> <span class="o">=</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">item</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">item</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data_files</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Single file/path or None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data_files</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">item</span> <span class="o">=</span> <span class="n">item</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_truncate</span> <span class="o">=</span> <span class="n">parse_truncate</span><span class="p">(</span><span class="n">truncate</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">truncate</span> <span class="o">=</span> <span class="kc">True</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_truncate</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">truncate</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;LongRecording will be truncated to the first </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">n_truncate</span><span class="si">}</span><span class="s2"> files&quot;</span>
+            <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">manual_datetimes</span> <span class="o">=</span> <span class="n">manual_datetimes</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">datetimes_are_start</span> <span class="o">=</span> <span class="n">datetimes_are_start</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_jobs</span> <span class="o">=</span> <span class="n">n_jobs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">labels</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">meta</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">channel_names</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">LongRecording</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">temppaths</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">file_durations</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cumulative_file_durations</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bad_channel_names</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_is_in_memory</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="k">if</span> <span class="n">recording</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_init_from_recording</span><span class="p">(</span><span class="n">recording</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">item</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_validate_manual_time_params</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">mode</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">item</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">detect_and_load_data</span><span class="p">(</span>
+                <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span>
+                <span class="n">cache_policy</span><span class="o">=</span><span class="n">cache_policy</span><span class="p">,</span>
+                <span class="n">multiprocess_mode</span><span class="o">=</span><span class="n">multiprocess_mode</span><span class="p">,</span>
+                <span class="n">extract_func</span><span class="o">=</span><span class="n">extract_func</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+            <span class="p">)</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">display_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Short display name for logging, derived from the item.&quot;&quot;&quot;</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.discovery</span><span class="w"> </span><span class="kn">import</span> <span class="n">DiscoveredFile</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">item</span><span class="p">,</span> <span class="n">DiscoveredFile</span><span class="p">):</span>
+            <span class="n">paths</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">item</span><span class="o">.</span><span class="n">get_path_list</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">paths</span><span class="p">:</span>
+                <span class="n">name</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">paths</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">name</span>
+                <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">...&quot;</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">paths</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">name</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">item</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">))</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">item</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">Path</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">name</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">item</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">item</span><span class="p">))</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;unknown&quot;</span>
+
+<div class="viewcode-block" id="LongRecordingOrganizer.get_num_fragments">
+<a class="viewcode-back" href="../../../api/core/long_recording_organizer.html#neurodent.loading.LongRecordingOrganizer.get_num_fragments">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_num_fragments</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fragment_len_s</span><span class="p">):</span>
+        <span class="n">frag_len_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__time_to_idx</span><span class="p">(</span><span class="n">fragment_len_s</span><span class="p">)</span>
+        <span class="n">duration_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">LongRecording</span><span class="o">.</span><span class="n">get_num_frames</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">duration_idx</span> <span class="o">/</span> <span class="n">frag_len_idx</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__time_to_idx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time_s</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">LongRecording</span><span class="o">.</span><span class="n">time_to_sample_index</span><span class="p">(</span><span class="n">time_s</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__idx_to_time</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">LongRecording</span><span class="o">.</span><span class="n">sample_index_to_time</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
+
+<div class="viewcode-block" id="LongRecordingOrganizer.get_fragment">
+<a class="viewcode-back" href="../../../api/core/long_recording_organizer.html#neurodent.loading.LongRecordingOrganizer.get_fragment">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_fragment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fragment_len_s</span><span class="p">,</span> <span class="n">fragment_idx</span><span class="p">):</span>
+        <span class="n">startidx</span><span class="p">,</span> <span class="n">endidx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__fragidx_to_startendind</span><span class="p">(</span><span class="n">fragment_len_s</span><span class="p">,</span> <span class="n">fragment_idx</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">LongRecording</span><span class="o">.</span><span class="n">frame_slice</span><span class="p">(</span><span class="n">startidx</span><span class="p">,</span> <span class="n">endidx</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="LongRecordingOrganizer.get_dur_fragment">
+<a class="viewcode-back" href="../../../api/core/long_recording_organizer.html#neurodent.loading.LongRecordingOrganizer.get_dur_fragment">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_dur_fragment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fragment_len_s</span><span class="p">,</span> <span class="n">fragment_idx</span><span class="p">):</span>
+        <span class="n">startidx</span><span class="p">,</span> <span class="n">endidx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__fragidx_to_startendind</span><span class="p">(</span><span class="n">fragment_len_s</span><span class="p">,</span> <span class="n">fragment_idx</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">__idx_to_time</span><span class="p">(</span><span class="n">endidx</span><span class="p">)</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">__idx_to_time</span><span class="p">(</span><span class="n">startidx</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__fragidx_to_startendind</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fragment_len_s</span><span class="p">,</span> <span class="n">fragment_idx</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert fragment index to start and end sample indices.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            fragment_len_s (float): Length of each fragment in seconds</span>
+<span class="sd">            fragment_idx (int): Index of the fragment to get indices for</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple[int, int]: Start and end sample indices for the fragment. The end index is capped at the recording length.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">frag_len_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__time_to_idx</span><span class="p">(</span><span class="n">fragment_len_s</span><span class="p">)</span>
+        <span class="n">startidx</span> <span class="o">=</span> <span class="n">frag_len_idx</span> <span class="o">*</span> <span class="n">fragment_idx</span>
+        <span class="n">endidx</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span>
+            <span class="n">frag_len_idx</span> <span class="o">*</span> <span class="p">(</span><span class="n">fragment_idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">LongRecording</span><span class="o">.</span><span class="n">get_num_frames</span><span class="p">()</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">startidx</span><span class="p">,</span> <span class="n">endidx</span>
+
+<div class="viewcode-block" id="LongRecordingOrganizer.__str__">
+<a class="viewcode-back" href="../../../api/core/long_recording_organizer.html#neurodent.loading.LongRecordingOrganizer.__str__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a string representation of critical long recording features.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;LongRecording&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">LongRecording</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;LongRecordingOrganizer: No recording loaded yet&quot;</span>
+
+        <span class="n">n_channels</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">LongRecording</span><span class="o">.</span><span class="n">get_num_channels</span><span class="p">()</span>
+        <span class="n">sampling_freq</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">LongRecording</span><span class="o">.</span><span class="n">get_sampling_frequency</span><span class="p">()</span>
+        <span class="n">total_duration</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">LongRecording</span><span class="o">.</span><span class="n">get_duration</span><span class="p">()</span>
+
+        <span class="n">n_files</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">file_durations</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;file_durations&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">file_durations</span>
+            <span class="k">else</span> <span class="mi">1</span>
+        <span class="p">)</span>
+
+        <span class="n">timestamp_info</span> <span class="o">=</span> <span class="s2">&quot;No timestamps&quot;</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;file_end_datetimes&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">file_end_datetimes</span><span class="p">:</span>
+            <span class="n">timestamp_coverage</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span>
+                <span class="p">[</span><span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">file_end_datetimes</span> <span class="k">if</span> <span class="n">x</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">]</span>
+            <span class="p">)</span>
+            <span class="n">timestamp_info</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">timestamp_coverage</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">file_end_datetimes</span><span class="p">)</span><span class="si">}</span><span class="s2"> files have timestamps&quot;</span>
+
+        <span class="n">channel_info</span> <span class="o">=</span> <span class="s2">&quot;No channels&quot;</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;channel_names&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">channel_names</span><span class="p">:</span>
+            <span class="c1"># if len(self.channel_names) &lt;= 5:</span>
+            <span class="n">channel_info</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">channel_names</span><span class="p">)</span><span class="si">}</span><span class="s2">]&quot;</span>
+            <span class="c1"># else:</span>
+            <span class="c1">#     channel_info = f&quot;[{&#39;, &#39;.join(self.channel_names[:3])}, ..., {self.channel_names[-1]}] ({len(self.channel_names)} total)&quot;</span>
+
+        <span class="n">metadata_info</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;meta&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">,</span> <span class="s2">&quot;precision&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">precision</span><span class="p">:</span>
+                <span class="n">metadata_info</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">precision</span><span class="si">}</span><span class="s2"> precision&quot;</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">,</span> <span class="s2">&quot;V_units&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">V_units</span><span class="p">:</span>
+                <span class="n">metadata_info</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">V_units</span><span class="si">}</span><span class="s2"> units&quot;</span>
+
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;LongRecording: </span><span class="si">{</span><span class="n">n_files</span><span class="si">}</span><span class="s2"> files, </span><span class="si">{</span><span class="n">n_channels</span><span class="si">}</span><span class="s2"> channels, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">sampling_freq</span><span class="si">}</span><span class="s2"> Hz, </span><span class="si">{</span><span class="n">total_duration</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">s duration, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;channels: </span><span class="si">{</span><span class="n">channel_info</span><span class="si">}{</span><span class="n">metadata_info</span><span class="si">}</span><span class="s2">, timestamps: </span><span class="si">{</span><span class="n">timestamp_info</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="LongRecordingOrganizer.__repr__">
+<a class="viewcode-back" href="../../../api/core/long_recording_organizer.html#neurodent.loading.LongRecordingOrganizer.__repr__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a detailed string representation for debugging.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="fm">__str__</span><span class="p">()</span></div>
+</div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025, Joseph Dong, Yongtaek Oh, Eric Marsh.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

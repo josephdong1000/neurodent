@@ -1,0 +1,1285 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Visualization Tutorial &#8212; Neurodent 0.4.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../_static/documentation_options.js?v=6c02275b"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/visualization';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://josephdong1000.github.io/neurodent/_static/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.4.0';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner =
+            false;
+        </script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Running the Snakemake Pipeline" href="snakemake_pipeline.html" />
+    <link rel="prev" title="Spike Analysis Tutorial" href="spike_analysis.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">NeuRodent</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api/index.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../license/index.html">
+    License
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-2"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-2"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-2"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-2">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../license/index.html">
+    License
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-3"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-3"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-3"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-3">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="windowed_analysis.html">Windowed Analysis Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="spike_analysis.html">Spike Analysis Tutorial</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Visualization Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="snakemake_pipeline.html">Running the Snakemake Pipeline</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Tutorials</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Visualization Tutorial</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="visualization-tutorial">
+<h1>Visualization Tutorial<a class="headerlink" href="#visualization-tutorial" title="Link to this heading">#</a></h1>
+<p>This tutorial covers NeuRodent’s comprehensive visualization capabilities for EEG analysis results.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">#</a></h2>
+<p>NeuRodent provides three main plotting classes:</p>
+<ol class="arabic simple">
+<li><p><strong>AnimalPlotter</strong>: Visualize data from a single animal</p></li>
+<li><p><strong>ExperimentPlotter</strong>: Compare data across multiple animals with grouping</p></li>
+<li><p><strong>ZeitgeberPlotter</strong>: Circadian rhythm plots using Zeitgeber Time (ZT)</p></li>
+</ol>
+<p>They support various plot types: time series, categorical plots, heatmaps, and more.</p>
+<p>This tutorial runs on the small example recordings bundled with the package, so every
+cell below executes as written after a plain <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">neurodent</span></code>.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">seaborn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sns</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">neurodent</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">AnimalAnalyzer</span><span class="p">,</span>
+    <span class="n">AnimalOrganizer</span><span class="p">,</span>
+    <span class="n">AnimalPlotter</span><span class="p">,</span>
+    <span class="n">ExperimentPlotter</span><span class="p">,</span>
+    <span class="n">ZeitgeberAnalysisResult</span><span class="p">,</span>
+    <span class="n">ZeitgeberPlotter</span><span class="p">,</span>
+    <span class="n">constants</span><span class="p">,</span>
+    <span class="n">set_channel_map</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>/home/runner/work/neurodent/neurodent/.venv/lib/python3.10/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="single-animal-visualization-animalplotter">
+<h2>1. Single Animal Visualization (AnimalPlotter)<a class="headerlink" href="#single-animal-visualization-animalplotter" title="Link to this heading">#</a></h2>
+<section id="setup">
+<h3>Setup<a class="headerlink" href="#setup" title="Link to this heading">#</a></h3>
+<p>First declare the channel map and the per-animal metadata, then build a
+<code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult</span></code> from the bundled example recordings. <code class="docutils literal notranslate"><span class="pre">ANIMAL_METADATA</span></code> is what gives
+each animal its genotype, which the grouped plots later in this tutorial rely on.</p>
+<p>The two animals are given different times of day so that the day/night (<code class="docutils literal notranslate"><span class="pre">isday</span></code>) comparisons
+below have both values to work with.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">neurodent.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">sample_dataset</span>
+
+<span class="n">SAMPLE_DATA</span> <span class="o">=</span> <span class="n">sample_dataset</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="using-your-own-data">
+<h3>Using your own data<a class="headerlink" href="#using-your-own-data" title="Link to this heading">#</a></h3>
+<p>Replace <code class="docutils literal notranslate"><span class="pre">SAMPLE_DATA</span></code> with your own directory and set <code class="docutils literal notranslate"><span class="pre">extract_func</span></code> for your format.
+<a class="reference internal" href="../quickstart/data_loading.html"><span class="std std-doc">Data Loading</span></a> covers readers and patterns.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">set_channel_map</span><span class="p">({</span>
+    <span class="s2">&quot;LMot&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;C-015&quot;</span><span class="p">,</span> <span class="s2">&quot;D-015&quot;</span><span class="p">],</span>
+    <span class="s2">&quot;RMot&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;C-016&quot;</span><span class="p">,</span> <span class="s2">&quot;D-016&quot;</span><span class="p">],</span>
+    <span class="s2">&quot;LBar&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;C-014&quot;</span><span class="p">,</span> <span class="s2">&quot;D-014&quot;</span><span class="p">],</span>
+    <span class="s2">&quot;RBar&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;C-017&quot;</span><span class="p">,</span> <span class="s2">&quot;D-017&quot;</span><span class="p">],</span>
+    <span class="s2">&quot;LHip&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;C-012&quot;</span><span class="p">,</span> <span class="s2">&quot;D-012&quot;</span><span class="p">],</span>
+    <span class="s2">&quot;RHip&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;C-019&quot;</span><span class="p">,</span> <span class="s2">&quot;D-019&quot;</span><span class="p">],</span>
+    <span class="s2">&quot;LAud&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;C-009&quot;</span><span class="p">,</span> <span class="s2">&quot;D-009&quot;</span><span class="p">],</span>
+    <span class="s2">&quot;RAud&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;C-022&quot;</span><span class="p">,</span> <span class="s2">&quot;D-022&quot;</span><span class="p">],</span>
+    <span class="s2">&quot;LVis&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;C-010&quot;</span><span class="p">,</span> <span class="s2">&quot;D-010&quot;</span><span class="p">],</span>
+    <span class="s2">&quot;RVis&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;C-021&quot;</span><span class="p">,</span> <span class="s2">&quot;D-021&quot;</span><span class="p">],</span>
+<span class="p">})</span>
+
+<span class="c1"># Per-animal genotype and sex. Every WindowAnalysisResult re-reads this at construction,</span>
+<span class="c1"># so it is the single source of truth for animal metadata.</span>
+<span class="n">constants</span><span class="o">.</span><span class="n">ANIMAL_METADATA</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;A10&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;genotype&quot;</span><span class="p">:</span> <span class="s2">&quot;WT&quot;</span><span class="p">,</span> <span class="s2">&quot;sex&quot;</span><span class="p">:</span> <span class="s2">&quot;Male&quot;</span><span class="p">},</span>
+    <span class="s2">&quot;F22&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;genotype&quot;</span><span class="p">:</span> <span class="s2">&quot;KO&quot;</span><span class="p">,</span> <span class="s2">&quot;sex&quot;</span><span class="p">:</span> <span class="s2">&quot;Female&quot;</span><span class="p">},</span>
+<span class="p">}</span>
+
+<span class="n">DATA_PATTERN</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="nb">str</span><span class="p">(</span><span class="n">SAMPLE_DATA</span> <span class="o">/</span> <span class="s2">&quot;</span><span class="si">{animal}</span><span class="s2">&quot;</span> <span class="o">/</span> <span class="s2">&quot;*_ColMajor.bin&quot;</span><span class="p">),</span>
+    <span class="nb">str</span><span class="p">(</span><span class="n">SAMPLE_DATA</span> <span class="o">/</span> <span class="s2">&quot;</span><span class="si">{animal}</span><span class="s2">&quot;</span> <span class="o">/</span> <span class="s2">&quot;*_Meta.csv&quot;</span><span class="p">),</span>
+<span class="p">]</span>
+<span class="n">READER</span> <span class="o">=</span> <span class="s2">&quot;neurodent.readers:read_bin_csv_pair&quot;</span>
+<span class="n">FEATURES</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;rms&#39;</span><span class="p">,</span> <span class="s1">&#39;psdband&#39;</span><span class="p">,</span> <span class="s1">&#39;cohere&#39;</span><span class="p">,</span> <span class="s1">&#39;pcorr&#39;</span><span class="p">,</span> <span class="s1">&#39;psd&#39;</span><span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">build_war</span><span class="p">(</span><span class="n">animal_id</span><span class="p">,</span> <span class="n">recording_start</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build a WindowAnalysisResult for one animal from the bundled example data.&quot;&quot;&quot;</span>
+    <span class="n">ao</span> <span class="o">=</span> <span class="n">AnimalOrganizer</span><span class="p">(</span>
+        <span class="n">pattern</span><span class="o">=</span><span class="n">DATA_PATTERN</span><span class="p">,</span>
+        <span class="n">animal_id</span><span class="o">=</span><span class="n">animal_id</span><span class="p">,</span>
+        <span class="n">lro_kwargs</span><span class="o">=</span><span class="p">{</span>
+            <span class="s2">&quot;mode&quot;</span><span class="p">:</span> <span class="s2">&quot;si&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;extract_func&quot;</span><span class="p">:</span> <span class="n">READER</span><span class="p">,</span>
+            <span class="s2">&quot;manual_datetimes&quot;</span><span class="p">:</span> <span class="n">recording_start</span><span class="p">,</span>
+        <span class="p">},</span>
+    <span class="p">)</span>
+    <span class="n">analyzer</span> <span class="o">=</span> <span class="n">AnimalAnalyzer</span><span class="p">(</span><span class="n">ao</span><span class="p">)</span>
+    <span class="n">analyzer</span><span class="o">.</span><span class="n">compute_bad_channels</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">analyzer</span><span class="o">.</span><span class="n">compute_windowed_analysis</span><span class="p">(</span><span class="n">FEATURES</span><span class="p">,</span> <span class="n">multiprocess_mode</span><span class="o">=</span><span class="s1">&#39;serial&#39;</span><span class="p">)</span>
+
+
+<span class="c1"># A10 is recorded during the day, F22 at night</span>
+<span class="n">war</span> <span class="o">=</span> <span class="n">build_war</span><span class="p">(</span><span class="s2">&quot;A10&quot;</span><span class="p">,</span> <span class="n">datetime</span><span class="p">(</span><span class="mi">2023</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">13</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+
+<span class="c1"># Create plotter</span>
+<span class="n">ap</span> <span class="o">=</span> <span class="n">AnimalPlotter</span><span class="p">(</span><span class="n">war</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Processing rows:   0%|          | 0/12 [00:00&lt;?, ?it/s]
+Processing rows:  25%|██▌       | 3/12 [00:00&lt;00:00, 22.09it/s]
+Processing rows:  50%|█████     | 6/12 [00:00&lt;00:00, 21.82it/s]
+Processing rows:  75%|███████▌  | 9/12 [00:00&lt;00:00, 21.70it/s]
+Processing rows: 100%|██████████| 12/12 [00:00&lt;00:00, 21.27it/s]
+Processing rows: 100%|██████████| 12/12 [00:00&lt;00:00, 21.43it/s]
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="time-series-plots">
+<h3>Time Series Plots<a class="headerlink" href="#time-series-plots" title="Link to this heading">#</a></h3>
+<p>Visualize features over time. <code class="docutils literal notranslate"><span class="pre">AnimalPlotter</span></code> methods draw and display the figure
+themselves. They do not return a <code class="docutils literal notranslate"><span class="pre">Figure</span></code> object, so there is nothing to assign and no need to call
+<code class="docutils literal notranslate"><span class="pre">plt.show()</span></code> afterwards. One figure is produced per recording session.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Plot RMS amplitude over time, one trace per channel</span>
+<span class="n">ap</span><span class="o">.</span><span class="n">plot_linear_temporal</span><span class="p">(</span><span class="n">features</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;rms&#39;</span><span class="p">])</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/5de31e77707982d3ea42fa6983aa813f2dc79f434f66842a6bb6c2a903784c83.png" src="../_images/5de31e77707982d3ea42fa6983aa813f2dc79f434f66842a6bb6c2a903784c83.png" />
+</div>
+</div>
+</section>
+<section id="band-power-visualization">
+<h3>Band Power Visualization<a class="headerlink" href="#band-power-visualization" title="Link to this heading">#</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">psdband</span></code> holds one value per frequency band per channel, so <code class="docutils literal notranslate"><span class="pre">plot_linear_temporal</span></code> draws it
+as a set of band traces. <code class="docutils literal notranslate"><span class="pre">plot_psd_histogram</span></code> is a different view of the spectrum: it plots
+the full <code class="docutils literal notranslate"><span class="pre">psd</span></code> feature on log-log axes and fits a slope to each channel.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Band powers over time</span>
+<span class="n">ap</span><span class="o">.</span><span class="n">plot_linear_temporal</span><span class="p">(</span><span class="n">features</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;psdband&#39;</span><span class="p">])</span>
+
+<span class="c1"># Power spectrum with a fitted slope per channel</span>
+<span class="n">ap</span><span class="o">.</span><span class="n">plot_psd_histogram</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/5885fe7500aae2b2cd6733c6e890488bb639883ecdbd7cead791b8958748727f.png" src="../_images/5885fe7500aae2b2cd6733c6e890488bb639883ecdbd7cead791b8958748727f.png" />
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>/home/runner/work/neurodent/neurodent/src/neurodent/plotting/animal.py:612: RuntimeWarning: divide by zero encountered in log10
+  freqs, 10 ** (b + m * np.log10(freqs)), c=f&quot;C{j}&quot;, alpha=0.75
+</pre></div>
+</div>
+<img alt="../_images/cf7b0469ecb9bae7426b1b24b6fe25dec3778785e86f6eef6209b3bb0b417cc0.png" src="../_images/cf7b0469ecb9bae7426b1b24b6fe25dec3778785e86f6eef6209b3bb0b417cc0.png" />
+</div>
+</div>
+</section>
+</section>
+<section id="multi-animal-comparison-experimentplotter">
+<h2>2. Multi-Animal Comparison (ExperimentPlotter)<a class="headerlink" href="#multi-animal-comparison-experimentplotter" title="Link to this heading">#</a></h2>
+<section id="id1">
+<h3>Setup<a class="headerlink" href="#id1" title="Link to this heading">#</a></h3>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Build a second animal so there are two genotypes to compare</span>
+<span class="n">war_f22</span> <span class="o">=</span> <span class="n">build_war</span><span class="p">(</span><span class="s2">&quot;F22&quot;</span><span class="p">,</span> <span class="n">datetime</span><span class="p">(</span><span class="mi">2023</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+<span class="n">wars</span> <span class="o">=</span> <span class="p">[</span><span class="n">war</span><span class="p">,</span> <span class="n">war_f22</span><span class="p">]</span>
+
+<span class="c1"># Create experiment plotter.</span>
+<span class="c1"># Pass the same feature list used to compute the WARs -- `features` defaults to &quot;all&quot;,</span>
+<span class="c1"># which would then fail on every feature that was not computed.</span>
+<span class="n">EXCLUDE</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;nspike&#39;</span><span class="p">,</span> <span class="s1">&#39;lognspike&#39;</span><span class="p">]</span>
+<span class="n">ep</span> <span class="o">=</span> <span class="n">ExperimentPlotter</span><span class="p">(</span>
+    <span class="n">wars</span><span class="p">,</span>
+    <span class="n">features</span><span class="o">=</span><span class="n">FEATURES</span><span class="p">,</span>
+    <span class="n">exclude</span><span class="o">=</span><span class="n">EXCLUDE</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Processing rows:   0%|          | 0/12 [00:00&lt;?, ?it/s]
+Processing rows:  25%|██▌       | 3/12 [00:00&lt;00:00, 21.32it/s]
+Processing rows:  50%|█████     | 6/12 [00:00&lt;00:00, 21.31it/s]
+Processing rows:  75%|███████▌  | 9/12 [00:00&lt;00:00, 21.50it/s]
+Processing rows: 100%|██████████| 12/12 [00:00&lt;00:00, 21.27it/s]
+Processing rows: 100%|██████████| 12/12 [00:00&lt;00:00, 21.28it/s]
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="categorical-plots">
+<h3>Categorical Plots<a class="headerlink" href="#categorical-plots" title="Link to this heading">#</a></h3>
+<p>Compare features across groups using box plots, violin plots, swarm plots, etc.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Box plot grouped by genotype</span>
+<span class="n">ep</span><span class="o">.</span><span class="n">plot_catplot</span><span class="p">(</span>
+    <span class="s1">&#39;rms&#39;</span><span class="p">,</span>
+    <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;genotype&#39;</span><span class="p">,</span>
+    <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;box&#39;</span><span class="p">,</span>
+    <span class="n">catplot_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;showfliers&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">}</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;RMS by Genotype&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+<span class="c1"># Violin plot with day/night comparison</span>
+<span class="n">ep</span><span class="o">.</span><span class="n">plot_catplot</span><span class="p">(</span>
+    <span class="s1">&#39;rms&#39;</span><span class="p">,</span>
+    <span class="n">groupby</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;genotype&#39;</span><span class="p">,</span> <span class="s1">&#39;isday&#39;</span><span class="p">],</span>
+    <span class="n">x</span><span class="o">=</span><span class="s1">&#39;genotype&#39;</span><span class="p">,</span>
+    <span class="n">col</span><span class="o">=</span><span class="s1">&#39;isday&#39;</span><span class="p">,</span>
+    <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;violin&#39;</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;RMS by Genotype and Time of Day&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/4900f80364e6e16fe22a8c18d98ab6ef230607ff247762848642b25f4c3dd4e6.png" src="../_images/4900f80364e6e16fe22a8c18d98ab6ef230607ff247762848642b25f4c3dd4e6.png" />
+<img alt="../_images/d00e416fb3bd977908cbea15cda3f0fd7a2fdac1b82e61d055997eca1320ed3b.png" src="../_images/d00e416fb3bd977908cbea15cda3f0fd7a2fdac1b82e61d055997eca1320ed3b.png" />
+</div>
+</div>
+</section>
+<section id="band-power-comparisons">
+<h3>Band Power Comparisons<a class="headerlink" href="#band-power-comparisons" title="Link to this heading">#</a></h3>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Box plot of band powers by genotype</span>
+<span class="n">ep</span><span class="o">.</span><span class="n">plot_catplot</span><span class="p">(</span>
+    <span class="s1">&#39;psdband&#39;</span><span class="p">,</span>
+    <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;genotype&#39;</span><span class="p">,</span>
+    <span class="n">x</span><span class="o">=</span><span class="s1">&#39;genotype&#39;</span><span class="p">,</span>
+    <span class="n">hue</span><span class="o">=</span><span class="s1">&#39;band&#39;</span><span class="p">,</span>
+    <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;box&#39;</span><span class="p">,</span>
+    <span class="n">collapse_channels</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">catplot_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;showfliers&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">}</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;Band Power by Genotype&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+<span class="c1"># With day/night split</span>
+<span class="n">ep</span><span class="o">.</span><span class="n">plot_catplot</span><span class="p">(</span>
+    <span class="s1">&#39;psdband&#39;</span><span class="p">,</span>
+    <span class="n">groupby</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;genotype&#39;</span><span class="p">,</span> <span class="s1">&#39;isday&#39;</span><span class="p">],</span>
+    <span class="n">x</span><span class="o">=</span><span class="s1">&#39;genotype&#39;</span><span class="p">,</span>
+    <span class="n">col</span><span class="o">=</span><span class="s1">&#39;isday&#39;</span><span class="p">,</span>
+    <span class="n">hue</span><span class="o">=</span><span class="s1">&#39;band&#39;</span><span class="p">,</span>
+    <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;box&#39;</span><span class="p">,</span>
+    <span class="n">collapse_channels</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">catplot_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;showfliers&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">}</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;Band Power by Genotype and Time&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/183b817d77a50c545f904cdaa55c1ff597543a4f82d74105ec485030f3d559ee.png" src="../_images/183b817d77a50c545f904cdaa55c1ff597543a4f82d74105ec485030f3d559ee.png" />
+<img alt="../_images/46d4c483b9629230177232f5675b6670736155f4bfcdbf7035c8751b5dbdcf79.png" src="../_images/46d4c483b9629230177232f5675b6670736155f4bfcdbf7035c8751b5dbdcf79.png" />
+</div>
+</div>
+</section>
+<section id="swarm-and-point-plots">
+<h3>Swarm and Point Plots<a class="headerlink" href="#swarm-and-point-plots" title="Link to this heading">#</a></h3>
+<p>Show individual data points with averages:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Swarm plot with animal-level averaging</span>
+<span class="n">ep</span><span class="o">.</span><span class="n">plot_catplot</span><span class="p">(</span>
+    <span class="s1">&#39;rms&#39;</span><span class="p">,</span>
+    <span class="n">groupby</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;animal&#39;</span><span class="p">,</span> <span class="s1">&#39;genotype&#39;</span><span class="p">],</span>
+    <span class="n">x</span><span class="o">=</span><span class="s1">&#39;genotype&#39;</span><span class="p">,</span>
+    <span class="n">hue</span><span class="o">=</span><span class="s1">&#39;channel&#39;</span><span class="p">,</span>
+    <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;swarm&#39;</span><span class="p">,</span>
+    <span class="n">average_groupby</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">collapse_channels</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">catplot_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;dodge&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;errorbar&#39;</span><span class="p">:</span> <span class="s1">&#39;ci&#39;</span><span class="p">}</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;RMS by Genotype (Animal Averages)&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+<span class="c1"># Point plot with confidence intervals</span>
+<span class="n">ep</span><span class="o">.</span><span class="n">plot_catplot</span><span class="p">(</span>
+    <span class="s1">&#39;rms&#39;</span><span class="p">,</span>
+    <span class="n">groupby</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;animal&#39;</span><span class="p">,</span> <span class="s1">&#39;genotype&#39;</span><span class="p">],</span>
+    <span class="n">x</span><span class="o">=</span><span class="s1">&#39;genotype&#39;</span><span class="p">,</span>
+    <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;point&#39;</span><span class="p">,</span>
+    <span class="n">average_groupby</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">collapse_channels</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">catplot_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;errorbar&#39;</span><span class="p">:</span> <span class="s1">&#39;ci&#39;</span><span class="p">}</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;RMS by Genotype (Mean ± CI)&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/f067d3cc79c48c92850a5a68f4593f430059a695e0aeb3d2d2668c030b9c0a2c.png" src="../_images/f067d3cc79c48c92850a5a68f4593f430059a695e0aeb3d2d2668c030b9c0a2c.png" />
+<img alt="../_images/c940ea7bb43f90c7dd4eda8bc89b9140495bc0075cd32cacd19e495ee27a1ba3.png" src="../_images/c940ea7bb43f90c7dd4eda8bc89b9140495bc0075cd32cacd19e495ee27a1ba3.png" />
+</div>
+</div>
+</section>
+</section>
+<section id="connectivity-visualization">
+<h2>3. Connectivity Visualization<a class="headerlink" href="#connectivity-visualization" title="Link to this heading">#</a></h2>
+<section id="heatmaps-for-coherence-and-correlation">
+<h3>Heatmaps for Coherence and Correlation<a class="headerlink" href="#heatmaps-for-coherence-and-correlation" title="Link to this heading">#</a></h3>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Coherence heatmap by genotype</span>
+<span class="n">ep</span><span class="o">.</span><span class="n">plot_heatmap</span><span class="p">(</span>
+    <span class="s1">&#39;cohere&#39;</span><span class="p">,</span>
+    <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;genotype&#39;</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;Coherence by Genotype&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+<span class="c1"># Pearson correlation heatmap</span>
+<span class="n">ep</span><span class="o">.</span><span class="n">plot_heatmap</span><span class="p">(</span>
+    <span class="s1">&#39;pcorr&#39;</span><span class="p">,</span>
+    <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;genotype&#39;</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;Correlation by Genotype&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+<span class="c1"># With day/night comparison</span>
+<span class="n">ep</span><span class="o">.</span><span class="n">plot_heatmap</span><span class="p">(</span>
+    <span class="s1">&#39;cohere&#39;</span><span class="p">,</span>
+    <span class="n">groupby</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;genotype&#39;</span><span class="p">,</span> <span class="s1">&#39;isday&#39;</span><span class="p">]</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;Coherence by Genotype and Time&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/e84b72bcda68fd9c5825abe743e4e261b3419da21523911697e65df3a191c5b3.png" src="../_images/e84b72bcda68fd9c5825abe743e4e261b3419da21523911697e65df3a191c5b3.png" />
+<img alt="../_images/e62a827a281daf8a621c05426c5209e1a4cc3e1b106e9f83897837066a2595e5.png" src="../_images/e62a827a281daf8a621c05426c5209e1a4cc3e1b106e9f83897837066a2595e5.png" />
+<img alt="../_images/d44b960ca5e6ff72ff40ba056e84344f049341a028c0fc80916387c9118b07bb.png" src="../_images/d44b960ca5e6ff72ff40ba056e84344f049341a028c0fc80916387c9118b07bb.png" />
+</div>
+</div>
+</section>
+<section id="difference-heatmaps">
+<h3>Difference Heatmaps<a class="headerlink" href="#difference-heatmaps" title="Link to this heading">#</a></h3>
+<p>Show differences relative to a baseline condition:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Difference from wildtype, broken out by frequency band.</span>
+<span class="c1"># `baseline_groupby` names the column holding the baseline label, and `remove_baseline`</span>
+<span class="c1"># drops the baseline group itself from the output.</span>
+<span class="n">ep</span><span class="o">.</span><span class="n">plot_diffheatmap</span><span class="p">(</span>
+    <span class="s1">&#39;cohere&#39;</span><span class="p">,</span>
+    <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;genotype&#39;</span><span class="p">,</span>
+    <span class="n">baseline_key</span><span class="o">=</span><span class="s1">&#39;WT&#39;</span><span class="p">,</span>
+    <span class="n">baseline_groupby</span><span class="o">=</span><span class="s1">&#39;genotype&#39;</span><span class="p">,</span>
+    <span class="n">col</span><span class="o">=</span><span class="s1">&#39;band&#39;</span><span class="p">,</span>
+    <span class="n">remove_baseline</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;Band-Specific Coherence Differences from WT&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>/home/runner/work/neurodent/neurodent/src/neurodent/plotting/experiment.py:1116: FutureWarning: The default of observed=False is deprecated and will be changed to True in a future version of pandas. Pass observed=False to retain current behavior or observed=True to adopt the future default and silence this warning.
+  df_base = df.groupby(baseline_groupby, as_index=False).get_group(
+/home/runner/work/neurodent/neurodent/src/neurodent/plotting/experiment.py:1127: FutureWarning: The default of observed=False is deprecated and will be changed to True in a future version of pandas. Pass observed=False to retain current behavior or observed=True to adopt the future default and silence this warning.
+  baseline_means = df_base.groupby(remaining_groupby)[feature].apply(
+</pre></div>
+</div>
+<img alt="../_images/3d73caa423af78efb22820a7ed0f12bbf30140287e803c6b56d497cef0dda314.png" src="../_images/3d73caa423af78efb22820a7ed0f12bbf30140287e803c6b56d497cef0dda314.png" />
+</div>
+</div>
+</section>
+</section>
+<section id="qq-plots-for-distribution-analysis">
+<h2>4. QQ Plots for Distribution Analysis<a class="headerlink" href="#qq-plots-for-distribution-analysis" title="Link to this heading">#</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># QQ plot by genotype and channel</span>
+<span class="n">ep</span><span class="o">.</span><span class="n">plot_qqplot</span><span class="p">(</span>
+    <span class="s1">&#39;rms&#39;</span><span class="p">,</span>
+    <span class="n">groupby</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;genotype&#39;</span><span class="p">],</span>
+    <span class="n">row</span><span class="o">=</span><span class="s1">&#39;genotype&#39;</span><span class="p">,</span>
+    <span class="n">col</span><span class="o">=</span><span class="s1">&#39;channel&#39;</span><span class="p">,</span>
+    <span class="n">height</span><span class="o">=</span><span class="mi">3</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;RMS Distribution QQ Plot&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/1d0233b25228bd48d50c89442afafc95e729be45879a9f331eecd3be3ff72368.png" src="../_images/1d0233b25228bd48d50c89442afafc95e729be45879a9f331eecd3be3ff72368.png" />
+</div>
+</div>
+</section>
+<section id="customizing-plots">
+<h2>5. Customizing Plots<a class="headerlink" href="#customizing-plots" title="Link to this heading">#</a></h2>
+<section id="plot-parameters">
+<h3>Plot Parameters<a class="headerlink" href="#plot-parameters" title="Link to this heading">#</a></h3>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Custom catplot parameters</span>
+<span class="n">custom_params</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;showfliers&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s1">&#39;aspect&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+    <span class="s1">&#39;height&#39;</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span>
+    <span class="s1">&#39;palette&#39;</span><span class="p">:</span> <span class="s1">&#39;Set2&#39;</span>
+<span class="p">}</span>
+
+<span class="n">ep</span><span class="o">.</span><span class="n">plot_catplot</span><span class="p">(</span>
+    <span class="s1">&#39;rms&#39;</span><span class="p">,</span>
+    <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;genotype&#39;</span><span class="p">,</span>
+    <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;box&#39;</span><span class="p">,</span>
+    <span class="n">catplot_params</span><span class="o">=</span><span class="n">custom_params</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/32901cc10315a5e4be161a56859d3bace2484e3e13072c1c1be4c61834472f7d.png" src="../_images/32901cc10315a5e4be161a56859d3bace2484e3e13072c1c1be4c61834472f7d.png" />
+</div>
+</div>
+</section>
+<section id="channel-collapsing">
+<h3>Channel Collapsing<a class="headerlink" href="#channel-collapsing" title="Link to this heading">#</a></h3>
+<p>Average across channels:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Without channel collapsing (show all channels)</span>
+<span class="n">ep</span><span class="o">.</span><span class="n">plot_catplot</span><span class="p">(</span>
+    <span class="s1">&#39;rms&#39;</span><span class="p">,</span>
+    <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;genotype&#39;</span><span class="p">,</span>
+    <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;box&#39;</span><span class="p">,</span>
+    <span class="n">collapse_channels</span><span class="o">=</span><span class="kc">False</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;RMS by Channel&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+<span class="c1"># With channel collapsing (average across channels)</span>
+<span class="n">ep</span><span class="o">.</span><span class="n">plot_catplot</span><span class="p">(</span>
+    <span class="s1">&#39;rms&#39;</span><span class="p">,</span>
+    <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;genotype&#39;</span><span class="p">,</span>
+    <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;box&#39;</span><span class="p">,</span>
+    <span class="n">collapse_channels</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;RMS (Averaged Across Channels)&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/fbc24624064023c9125f54ad3fb8bcc4b578c55fd70ed2a8fd95adc548286334.png" src="../_images/fbc24624064023c9125f54ad3fb8bcc4b578c55fd70ed2a8fd95adc548286334.png" />
+<img alt="../_images/a3e9621e0d5e6437c6c2b34e6118ed0341c51eda9b876c7154717e8399230f50.png" src="../_images/a3e9621e0d5e6437c6c2b34e6118ed0341c51eda9b876c7154717e8399230f50.png" />
+</div>
+</div>
+</section>
+</section>
+<section id="saving-figures">
+<h2>6. Saving Figures<a class="headerlink" href="#saving-figures" title="Link to this heading">#</a></h2>
+<p>Save high-quality figures for publications:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Use a temporary directory so this tutorial does not write into the docs source tree.</span>
+<span class="c1"># In your own work this would be a real output folder.</span>
+<span class="n">output_folder</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tempfile</span><span class="o">.</span><span class="n">mkdtemp</span><span class="p">())</span>
+
+<span class="c1"># Generate and save plot</span>
+<span class="n">g</span> <span class="o">=</span> <span class="n">ep</span><span class="o">.</span><span class="n">plot_catplot</span><span class="p">(</span>
+    <span class="s1">&#39;rms&#39;</span><span class="p">,</span>
+    <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;genotype&#39;</span><span class="p">,</span>
+    <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;box&#39;</span><span class="p">,</span>
+    <span class="n">catplot_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;showfliers&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">}</span>
+<span class="p">)</span>
+
+<span class="c1"># Save as PNG (high DPI for publications)</span>
+<span class="n">g</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">output_folder</span> <span class="o">/</span> <span class="s1">&#39;rms_by_genotype.png&#39;</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span> <span class="n">bbox_inches</span><span class="o">=</span><span class="s1">&#39;tight&#39;</span><span class="p">)</span>
+
+<span class="c1"># Save as PDF (vector format)</span>
+<span class="n">g</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">output_folder</span> <span class="o">/</span> <span class="s1">&#39;rms_by_genotype.pdf&#39;</span><span class="p">,</span> <span class="n">bbox_inches</span><span class="o">=</span><span class="s1">&#39;tight&#39;</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Figures saved to </span><span class="si">{</span><span class="n">output_folder</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Figures saved to /tmp/tmpg11evfi0
+</pre></div>
+</div>
+<img alt="../_images/e9125c4632899dd45d86b33b5a3e49cb9519baf48a9cb9b4dff3ee207205d3b6.png" src="../_images/e9125c4632899dd45d86b33b5a3e49cb9519baf48a9cb9b4dff3ee207205d3b6.png" />
+</div>
+</div>
+</section>
+<section id="batch-figure-generation">
+<h2>7. Batch Figure Generation<a class="headerlink" href="#batch-figure-generation" title="Link to this heading">#</a></h2>
+<p>Generate multiple figures systematically:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Generate plots for all linear features that were computed.</span>
+<span class="c1"># `ExperimentPlotter` does not keep the exclude list, so reuse the one declared above.</span>
+<span class="k">for</span> <span class="n">feature</span> <span class="ow">in</span> <span class="n">constants</span><span class="o">.</span><span class="n">LINEAR_FEATURES</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">feature</span> <span class="ow">in</span> <span class="n">EXCLUDE</span> <span class="ow">or</span> <span class="n">feature</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">FEATURES</span><span class="p">:</span>
+        <span class="k">continue</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Generating plot for </span><span class="si">{</span><span class="n">feature</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Box plot</span>
+    <span class="n">g</span> <span class="o">=</span> <span class="n">ep</span><span class="o">.</span><span class="n">plot_catplot</span><span class="p">(</span>
+        <span class="n">feature</span><span class="p">,</span>
+        <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;genotype&#39;</span><span class="p">,</span>
+        <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;box&#39;</span><span class="p">,</span>
+        <span class="n">collapse_channels</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">catplot_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;showfliers&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">}</span>
+    <span class="p">)</span>
+    <span class="n">g</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span>
+        <span class="n">output_folder</span> <span class="o">/</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">feature</span><span class="si">}</span><span class="s1">_genotype_box.png&#39;</span><span class="p">,</span>
+        <span class="n">dpi</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span>
+        <span class="n">bbox_inches</span><span class="o">=</span><span class="s1">&#39;tight&#39;</span>
+    <span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Batch generation complete!&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Generating plot for rms
+Batch generation complete!
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="advanced-custom-plot-types">
+<h2>8. Advanced: Custom Plot Types<a class="headerlink" href="#advanced-custom-plot-types" title="Link to this heading">#</a></h2>
+<p>Access underlying data for custom visualizations:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get the long-form dataframe backing the plots.</span>
+<span class="c1"># Columns are the groupby keys, plus &#39;channel&#39; and one column named after the feature.</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">ep</span><span class="o">.</span><span class="n">pull_timeseries_dataframe</span><span class="p">(</span><span class="s1">&#39;rms&#39;</span><span class="p">,</span> <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;genotype&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
+
+<span class="c1"># Create custom plot with matplotlib</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>
+
+<span class="c1"># Plot using pandas/seaborn directly</span>
+<span class="n">sns</span><span class="o">.</span><span class="n">boxplot</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">df</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="s1">&#39;genotype&#39;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s1">&#39;rms&#39;</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Custom RMS Plot&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;RMS Amplitude&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>[&#39;genotype&#39;, &#39;channel&#39;, &#39;rms&#39;]
+</pre></div>
+</div>
+<img alt="../_images/30dd9c1ce23313110db95cef5153d868723f7cfdde6152b6f88bb923b5501836.png" src="../_images/30dd9c1ce23313110db95cef5153d868723f7cfdde6152b6f88bb923b5501836.png" />
+</div>
+</div>
+</section>
+<section id="circadian-rhythms-zeitgeberplotter">
+<h2>9. Circadian Rhythms (ZeitgeberPlotter)<a class="headerlink" href="#circadian-rhythms-zeitgeberplotter" title="Link to this heading">#</a></h2>
+<p>Visualize circadian patterns using <code class="docutils literal notranslate"><span class="pre">ZeitgeberPlotter</span></code>. This specialized plotter handles the
+48-hour duplicated time axis often used in circadian research.</p>
+<p><code class="docutils literal notranslate"><span class="pre">ZeitgeberPlotter</span></code> needs one scalar per row, so feed it
+<code class="docutils literal notranslate"><span class="pre">ZeitgeberAnalysisResult.get_channel_averaged_result()</span></code> rather than <code class="docutils literal notranslate"><span class="pre">get_result()</span></code>. The
+latter keeps one array of per-channel values in each feature cell. Channel-averaging is also
+what produces the baseline-subtracted <code class="docutils literal notranslate"><span class="pre">*_nobase</span></code> columns, since baseline subtraction only
+applies to numeric columns.</p>
+<p>The bundled excerpts are 60 seconds long, so every window falls in the same Zeitgeber bin.
+The curve below therefore demonstrates the plot’s shape and axis handling rather than a real
+circadian profile.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Wrap a WAR in the Zeitgeber pipeline and average across channels</span>
+<span class="n">zar</span> <span class="o">=</span> <span class="n">ZeitgeberAnalysisResult</span><span class="p">(</span><span class="n">war</span><span class="p">)</span>
+<span class="n">df_zar</span> <span class="o">=</span> <span class="n">zar</span><span class="o">.</span><span class="n">get_channel_averaged_result</span><span class="p">(</span><span class="n">features</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;rms&#39;</span><span class="p">])</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;ZT columns:&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df_zar</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">c</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;zt&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="s1">&#39;_nobase&#39;</span> <span class="ow">in</span> <span class="n">c</span><span class="p">])</span>
+
+<span class="n">zp</span> <span class="o">=</span> <span class="n">ZeitgeberPlotter</span><span class="p">(</span><span class="n">df_zar</span><span class="p">)</span>
+
+<span class="c1"># Plot a single feature against Zeitgeber time</span>
+<span class="n">zp</span><span class="o">.</span><span class="n">plot_feature</span><span class="p">(</span>
+    <span class="s1">&#39;rms_nobase&#39;</span><span class="p">,</span>    <span class="c1"># Baseline-subtracted feature</span>
+    <span class="n">output_path</span><span class="o">=</span><span class="n">output_folder</span> <span class="o">/</span> <span class="s1">&#39;circadian_rms.png&#39;</span><span class="p">,</span>
+    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">6</span><span class="p">)</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Circadian plot written to </span><span class="si">{</span><span class="n">output_folder</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="s1">&#39;circadian_rms.png&#39;</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>ZT columns: [&#39;zt_minutes&#39;, &#39;duration_nobase&#39;, &#39;rms_nobase&#39;]
+Circadian plot written to /tmp/tmpg11evfi0/circadian_rms.png
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="next-steps">
+<h2>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><strong><a class="reference internal" href="windowed_analysis.html"><span class="std std-doc">Windowed Analysis Tutorial</span></a></strong>: Generate data for visualization</p></li>
+<li><p><strong><a class="reference internal" href="../quickstart/basic_usage.html"><span class="std std-doc">Basic Usage Tutorial</span></a></strong>: Complete workflow</p></li>
+</ul>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="spike_analysis.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Spike Analysis Tutorial</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="snakemake_pipeline.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Running the Snakemake Pipeline</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#overview">Overview</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#single-animal-visualization-animalplotter">1. Single Animal Visualization (AnimalPlotter)</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#setup">Setup</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#using-your-own-data">Using your own data</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#time-series-plots">Time Series Plots</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#band-power-visualization">Band Power Visualization</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#multi-animal-comparison-experimentplotter">2. Multi-Animal Comparison (ExperimentPlotter)</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id1">Setup</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#categorical-plots">Categorical Plots</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#band-power-comparisons">Band Power Comparisons</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#swarm-and-point-plots">Swarm and Point Plots</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#connectivity-visualization">3. Connectivity Visualization</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#heatmaps-for-coherence-and-correlation">Heatmaps for Coherence and Correlation</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#difference-heatmaps">Difference Heatmaps</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#qq-plots-for-distribution-analysis">4. QQ Plots for Distribution Analysis</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#customizing-plots">5. Customizing Plots</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#plot-parameters">Plot Parameters</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#channel-collapsing">Channel Collapsing</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#saving-figures">6. Saving Figures</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#batch-figure-generation">7. Batch Figure Generation</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#advanced-custom-plot-types">8. Advanced: Custom Plot Types</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#circadian-rhythms-zeitgeberplotter">9. Circadian Rhythms (ZeitgeberPlotter)</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#next-steps">Next Steps</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/tutorials/visualization.ipynb.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025, Joseph Dong, Yongtaek Oh, Eric Marsh.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

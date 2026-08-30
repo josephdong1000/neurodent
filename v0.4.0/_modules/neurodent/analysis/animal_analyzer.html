@@ -1,0 +1,1060 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>neurodent.analysis.animal_analyzer &#8212; Neurodent 0.4.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../_static/documentation_options.js?v=6c02275b"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/neurodent/analysis/animal_analyzer';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://josephdong1000.github.io/neurodent/_static/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.4.0';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner =
+            false;
+        </script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">NeuRodent</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../license/index.html">
+    License
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-2"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-2"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-2"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-2">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../license/index.html">
+    License
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-3"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-3"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-3"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-3">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">neurodent.analysis.animal_analyzer</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for neurodent.analysis.animal_analyzer</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Analysis stage for a single animal.</span>
+
+<span class="sd">``AnimalAnalyzer`` runs the LOF / windowed-analysis / spike-detection steps on an</span>
+<span class="sd">:class:`~neurodent.loading.animal_organizer.AnimalOrganizer`&#39;s already-loaded</span>
+<span class="sd">recordings. It reads the organizer&#39;s recordings and metadata and stores the</span>
+<span class="sd">results on itself, keeping loading (``AnimalOrganizer``) and analysis separate.</span>
+
+<span class="sd">Construct it as ``AnimalAnalyzer(ao)`` and reuse one instance across the</span>
+<span class="sd">``compute_*`` calls so intermediate state (e.g. bad channels) is shared, the same</span>
+<span class="sd">way you reuse a :class:`~neurodent.analysis.long_recording_analyzer.LongRecordingAnalyzer`.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">dask</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">dask.array</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">da</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dask</span><span class="w"> </span><span class="kn">import</span> <span class="n">delayed</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tqdm</span><span class="w"> </span><span class="kn">import</span> <span class="n">tqdm</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">neurodent</span><span class="w"> </span><span class="kn">import</span> <span class="n">constants</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.long_recording_analyzer</span><span class="w"> </span><span class="kn">import</span> <span class="n">LongRecordingAnalyzer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neurodent.core.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">validate_timestamps</span><span class="p">,</span> <span class="n">is_day</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neurodent.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">utils</span> <span class="k">as</span> <span class="n">core_utils</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.fragment_analyzer</span><span class="w"> </span><span class="kn">import</span> <span class="n">FragmentAnalyzer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.spike_detection</span><span class="w"> </span><span class="kn">import</span> <span class="n">FrequencyDomainSpikeDetector</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neurodent.results</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowAnalysisResult</span><span class="p">,</span> <span class="n">_sanitize_feature_request</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">spikeinterface.preprocessing</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">spre</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+    <span class="n">spre</span> <span class="o">=</span> <span class="kc">None</span>
+
+
+<div class="viewcode-block" id="AnimalAnalyzer">
+<a class="viewcode-back" href="../../../api/core/animal_analyzer.html#neurodent.analysis.AnimalAnalyzer">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">AnimalAnalyzer</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Runs analysis on a loaded :class:`AnimalOrganizer`, owning the results.</span>
+
+<span class="sd">    Analysis state (``bad_channels_dict``, ``features_df``, ``window_analysis_result``,</span>
+<span class="sd">    ``frequency_domain_spike_analysis_results``) is stored on the instance, so reuse a</span>
+<span class="sd">    single ``AnimalAnalyzer(ao)`` across ``compute_bad_channels`` /</span>
+<span class="sd">    ``compute_windowed_analysis`` / ``compute_frequency_domain_spike_analysis``. Computing</span>
+<span class="sd">    bad channels on one instance and windowed analysis on a separate ``AnimalAnalyzer(ao)``</span>
+<span class="sd">    will yield a result with empty bad channels on the second instance.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        ao (AnimalOrganizer): A loaded organizer whose recordings are analyzed.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="AnimalAnalyzer.__init__">
+<a class="viewcode-back" href="../../../api/core/animal_analyzer.html#neurodent.analysis.AnimalAnalyzer.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ao</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ao</span> <span class="o">=</span> <span class="n">ao</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">long_analyzers</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">LongRecordingAnalyzer</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bad_channels_dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">features_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">window_analysis_result</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">frequency_domain_spike_analysis_results</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="AnimalAnalyzer.compute_bad_channels">
+<a class="viewcode-back" href="../../../api/core/animal_analyzer.html#neurodent.analysis.AnimalAnalyzer.compute_bad_channels">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_bad_channels</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">lof_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">force_recompute</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">lof_chunk_duration_s</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">60</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute bad channels using LOF analysis for all recordings.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            lof_threshold (float, optional): Threshold for determining bad channels from LOF scores.</span>
+<span class="sd">                                           If None, only computes/loads scores without setting bad_channel_names.</span>
+<span class="sd">            force_recompute (bool): Whether to recompute LOF scores even if they exist.</span>
+<span class="sd">            lof_chunk_duration_s (float): Duration in seconds of each chunk used</span>
+<span class="sd">                for the pairwise-distance computation in LOF.  Defaults to 60.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Computing bad channels for </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">long_recordings</span><span class="p">)</span><span class="si">}</span><span class="s2"> recordings with threshold=</span><span class="si">{</span><span class="n">lof_threshold</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">lrec</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">_iter_valid_recordings</span><span class="p">():</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Computing bad channels for recording </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">animaldays</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+            <span class="n">lrec</span><span class="o">.</span><span class="n">compute_bad_channels</span><span class="p">(</span>
+                <span class="n">lof_threshold</span><span class="o">=</span><span class="n">lof_threshold</span><span class="p">,</span> <span class="n">force_recompute</span><span class="o">=</span><span class="n">force_recompute</span><span class="p">,</span>
+                <span class="n">lof_chunk_duration_s</span><span class="o">=</span><span class="n">lof_chunk_duration_s</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Recording </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> LOF scores computed: </span><span class="si">{</span><span class="nb">hasattr</span><span class="p">(</span><span class="n">lrec</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;lof_scores&#39;</span><span class="p">)</span><span class="w"> </span><span class="ow">and</span><span class="w"> </span><span class="n">lrec</span><span class="o">.</span><span class="n">lof_scores</span><span class="w"> </span><span class="ow">is</span><span class="w"> </span><span class="ow">not</span><span class="w"> </span><span class="kc">None</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Update bad channels dict if threshold was applied</span>
+        <span class="k">if</span> <span class="n">lof_threshold</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bad_channels_dict</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="n">animalday</span><span class="p">:</span> <span class="n">lrec</span><span class="o">.</span><span class="n">bad_channel_names</span>
+                <span class="k">for</span> <span class="n">animalday</span><span class="p">,</span> <span class="n">lrec</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">animaldays</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">long_recordings</span><span class="p">)</span>
+            <span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="AnimalAnalyzer.apply_lof_threshold">
+<a class="viewcode-back" href="../../../api/core/animal_analyzer.html#neurodent.analysis.AnimalAnalyzer.apply_lof_threshold">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">apply_lof_threshold</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lof_threshold</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply threshold to existing LOF scores to determine bad channels for all recordings.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            lof_threshold (float): Threshold for determining bad channels.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">lrec</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">long_recordings</span><span class="p">:</span>
+            <span class="n">lrec</span><span class="o">.</span><span class="n">apply_lof_threshold</span><span class="p">(</span><span class="n">lof_threshold</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">bad_channels_dict</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">animalday</span><span class="p">:</span> <span class="n">lrec</span><span class="o">.</span><span class="n">bad_channel_names</span>
+            <span class="k">for</span> <span class="n">animalday</span><span class="p">,</span> <span class="n">lrec</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">animaldays</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">long_recordings</span><span class="p">)</span>
+        <span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="AnimalAnalyzer.get_all_lof_scores">
+<a class="viewcode-back" href="../../../api/core/animal_analyzer.html#neurodent.analysis.AnimalAnalyzer.get_all_lof_scores">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_all_lof_scores</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get LOF scores for all recordings.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict: Dictionary mapping animal days to LOF score dictionaries.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="n">animalday</span><span class="p">:</span> <span class="n">lrec</span><span class="o">.</span><span class="n">get_lof_scores</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">animalday</span><span class="p">,</span> <span class="n">lrec</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">animaldays</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">long_recordings</span><span class="p">)</span>
+        <span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="AnimalAnalyzer.compute_windowed_analysis">
+<a class="viewcode-back" href="../../../api/core/animal_analyzer.html#neurodent.analysis.AnimalAnalyzer.compute_windowed_analysis">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_windowed_analysis</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">features</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+        <span class="n">exclude</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[],</span>
+        <span class="n">window_s</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+        <span class="n">multiprocess_mode</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;dask&quot;</span><span class="p">,</span> <span class="s2">&quot;serial&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;serial&quot;</span><span class="p">,</span>
+        <span class="n">suppress_short_interval_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">apply_notch_filter</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">chunk_duration_s</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="mi">3600</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;WindowAnalysisResult&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Computes windowed analysis of animal recordings. The data is divided into windows (time bins), then features are extracted from each window. The result is</span>
+<span class="sd">        formatted to a Dataframe and wrapped into a WindowAnalysisResult object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            features (list[str]): List of features to compute. See individual ``compute_...()`` functions for output format</span>
+<span class="sd">            exclude (list[str], optional): List of features to ignore. Will override the features parameter. Defaults to [].</span>
+<span class="sd">            window_s (int, optional): Length of each window in seconds. Note that some features break with very short window times. Defaults to 5.</span>
+<span class="sd">            suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps in resulting WindowAnalysisResult. Useful for aggregated WARs. Defaults to False.</span>
+<span class="sd">            apply_notch_filter (bool, optional): Whether to apply notch filtering to remove line noise. Uses constants.LINE_FREQ. Defaults to True.</span>
+<span class="sd">            chunk_duration_s (float, optional): Duration in seconds of data to hold</span>
+<span class="sd">                in memory at once during the Dask processing path.  Internally</span>
+<span class="sd">                converted to a number of fragments via</span>
+<span class="sd">                ``int(chunk_duration_s / window_s)``.  When ``None``,</span>
+<span class="sd">                all fragments are loaded into a single NumPy array before being</span>
+<span class="sd">                written to the intermediate zarr store — the original behavior,</span>
+<span class="sd">                which maximizes throughput but requires enough RAM to hold the</span>
+<span class="sd">                entire recording at once.  When set to a positive value, only the</span>
+<span class="sd">                corresponding number of fragments are buffered at a time, streaming</span>
+<span class="sd">                them to zarr incrementally; use a small value (e.g. 250) on</span>
+<span class="sd">                memory-constrained machines and a larger value (e.g. 2500+) on</span>
+<span class="sd">                high-memory nodes for maximum throughput.  Only has an effect when</span>
+<span class="sd">                ``multiprocess_mode=&quot;dask&quot;``.  Defaults to 3600.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            AttributeError: If a feature&#39;s ``compute_...()`` function was not implemented, this error will be raised.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            WindowAnalysisResult: A WindowAnalysisResult object containing extracted features for all recordings</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">features</span> <span class="o">=</span> <span class="n">_sanitize_feature_request</span><span class="p">(</span><span class="n">features</span><span class="p">,</span> <span class="n">exclude</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">_validate_sampling_rates</span><span class="p">()</span>
+
+        <span class="n">dataframes</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">_i</span><span class="p">,</span> <span class="n">lrec</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">_iter_valid_recordings</span><span class="p">():</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Computing windowed analysis for </span><span class="si">{</span><span class="n">lrec</span><span class="o">.</span><span class="n">display_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">lan</span> <span class="o">=</span> <span class="n">LongRecordingAnalyzer</span><span class="p">(</span>
+                <span class="n">lrec</span><span class="p">,</span> <span class="n">fragment_len_s</span><span class="o">=</span><span class="n">window_s</span><span class="p">,</span> <span class="n">apply_notch_filter</span><span class="o">=</span><span class="n">apply_notch_filter</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">lan</span><span class="o">.</span><span class="n">n_fragments</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;No fragments found for </span><span class="si">{</span><span class="n">lrec</span><span class="o">.</span><span class="n">display_name</span><span class="si">}</span><span class="s2">. Skipping.&quot;</span>
+                <span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing </span><span class="si">{</span><span class="n">lan</span><span class="o">.</span><span class="n">n_fragments</span><span class="si">}</span><span class="s2"> fragments&quot;</span><span class="p">)</span>
+            <span class="n">miniters</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">lan</span><span class="o">.</span><span class="n">n_fragments</span> <span class="o">/</span> <span class="mi">100</span><span class="p">)</span>
+            <span class="k">match</span> <span class="n">multiprocess_mode</span><span class="p">:</span>
+                <span class="k">case</span> <span class="s2">&quot;dask&quot;</span><span class="p">:</span>
+                    <span class="c1"># The last fragment is not included because it makes the dask array ragged</span>
+                    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Converting LongRecording to numpy array&quot;</span><span class="p">)</span>
+
+                    <span class="n">n_fragments_war</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">lan</span><span class="o">.</span><span class="n">n_fragments</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+                    <span class="n">n_samples_per_frag</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">window_s</span> <span class="o">*</span> <span class="n">lan</span><span class="o">.</span><span class="n">f_s</span><span class="p">)</span>
+
+                    <span class="c1"># Apply notch filter once to the entire recording (lazy SI wrapper)</span>
+                    <span class="n">rec</span> <span class="o">=</span> <span class="n">lrec</span><span class="o">.</span><span class="n">LongRecording</span>
+                    <span class="k">if</span> <span class="n">lan</span><span class="o">.</span><span class="n">apply_notch_filter</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">spre</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                            <span class="n">rec</span> <span class="o">=</span> <span class="n">spre</span><span class="o">.</span><span class="n">notch_filter</span><span class="p">(</span><span class="n">rec</span><span class="p">,</span> <span class="n">freq</span><span class="o">=</span><span class="n">constants</span><span class="o">.</span><span class="n">LINE_FREQ</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                                <span class="s2">&quot;apply_notch_filter=True but spikeinterface.preprocessing &quot;</span>
+                                <span class="s2">&quot;is not available; notch filter will be skipped.&quot;</span>
+                            <span class="p">)</span>
+
+                    <span class="k">if</span> <span class="n">chunk_duration_s</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="c1"># Convert seconds → number of fragments</span>
+                        <span class="n">n_frag_per_chunk</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">chunk_duration_s</span> <span class="o">/</span> <span class="n">window_s</span><span class="p">))</span>
+                        <span class="c1"># Streaming path: stream recording to zarr in batches,</span>
+                        <span class="c1"># keeping only `n_frag_per_chunk` fragments in RAM at a time.</span>
+                        <span class="n">tmppath</span> <span class="o">=</span> <span class="n">core_utils</span><span class="o">.</span><span class="n">stream_recording_to_zarr</span><span class="p">(</span>
+                            <span class="n">rec</span><span class="p">,</span>
+                            <span class="n">n_fragments_war</span><span class="p">,</span>
+                            <span class="n">n_samples_per_frag</span><span class="p">,</span>
+                            <span class="n">n_frag_per_chunk</span><span class="p">,</span>
+                        <span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="c1"># Default path: read all traces at once then write to zarr.</span>
+                        <span class="c1"># Maximises throughput on high-memory systems.</span>
+                        <span class="n">total_samples</span> <span class="o">=</span> <span class="n">n_fragments_war</span> <span class="o">*</span> <span class="n">n_samples_per_frag</span>
+                        <span class="n">all_traces</span> <span class="o">=</span> <span class="n">rec</span><span class="o">.</span><span class="n">get_traces</span><span class="p">(</span>
+                            <span class="n">start_frame</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                            <span class="n">end_frame</span><span class="o">=</span><span class="n">total_samples</span><span class="p">,</span>
+                            <span class="n">return_scaled</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                        <span class="p">)</span>
+                        <span class="n">np_fragments</span> <span class="o">=</span> <span class="n">all_traces</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span>
+                            <span class="n">n_fragments_war</span><span class="p">,</span> <span class="n">n_samples_per_frag</span><span class="p">,</span> <span class="n">rec</span><span class="o">.</span><span class="n">get_num_channels</span><span class="p">()</span>
+                        <span class="p">)</span>
+                        <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;np_fragments.shape: </span><span class="si">{</span><span class="n">np_fragments</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                        <span class="c1"># Cache fragments to zarr</span>
+                        <span class="n">tmppath</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">core_utils</span><span class="o">.</span><span class="n">cache_fragments_to_zarr</span><span class="p">(</span>
+                            <span class="n">np_fragments</span><span class="p">,</span> <span class="n">n_fragments_war</span>
+                        <span class="p">)</span>
+                        <span class="k">del</span> <span class="n">all_traces</span><span class="p">,</span> <span class="n">np_fragments</span>
+
+                    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Processing metadata serially&quot;</span><span class="p">)</span>
+                    <span class="n">metadatas</span> <span class="o">=</span> <span class="p">[</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_process_fragment_metadata</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">lan</span><span class="p">,</span> <span class="n">window_s</span><span class="p">)</span>
+                        <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_fragments_war</span><span class="p">)</span>
+                    <span class="p">]</span>
+                    <span class="n">meta_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">metadatas</span><span class="p">)</span>
+
+                    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Processing features in parallel&quot;</span><span class="p">)</span>
+                    <span class="n">np_fragments_reconstruct</span> <span class="o">=</span> <span class="n">da</span><span class="o">.</span><span class="n">from_zarr</span><span class="p">(</span>
+                        <span class="n">tmppath</span><span class="p">,</span> <span class="n">chunks</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;auto&quot;</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+                    <span class="p">)</span>
+                    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Dask array shape: </span><span class="si">{</span><span class="n">np_fragments_reconstruct</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Dask array chunks: </span><span class="si">{</span><span class="n">np_fragments_reconstruct</span><span class="o">.</span><span class="n">chunks</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="p">)</span>
+
+                    <span class="c1"># Create delayed tasks for each fragment using efficient dependency resolution</span>
+                    <span class="n">feature_values</span> <span class="o">=</span> <span class="p">[</span>
+                        <span class="n">delayed</span><span class="p">(</span><span class="n">FragmentAnalyzer</span><span class="o">.</span><span class="n">process_fragment_with_dependencies</span><span class="p">)(</span>
+                            <span class="n">np_fragments_reconstruct</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span> <span class="n">lan</span><span class="o">.</span><span class="n">f_s</span><span class="p">,</span> <span class="n">features</span><span class="p">,</span> <span class="n">kwargs</span>
+                        <span class="p">)</span>
+                        <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_fragments_war</span><span class="p">)</span>
+                    <span class="p">]</span>
+
+                    <span class="c1"># Compute features in parallel</span>
+                    <span class="n">feature_values</span> <span class="o">=</span> <span class="n">dask</span><span class="o">.</span><span class="n">compute</span><span class="p">(</span><span class="o">*</span><span class="n">feature_values</span><span class="p">)</span>
+
+                    <span class="c1"># Clean up temp directory after processing</span>
+                    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Cleaning up temp directory&quot;</span><span class="p">)</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+
+                        <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">tmppath</span><span class="p">)</span>
+                    <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="ne">FileNotFoundError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                        <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;Failed to remove temporary directory </span><span class="si">{</span><span class="n">tmppath</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span>
+                        <span class="p">)</span>
+
+                    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Combining metadata and feature values&quot;</span><span class="p">)</span>
+                    <span class="n">feat_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">feature_values</span><span class="p">)</span>
+                    <span class="n">lan_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">meta_df</span><span class="p">,</span> <span class="n">feat_df</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+                <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
+                    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Processing serially&quot;</span><span class="p">)</span>
+                    <span class="n">lan_df</span> <span class="o">=</span> <span class="p">[]</span>
+                    <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span>
+                        <span class="nb">range</span><span class="p">(</span><span class="n">lan</span><span class="o">.</span><span class="n">n_fragments</span><span class="p">),</span>
+                        <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Processing rows&quot;</span><span class="p">,</span>
+                        <span class="n">miniters</span><span class="o">=</span><span class="n">miniters</span><span class="p">,</span>
+                    <span class="p">):</span>
+                        <span class="n">lan_df</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">_process_fragment_serial</span><span class="p">(</span>
+                                <span class="n">idx</span><span class="p">,</span> <span class="n">features</span><span class="p">,</span> <span class="n">lan</span><span class="p">,</span> <span class="n">window_s</span><span class="p">,</span> <span class="n">kwargs</span>
+                            <span class="p">)</span>
+                        <span class="p">)</span>
+
+            <span class="n">lan_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">lan_df</span><span class="p">)</span>
+
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Validating timestamps&quot;</span><span class="p">)</span>
+            <span class="n">validate_timestamps</span><span class="p">(</span><span class="n">lan_df</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
+            <span class="n">lan_df</span> <span class="o">=</span> <span class="n">lan_df</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s2">&quot;timestamp&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">long_analyzers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">lan</span><span class="p">)</span>
+            <span class="n">dataframes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">lan_df</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">features_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">dataframes</span><span class="p">)</span>
+
+        <span class="c1"># Collect LOF scores from long recordings</span>
+        <span class="n">lof_scores_dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">missing_lof_animaldays</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">animalday</span><span class="p">,</span> <span class="n">lrec</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">animaldays</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">long_recordings</span><span class="p">):</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Checking LOF scores for </span><span class="si">{</span><span class="n">animalday</span><span class="si">}</span><span class="s2">: has_attr=</span><span class="si">{</span><span class="nb">hasattr</span><span class="p">(</span><span class="n">lrec</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;lof_scores&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;is_not_none=</span><span class="si">{</span><span class="nb">getattr</span><span class="p">(</span><span class="n">lrec</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;lof_scores&#39;</span><span class="p">,</span><span class="w"> </span><span class="kc">None</span><span class="p">)</span><span class="w"> </span><span class="ow">is</span><span class="w"> </span><span class="ow">not</span><span class="w"> </span><span class="kc">None</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">lrec</span><span class="p">,</span> <span class="s2">&quot;lof_scores&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">lrec</span><span class="o">.</span><span class="n">lof_scores</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">lof_scores_dict</span><span class="p">[</span><span class="n">animalday</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;lof_scores&quot;</span><span class="p">:</span> <span class="n">lrec</span><span class="o">.</span><span class="n">lof_scores</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
+                    <span class="s2">&quot;channel_names&quot;</span><span class="p">:</span> <span class="n">lrec</span><span class="o">.</span><span class="n">channel_names</span><span class="p">,</span>
+                <span class="p">}</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Added LOF scores for </span><span class="si">{</span><span class="n">animalday</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">lrec</span><span class="o">.</span><span class="n">lof_scores</span><span class="p">)</span><span class="si">}</span><span class="s2"> channels&quot;</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">missing_lof_animaldays</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">animalday</span><span class="p">)</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Missing LOF scores for </span><span class="si">{</span><span class="n">animalday</span><span class="si">}</span><span class="s2">! LOF computation may have failed or &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;compute_bad_channels() was not called for this LRO.&quot;</span>
+                <span class="p">)</span>
+
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total LOF scores collected: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">lof_scores_dict</span><span class="p">)</span><span class="si">}</span><span class="s2"> animal days&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Warn loudly if any animaldays are missing LOF scores</span>
+        <span class="k">if</span> <span class="n">missing_lof_animaldays</span><span class="p">:</span>
+            <span class="n">warning_msg</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;WARNING: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">missing_lof_animaldays</span><span class="p">)</span><span class="si">}</span><span class="s2"> animalday(s) are missing LOF scores: </span><span class="si">{</span><span class="n">missing_lof_animaldays</span><span class="si">}</span><span class="s2">. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Expected </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">animaldays</span><span class="p">)</span><span class="si">}</span><span class="s2"> but got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">lof_scores_dict</span><span class="p">)</span><span class="si">}</span><span class="s2">. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;These sessions will be auto-populated with empty placeholders and excluded from LOF-based analysis.&quot;</span>
+            <span class="p">)</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">warning_msg</span><span class="p">)</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="n">warning_msg</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">window_analysis_result</span> <span class="o">=</span> <span class="n">WindowAnalysisResult</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">features_df</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">animal_id</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">genotype</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">sex</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">channel_names</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bad_channels_dict</span><span class="p">,</span>
+            <span class="n">suppress_short_interval_error</span><span class="p">,</span>
+            <span class="n">lof_scores_dict</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">window_analysis_result</span></div>
+
+
+<div class="viewcode-block" id="AnimalAnalyzer.compute_frequency_domain_spike_analysis">
+<a class="viewcode-back" href="../../../api/core/animal_analyzer.html#neurodent.analysis.AnimalAnalyzer.compute_frequency_domain_spike_analysis">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_frequency_domain_spike_analysis</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">detection_params</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">chunk_duration_s</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">3600</span><span class="p">,</span>
+        <span class="n">multiprocess_mode</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;dask&quot;</span><span class="p">,</span> <span class="s2">&quot;serial&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;serial&quot;</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Compute frequency-domain spike detection on all long recordings.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            detection_params (dict, optional): Detection parameters. Uses defaults if None.</span>
+<span class="sd">            chunk_duration_s (float): Duration in seconds of each</span>
+<span class="sd">                processing chunk.  Defaults to 3600 (1 hour).  The full</span>
+<span class="sd">                recording is always analysed; this parameter controls peak RAM</span>
+<span class="sd">                by processing in overlapping chunks.  ``None`` loads the full</span>
+<span class="sd">                recording at once (fastest).</span>
+<span class="sd">            multiprocess_mode (Literal[&quot;dask&quot;, &quot;serial&quot;]): Processing mode</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list[FrequencyDomainSpikeAnalysisResult]: Results for each recording session</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ImportError: If SpikeInterface is not available</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Import here to avoid circular imports</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">neurodent.results</span><span class="w"> </span><span class="kn">import</span> <span class="n">FrequencyDomainSpikeAnalysisResult</span>
+
+        <span class="n">fdsar_list</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Running frequency-domain spike detection on </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">long_recordings</span><span class="p">)</span><span class="si">}</span><span class="s2"> recordings&quot;</span>
+        <span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Detection parameters: </span><span class="si">{</span><span class="n">detection_params</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">lrec</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">_iter_valid_recordings</span><span class="p">():</span>
+            <span class="n">rec</span> <span class="o">=</span> <span class="n">lrec</span><span class="o">.</span><span class="n">LongRecording</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="c1"># Run frequency domain spike detection</span>
+                <span class="n">spike_indices_per_channel</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">FrequencyDomainSpikeDetector</span><span class="o">.</span><span class="n">detect_spikes_recording</span><span class="p">(</span>
+                        <span class="n">rec</span><span class="p">,</span>
+                        <span class="n">detection_params</span><span class="o">=</span><span class="n">detection_params</span><span class="p">,</span>
+                        <span class="n">chunk_duration_s</span><span class="o">=</span><span class="n">chunk_duration_s</span><span class="p">,</span>
+                        <span class="n">multiprocess_mode</span><span class="o">=</span><span class="n">multiprocess_mode</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+
+                <span class="c1"># Create FrequencyDomainSpikeAnalysisResult</span>
+                <span class="n">fdsar</span> <span class="o">=</span> <span class="n">FrequencyDomainSpikeAnalysisResult</span><span class="o">.</span><span class="n">from_detection_results</span><span class="p">(</span>
+                    <span class="n">spike_indices_per_channel</span><span class="o">=</span><span class="n">spike_indices_per_channel</span><span class="p">,</span>
+                    <span class="n">recording</span><span class="o">=</span><span class="n">rec</span><span class="p">,</span>
+                    <span class="n">detection_params</span><span class="o">=</span><span class="n">detection_params</span> <span class="ow">or</span> <span class="p">{},</span>
+                    <span class="n">animal_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">animal_id</span><span class="p">,</span>
+                    <span class="n">genotype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">genotype</span><span class="p">,</span>
+                    <span class="n">animal_day</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">animaldays</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+                    <span class="n">bin_folder_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                    <span class="n">metadata</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">long_recordings</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">meta</span><span class="p">,</span>
+                <span class="p">)</span>
+
+                <span class="n">fdsar_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fdsar</span><span class="p">)</span>
+
+                <span class="c1"># Log results</span>
+                <span class="n">total_spikes</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">spikes</span><span class="p">)</span> <span class="k">for</span> <span class="n">spikes</span> <span class="ow">in</span> <span class="n">spike_indices_per_channel</span><span class="p">)</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Recording </span><span class="si">{</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">long_recordings</span><span class="p">)</span><span class="si">}</span><span class="s2">: Detected </span><span class="si">{</span><span class="n">total_spikes</span><span class="si">}</span><span class="s2"> spikes across </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">spike_indices_per_channel</span><span class="p">)</span><span class="si">}</span><span class="s2"> channels&quot;</span>
+                <span class="p">)</span>
+
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error processing recording </span><span class="si">{</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">long_recordings</span><span class="p">)</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">raise</span>
+
+        <span class="c1"># Store results for later access</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">frequency_domain_spike_analysis_results</span> <span class="o">=</span> <span class="n">fdsar_list</span>
+
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Completed frequency-domain spike detection. Total recordings processed: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">fdsar_list</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">fdsar_list</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_process_fragment_serial</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">features</span><span class="p">,</span> <span class="n">lan</span><span class="p">:</span> <span class="n">LongRecordingAnalyzer</span><span class="p">,</span> <span class="n">window_s</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">:</span> <span class="nb">dict</span>
+    <span class="p">):</span>
+        <span class="n">row</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_process_fragment_metadata</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">lan</span><span class="p">,</span> <span class="n">window_s</span><span class="p">)</span>
+        <span class="n">row</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_process_fragment_features</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">features</span><span class="p">,</span> <span class="n">lan</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">row</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_process_fragment_metadata</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">lan</span><span class="p">:</span> <span class="n">LongRecordingAnalyzer</span><span class="p">,</span> <span class="n">window_s</span>
+    <span class="p">):</span>
+        <span class="n">row</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="c1"># Build session labels from LRO&#39;s DiscoveredFile metadata</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">neurodent.loading</span><span class="w"> </span><span class="kn">import</span> <span class="n">DiscoveredFile</span>
+
+        <span class="n">lro</span> <span class="o">=</span> <span class="n">lan</span><span class="o">.</span><span class="n">LongRecording</span>
+        <span class="n">item</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">lro</span><span class="p">,</span> <span class="s2">&quot;item&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="n">animal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">animal_id</span> <span class="ow">or</span> <span class="s2">&quot;unknown&quot;</span>
+        <span class="n">genotype</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">genotype</span> <span class="ow">or</span> <span class="s2">&quot;Unknown&quot;</span>
+        <span class="n">sex</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ao</span><span class="o">.</span><span class="n">sex</span> <span class="ow">or</span> <span class="s2">&quot;Unknown&quot;</span>
+        <span class="n">session</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">DiscoveredFile</span><span class="p">)</span> <span class="ow">and</span> <span class="n">item</span><span class="o">.</span><span class="n">metadata</span><span class="p">:</span>
+            <span class="n">meta</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">metadata</span>
+            <span class="n">animal</span> <span class="o">=</span> <span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;animal&quot;</span><span class="p">,</span> <span class="n">animal</span><span class="p">)</span>
+            <span class="n">session</span> <span class="o">=</span> <span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;session&quot;</span><span class="p">)</span>
+            <span class="n">genotype</span> <span class="o">=</span> <span class="n">constants</span><span class="o">.</span><span class="n">ANIMAL_METADATA</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">animal</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;genotype&quot;</span><span class="p">,</span> <span class="n">genotype</span><span class="p">)</span>
+            <span class="n">sex</span> <span class="o">=</span> <span class="n">constants</span><span class="o">.</span><span class="n">ANIMAL_METADATA</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">animal</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sex&quot;</span><span class="p">,</span> <span class="n">sex</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">session</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">session</span> <span class="o">=</span> <span class="n">lro</span><span class="o">.</span><span class="n">get_date_string</span><span class="p">()</span>
+            <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">AttributeError</span><span class="p">):</span>
+                <span class="n">session</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>
+
+        <span class="n">row</span><span class="p">[</span><span class="s2">&quot;animalday&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">animal</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">genotype</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">session</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">row</span><span class="p">[</span><span class="s2">&quot;animal&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">animal</span>
+        <span class="n">row</span><span class="p">[</span><span class="s2">&quot;day&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">session</span>
+        <span class="n">row</span><span class="p">[</span><span class="s2">&quot;genotype&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">genotype</span>
+        <span class="n">row</span><span class="p">[</span><span class="s2">&quot;sex&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">sex</span>
+        <span class="n">row</span><span class="p">[</span><span class="s2">&quot;duration&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">lan</span><span class="o">.</span><span class="n">LongRecording</span><span class="o">.</span><span class="n">get_dur_fragment</span><span class="p">(</span><span class="n">window_s</span><span class="p">,</span> <span class="n">idx</span><span class="p">)</span>
+        <span class="n">row</span><span class="p">[</span><span class="s2">&quot;endfile&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">lan</span><span class="o">.</span><span class="n">get_file_end</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
+
+        <span class="n">frag_dt</span> <span class="o">=</span> <span class="n">lan</span><span class="o">.</span><span class="n">LongRecording</span><span class="o">.</span><span class="n">get_datetime_fragment</span><span class="p">(</span><span class="n">window_s</span><span class="p">,</span> <span class="n">idx</span><span class="p">)</span>
+        <span class="n">row</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">frag_dt</span>
+        <span class="n">row</span><span class="p">[</span><span class="s2">&quot;isday&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">is_day</span><span class="p">(</span><span class="n">frag_dt</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">row</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_process_fragment_features</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">features</span><span class="p">,</span> <span class="n">lan</span><span class="p">:</span> <span class="n">LongRecordingAnalyzer</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">:</span> <span class="nb">dict</span>
+    <span class="p">):</span>
+        <span class="n">row</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">feat</span> <span class="ow">in</span> <span class="n">features</span><span class="p">:</span>
+            <span class="n">func</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">lan</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;compute_</span><span class="si">{</span><span class="n">feat</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+                <span class="n">row</span><span class="p">[</span><span class="n">feat</span><span class="p">]</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid function </span><span class="si">{</span><span class="n">func</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">row</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025, Joseph Dong, Yongtaek Oh, Eric Marsh.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

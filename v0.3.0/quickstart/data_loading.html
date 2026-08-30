@@ -1,0 +1,1117 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Data Loading Tutorial &#8212; Neurodent 0.3.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../_static/documentation_options.js?v=e259d695"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'quickstart/data_loading';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://josephdong1000.github.io/neurodent/_static/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.4.0';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner =
+            false;
+        </script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Configuration and Tips" href="configuration.html" />
+    <link rel="prev" title="Basic Usage Tutorial" href="basic_usage.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">NeuRodent</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api/index.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../license/index.html">
+    License
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-2"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-2"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-2"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-2">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../license/index.html">
+    License
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-3"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-3"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-3"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-3">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="basic_usage.html">Basic Usage Tutorial</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Data Loading Tutorial</a></li>
+
+
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and Tips</a></li>
+<li class="toctree-l1"><a class="reference internal" href="snakemake_setup.html">Snakemake Pipeline Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dataset_configuration.html">Dataset Configuration</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Quickstart</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Data Loading Tutorial</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="data-loading-tutorial">
+<h1>Data Loading Tutorial<a class="headerlink" href="#data-loading-tutorial" title="Link to this heading">#</a></h1>
+<p>This tutorial covers how to load EEG data from various formats into NeuRodent’s
+two main organizer classes:</p>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">LongRecordingOrganizer</span></code> (LRO)</strong> — loads and manages a single recording
+(one session, one animal).</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">AnimalOrganizer</span></code> (AO)</strong> — discovers and groups multiple recordings for one
+animal using file-path patterns, then creates LROs internally.</p></li>
+</ul>
+<p>Most users will interact with <code class="docutils literal notranslate"><span class="pre">AnimalOrganizer</span></code> directly.  Understanding
+the LRO helps when you need fine-grained control over how individual
+recordings are loaded.</p>
+<section id="setup">
+<h2>Setup<a class="headerlink" href="#setup" title="Link to this heading">#</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">csv</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">neurodent</span><span class="w"> </span><span class="kn">import</span> <span class="n">core</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neurodent.core.discovery</span><span class="w"> </span><span class="kn">import</span> <span class="n">DiscoveredFile</span><span class="p">,</span> <span class="n">FileDiscoverer</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">spikeinterface.core</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">si</span>
+
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span>
+    <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">%(asctime)s</span><span class="s2"> - </span><span class="si">%(levelname)s</span><span class="s2"> - </span><span class="si">%(message)s</span><span class="s2">&quot;</span><span class="p">,</span>
+    <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output traceback highlight-ipythontb notranslate"><div class="highlight"><pre><span></span><span class="gt">---------------------------------------------------------------------------</span>
+<span class="ne">ModuleNotFoundError</span><span class="g g-Whitespace">                       </span>Traceback (most recent call last)
+<span class="n">Cell</span> <span class="n">In</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">line</span> <span class="mi">9</span>
+<span class="g g-Whitespace">      </span><span class="mi">6</span> <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="g g-Whitespace">      </span><span class="mi">8</span> <span class="kn">from</span><span class="w"> </span><span class="nn">neurodent</span><span class="w"> </span><span class="kn">import</span> <span class="n">core</span>
+<span class="ne">----&gt; </span><span class="mi">9</span> <span class="kn">from</span><span class="w"> </span><span class="nn">neurodent.core.discovery</span><span class="w"> </span><span class="kn">import</span> <span class="n">DiscoveredFile</span><span class="p">,</span> <span class="n">FileDiscoverer</span>
+<span class="g g-Whitespace">     </span><span class="mi">11</span> <span class="kn">import</span><span class="w"> </span><span class="nn">spikeinterface.core</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">si</span>
+<span class="g g-Whitespace">     </span><span class="mi">13</span> <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span>
+<span class="g g-Whitespace">     </span><span class="mi">14</span>     <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">%(asctime)s</span><span class="s2"> - </span><span class="si">%(levelname)s</span><span class="s2"> - </span><span class="si">%(message)s</span><span class="s2">&quot;</span><span class="p">,</span>
+<span class="g g-Whitespace">     </span><span class="mi">15</span>     <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span>
+<span class="g g-Whitespace">     </span><span class="mi">16</span> <span class="p">)</span>
+
+<span class="ne">ModuleNotFoundError</span>: No module named &#39;neurodent.core.discovery&#39;
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section class="tex2jax_ignore mathjax_ignore" id="part-1-longrecordingorganizer">
+<h1>Part 1 — <code class="docutils literal notranslate"><span class="pre">LongRecordingOrganizer</span></code><a class="headerlink" href="#part-1-longrecordingorganizer" title="Link to this heading">#</a></h1>
+<section id="what-lro-accepts-as-item">
+<h2>What LRO Accepts as <code class="docutils literal notranslate"><span class="pre">item</span></code><a class="headerlink" href="#what-lro-accepts-as-item" title="Link to this heading">#</a></h2>
+<p>The first argument (<code class="docutils literal notranslate"><span class="pre">item</span></code>) of <code class="docutils literal notranslate"><span class="pre">LongRecordingOrganizer</span></code> accepts several
+types, depending on your data layout:</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p><code class="docutils literal notranslate"><span class="pre">item</span></code> type</p></th>
+<th class="head"><p>Use case</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong><code class="docutils literal notranslate"><span class="pre">str</span></code> / <code class="docutils literal notranslate"><span class="pre">Path</span></code></strong> (single file)</p></td>
+<td><p>One recording in a standard format (EDF, Intan, NWB, …)</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong><code class="docutils literal notranslate"><span class="pre">list[str]</span></code></strong> (multiple files)</p></td>
+<td><p>Several files to concatenate into one long recording</p></td>
+</tr>
+<tr class="row-even"><td><p><strong><code class="docutils literal notranslate"><span class="pre">DiscoveredFile</span></code></strong> (single-file)</p></td>
+<td><p>One file returned by <code class="docutils literal notranslate"><span class="pre">FileDiscoverer</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><strong><code class="docutils literal notranslate"><span class="pre">DiscoveredFile</span></code></strong> (multi-file)</p></td>
+<td><p>Paired files that together form one recording (e.g. <code class="docutils literal notranslate"><span class="pre">.bin</span></code> + <code class="docutils literal notranslate"><span class="pre">.csv</span></code>)</p></td>
+</tr>
+<tr class="row-even"><td><p><strong><code class="docutils literal notranslate"><span class="pre">None</span></code></strong></p></td>
+<td><p>When passing a pre-loaded <code class="docutils literal notranslate"><span class="pre">si.BaseRecording</span></code> via the <code class="docutils literal notranslate"><span class="pre">recording=</span></code> parameter</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">mode</span></code> parameter selects the backend: <code class="docutils literal notranslate"><span class="pre">&quot;si&quot;</span></code> (SpikeInterface),
+<code class="docutils literal notranslate"><span class="pre">&quot;mne&quot;</span></code> (MNE-Python), or <code class="docutils literal notranslate"><span class="pre">None</span></code> (pre-created recording).</p>
+<p>The optional <code class="docutils literal notranslate"><span class="pre">extract_func</span></code> tells LRO <em>how</em> to read the file(s).  It can
+be a SpikeInterface extractor name (e.g. <code class="docutils literal notranslate"><span class="pre">&quot;read_edf&quot;</span></code>), a callable, or
+a file-path string (e.g. <code class="docutils literal notranslate"><span class="pre">&quot;readers.py:read_custom&quot;</span></code>).</p>
+</section>
+<section id="loading-a-standard-format-edf">
+<h2>1. Loading a Standard Format (EDF)<a class="headerlink" href="#loading-a-standard-format-edf" title="Link to this heading">#</a></h2>
+<p>The simplest case: point LRO to a single file and specify a built-in
+SpikeInterface extractor.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Load an EDF file by passing a single path string</span>
+<span class="n">lro_edf</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">LongRecordingOrganizer</span><span class="p">(</span>
+    <span class="n">item</span><span class="o">=</span><span class="s2">&quot;../../.tests/integration/data/A10/A10_recording.edf&quot;</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;si&quot;</span><span class="p">,</span>
+    <span class="n">extract_func</span><span class="o">=</span><span class="s2">&quot;read_edf&quot;</span><span class="p">,</span>
+    <span class="n">manual_datetimes</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2023</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">13</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Sampling frequency: </span><span class="si">{</span><span class="n">lro_edf</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">f_s</span><span class="si">}</span><span class="s2"> Hz&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of channels: </span><span class="si">{</span><span class="n">lro_edf</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">n_channels</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Duration: </span><span class="si">{</span><span class="n">lro_edf</span><span class="o">.</span><span class="n">LongRecording</span><span class="o">.</span><span class="n">get_total_duration</span><span class="p">()</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> s&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Access the underlying SpikeInterface recording</span>
+<span class="n">recording</span> <span class="o">=</span> <span class="n">lro_edf</span><span class="o">.</span><span class="n">LongRecording</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Recording type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">recording</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Duration: </span><span class="si">{</span><span class="n">recording</span><span class="o">.</span><span class="n">get_total_duration</span><span class="p">()</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> seconds&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="loading-multi-file-formats-with-discoveredfile">
+<h2>2. Loading Multi-File Formats with <code class="docutils literal notranslate"><span class="pre">DiscoveredFile</span></code><a class="headerlink" href="#loading-multi-file-formats-with-discoveredfile" title="Link to this heading">#</a></h2>
+<p>Some formats pair a data file with a metadata sidecar (e.g. a <code class="docutils literal notranslate"><span class="pre">.bin</span></code>
+with a <code class="docutils literal notranslate"><span class="pre">.csv</span></code>).  Wrap the paths in a <code class="docutils literal notranslate"><span class="pre">DiscoveredFile</span></code> so LRO treats
+them as a single recording.</p>
+<p>A custom <code class="docutils literal notranslate"><span class="pre">extract_func</span></code> receives the <code class="docutils literal notranslate"><span class="pre">DiscoveredFile</span></code> and returns a
+<code class="docutils literal notranslate"><span class="pre">si.BaseRecording</span></code>.  First, define the reader function inline:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">read_bin_csv_pair</span><span class="p">(</span><span class="n">discovered_file</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Read paired ColMajor .bin + Meta .csv files into a recording.&quot;&quot;&quot;</span>
+    <span class="n">bin_path</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">discovered_file</span><span class="o">.</span><span class="n">paths</span> <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.bin&quot;</span><span class="p">)][</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">csv_path</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">discovered_file</span><span class="o">.</span><span class="n">paths</span> <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.csv&quot;</span><span class="p">)][</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">csv_path</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">csv</span><span class="o">.</span><span class="n">DictReader</span><span class="p">(</span><span class="n">f</span><span class="p">))</span>
+
+    <span class="n">n_channels</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
+    <span class="n">sampling_rate</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">rows</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;SampleRate&quot;</span><span class="p">])</span>
+    <span class="n">channel_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;Label&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">]</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fromfile</span><span class="p">(</span><span class="n">bin_path</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_channels</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">si</span><span class="o">.</span><span class="n">NumpyRecording</span><span class="p">(</span>
+        <span class="n">traces_list</span><span class="o">=</span><span class="p">[</span><span class="n">data</span><span class="p">],</span>
+        <span class="n">sampling_frequency</span><span class="o">=</span><span class="n">sampling_rate</span><span class="p">,</span>
+        <span class="n">channel_ids</span><span class="o">=</span><span class="n">channel_names</span><span class="p">,</span>
+    <span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Two files that together form one recording</span>
+<span class="n">discovered</span> <span class="o">=</span> <span class="n">DiscoveredFile</span><span class="p">(</span>
+    <span class="n">paths</span><span class="o">=</span><span class="p">(</span>
+        <span class="s2">&quot;../../.tests/integration/data/A10/Cage 2 A10-0_ColMajor.bin&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;../../.tests/integration/data/A10/Cage 2 A10-0_Meta.csv&quot;</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+
+<span class="c1"># Pass the inline function as extract_func</span>
+<span class="n">lro_bin</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">LongRecordingOrganizer</span><span class="p">(</span>
+    <span class="n">item</span><span class="o">=</span><span class="n">discovered</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;si&quot;</span><span class="p">,</span>
+    <span class="n">extract_func</span><span class="o">=</span><span class="n">read_bin_csv_pair</span><span class="p">,</span>
+    <span class="n">manual_datetimes</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2023</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">13</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Sampling frequency: </span><span class="si">{</span><span class="n">lro_bin</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">f_s</span><span class="si">}</span><span class="s2"> Hz&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of channels: </span><span class="si">{</span><span class="n">lro_bin</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">n_channels</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Channel names: </span><span class="si">{</span><span class="n">lro_bin</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">channel_names</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="file-path-string-alternative">
+<h3>File-path string alternative<a class="headerlink" href="#file-path-string-alternative" title="Link to this heading">#</a></h3>
+<p>Instead of defining the reader inline, you can point to a function in a
+Python file using the <code class="docutils literal notranslate"><span class="pre">&quot;path/to/file.py:function_name&quot;</span></code> syntax.  The
+repository includes a pre-packaged reader at
+<code class="docutils literal notranslate"><span class="pre">tests/integration/readers.py:read_bin_csv_pair</span></code>:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Same result, but the reader is loaded from a file</span>
+<span class="n">lro_bin_from_file</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">LongRecordingOrganizer</span><span class="p">(</span>
+    <span class="n">item</span><span class="o">=</span><span class="n">discovered</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;si&quot;</span><span class="p">,</span>
+    <span class="n">extract_func</span><span class="o">=</span><span class="s2">&quot;../../tests/integration/readers.py:read_bin_csv_pair&quot;</span><span class="p">,</span>
+    <span class="n">manual_datetimes</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2023</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">13</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Sampling frequency: </span><span class="si">{</span><span class="n">lro_bin_from_file</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">f_s</span><span class="si">}</span><span class="s2"> Hz&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of channels: </span><span class="si">{</span><span class="n">lro_bin_from_file</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">n_channels</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="other-standard-formats">
+<h2>3. Other Standard Formats<a class="headerlink" href="#other-standard-formats" title="Link to this heading">#</a></h2>
+<p>Any format supported by SpikeInterface can be loaded via <code class="docutils literal notranslate"><span class="pre">mode=&quot;si&quot;</span></code> by
+passing the appropriate extractor name:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Intan .rhd</span>
+<span class="n">lro</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">LongRecordingOrganizer</span><span class="p">(</span>
+    <span class="n">item</span><span class="o">=</span><span class="s2">&quot;/path/to/recording.rhd&quot;</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;si&quot;</span><span class="p">,</span>
+    <span class="n">extract_func</span><span class="o">=</span><span class="s2">&quot;read_intan&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># NWB</span>
+<span class="n">lro</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">LongRecordingOrganizer</span><span class="p">(</span>
+    <span class="n">item</span><span class="o">=</span><span class="s2">&quot;/path/to/file.nwb&quot;</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;si&quot;</span><span class="p">,</span>
+    <span class="n">extract_func</span><span class="o">=</span><span class="s2">&quot;read_nwb&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>MNE-Python formats are available with <code class="docutils literal notranslate"><span class="pre">mode=&quot;mne&quot;</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">mne</span>
+
+<span class="n">lro</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">LongRecordingOrganizer</span><span class="p">(</span>
+    <span class="n">item</span><span class="o">=</span><span class="s2">&quot;/path/to/recording.fif&quot;</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;mne&quot;</span><span class="p">,</span>
+    <span class="n">extract_func</span><span class="o">=</span><span class="n">mne</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">read_raw_fif</span><span class="p">,</span>
+    <span class="n">manual_datetimes</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2023</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">13</span><span class="p">),</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="concatenating-multiple-files">
+<h2>4. Concatenating Multiple Files<a class="headerlink" href="#concatenating-multiple-files" title="Link to this heading">#</a></h2>
+<p>Pass a <strong>list</strong> of paths to have LRO concatenate them in order:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">lro_multi</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">LongRecordingOrganizer</span><span class="p">(</span>
+    <span class="n">item</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;/path/to/session1.edf&quot;</span><span class="p">,</span> <span class="s2">&quot;/path/to/session2.edf&quot;</span><span class="p">],</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;si&quot;</span><span class="p">,</span>
+    <span class="n">extract_func</span><span class="o">=</span><span class="s2">&quot;read_edf&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="pre-loaded-recording-objects">
+<h2>5. Pre-Loaded Recording Objects<a class="headerlink" href="#pre-loaded-recording-objects" title="Link to this heading">#</a></h2>
+<p>If you already have a SpikeInterface <code class="docutils literal notranslate"><span class="pre">BaseRecording</span></code> in memory (from
+any source — <code class="docutils literal notranslate"><span class="pre">NumpyRecording</span></code>, a loaded <code class="docutils literal notranslate"><span class="pre">.nwb</span></code>, custom processing, etc.),
+pass it directly to LRO with <code class="docutils literal notranslate"><span class="pre">mode=None</span></code>.</p>
+<p>First, create the recording:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a SpikeInterface recording from raw numpy data</span>
+<span class="n">num_channels</span> <span class="o">=</span> <span class="mi">8</span>
+<span class="n">sampling_frequency</span> <span class="o">=</span> <span class="mi">1000</span>  <span class="c1"># Hz</span>
+<span class="n">duration</span> <span class="o">=</span> <span class="mi">10</span>  <span class="c1"># seconds</span>
+<span class="n">num_samples</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">sampling_frequency</span> <span class="o">*</span> <span class="n">duration</span><span class="p">)</span>
+
+<span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">num_samples</span><span class="p">,</span> <span class="n">num_channels</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+<span class="n">recording_custom</span> <span class="o">=</span> <span class="n">si</span><span class="o">.</span><span class="n">NumpyRecording</span><span class="p">(</span>
+    <span class="n">traces_list</span><span class="o">=</span><span class="p">[</span><span class="n">data</span><span class="p">],</span>
+    <span class="n">sampling_frequency</span><span class="o">=</span><span class="n">sampling_frequency</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">channel_ids</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;CH</span><span class="si">{</span><span class="n">i</span><span class="si">:</span><span class="s2">02d</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_channels</span><span class="p">)]</span>
+<span class="n">recording_custom</span> <span class="o">=</span> <span class="n">recording_custom</span><span class="o">.</span><span class="n">rename_channels</span><span class="p">(</span><span class="n">new_channel_ids</span><span class="o">=</span><span class="n">channel_ids</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Recording type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">recording_custom</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Duration: </span><span class="si">{</span><span class="n">recording_custom</span><span class="o">.</span><span class="n">get_total_duration</span><span class="p">()</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> s&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Pass any si.BaseRecording directly to LRO</span>
+<span class="n">lro_custom</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">LongRecordingOrganizer</span><span class="p">(</span>
+    <span class="n">item</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">recording</span><span class="o">=</span><span class="n">recording_custom</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Sampling frequency: </span><span class="si">{</span><span class="n">lro_custom</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">f_s</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of channels: </span><span class="si">{</span><span class="n">lro_custom</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">n_channels</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Channel names: </span><span class="si">{</span><span class="n">lro_custom</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">channel_names</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="inspecting-loaded-data">
+<h2>6. Inspecting Loaded Data<a class="headerlink" href="#inspecting-loaded-data" title="Link to this heading">#</a></h2>
+<p>Every LRO exposes a <code class="docutils literal notranslate"><span class="pre">meta</span></code> attribute (<code class="docutils literal notranslate"><span class="pre">RecordingMetadata</span></code>) with key
+properties:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">metadata</span> <span class="o">=</span> <span class="n">lro_edf</span><span class="o">.</span><span class="n">meta</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Recording metadata: </span><span class="si">{</span><span class="n">metadata</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Sampling frequency: </span><span class="si">{</span><span class="n">metadata</span><span class="o">.</span><span class="n">f_s</span><span class="si">}</span><span class="s2"> Hz&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of channels: </span><span class="si">{</span><span class="n">metadata</span><span class="o">.</span><span class="n">n_channels</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Channel names: </span><span class="si">{</span><span class="n">metadata</span><span class="o">.</span><span class="n">channel_names</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Units: </span><span class="si">{</span><span class="n">metadata</span><span class="o">.</span><span class="n">V_units</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Duration: </span><span class="si">{</span><span class="n">lro_edf</span><span class="o">.</span><span class="n">file_durations</span><span class="si">}</span><span class="s2"> seconds&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section class="tex2jax_ignore mathjax_ignore" id="part-2-animalorganizer">
+<h1>Part 2 — <code class="docutils literal notranslate"><span class="pre">AnimalOrganizer</span></code><a class="headerlink" href="#part-2-animalorganizer" title="Link to this heading">#</a></h1>
+<p>In practice you rarely create LROs yourself.  Instead, <code class="docutils literal notranslate"><span class="pre">AnimalOrganizer</span></code>
+discovers recordings for an animal automatically using <strong>patterns</strong> —
+format strings with placeholders that match parts of the file path.</p>
+<section id="pattern-placeholders">
+<h2>Pattern Placeholders<a class="headerlink" href="#pattern-placeholders" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Placeholder</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">{animal}</span></code></p></td>
+<td><p>Animal identifier (e.g. <code class="docutils literal notranslate"><span class="pre">A10</span></code>, <code class="docutils literal notranslate"><span class="pre">F22</span></code>)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">{session}</span></code></p></td>
+<td><p>Session or day folder (e.g. <code class="docutils literal notranslate"><span class="pre">day1</span></code>, <code class="docutils literal notranslate"><span class="pre">2023-12-13</span></code>)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">{index}</span></code></p></td>
+<td><p>File index within a session (when multiple files per session)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">*</span></code></p></td>
+<td><p>Standard glob wildcard — matches any characters</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Example:</strong>  <code class="docutils literal notranslate"><span class="pre">&quot;/data/{animal}/{session}/*.edf&quot;</span></code> matches files like
+<code class="docutils literal notranslate"><span class="pre">/data/A10/day1/recording.edf</span></code> and extracts <code class="docutils literal notranslate"><span class="pre">animal=&quot;A10&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">session=&quot;day1&quot;</span></code>.</p>
+</section>
+<section id="key-constructor-parameters">
+<h2>Key Constructor Parameters<a class="headerlink" href="#key-constructor-parameters" title="Link to this heading">#</a></h2>
+<p>AO internally uses <code class="docutils literal notranslate"><span class="pre">FileDiscoverer</span></code> to match files, groups them by
+session, and creates one LRO per session:</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">pattern</span></code></p></td>
+<td><p>A single pattern string, or a <strong>list</strong> of patterns for multi-file formats</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">animal_id</span></code></p></td>
+<td><p>Filter discoveries to one animal</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">skip_sessions</span></code></p></td>
+<td><p>Glob patterns for sessions to exclude</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">truncate</span></code></p></td>
+<td><p>Limit the number of sessions loaded</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">assume_from_number</span></code></p></td>
+<td><p>Parse channel aliases from channel-name numbers</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">lro_kwargs</span></code></p></td>
+<td><p>Dict of arguments forwarded to each <code class="docutils literal notranslate"><span class="pre">LongRecordingOrganizer</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="filediscoverer-finding-recordings">
+<h2>7. FileDiscoverer — Finding Recordings<a class="headerlink" href="#filediscoverer-finding-recordings" title="Link to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">FileDiscoverer</span></code> scans the filesystem using placeholder patterns and
+returns <code class="docutils literal notranslate"><span class="pre">DiscoveredFile</span></code> objects.  For multi-file formats, pass a
+<strong>list</strong> of patterns; files that share the same placeholder values are
+grouped automatically.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Discover all bin/csv pairs under .tests/integration/data/</span>
+<span class="n">discoverer</span> <span class="o">=</span> <span class="n">FileDiscoverer</span><span class="p">([</span>
+    <span class="s2">&quot;../../.tests/integration/data/</span><span class="si">{animal}</span><span class="s2">/*_ColMajor.bin&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;../../.tests/integration/data/</span><span class="si">{animal}</span><span class="s2">/*_Meta.csv&quot;</span><span class="p">,</span>
+<span class="p">])</span>
+<span class="n">discovered_files</span> <span class="o">=</span> <span class="n">discoverer</span><span class="o">.</span><span class="n">discover</span><span class="p">()</span>
+
+<span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">discovered_files</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Animal </span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="n">metadata</span><span class="p">[</span><span class="s1">&#39;animal&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="p">[</span><span class="n">Path</span><span class="p">(</span><span class="n">p</span><span class="p">)</span><span class="o">.</span><span class="n">name</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">p</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">f</span><span class="o">.</span><span class="n">paths</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="passing-patterns-to-animalorganizer">
+<h2>8. Passing Patterns to <code class="docutils literal notranslate"><span class="pre">AnimalOrganizer</span></code><a class="headerlink" href="#passing-patterns-to-animalorganizer" title="Link to this heading">#</a></h2>
+<p>The same pattern syntax goes straight into <code class="docutils literal notranslate"><span class="pre">AnimalOrganizer</span></code>.  The AO
+runs <code class="docutils literal notranslate"><span class="pre">FileDiscoverer</span></code> internally, groups the results by session, and
+builds LROs.</p>
+<p>For example, the patterns below discover the <code class="docutils literal notranslate"><span class="pre">Cage</span> <span class="pre">2</span> <span class="pre">A10-0_ColMajor.bin</span></code>
+and <code class="docutils literal notranslate"><span class="pre">Cage</span> <span class="pre">2</span> <span class="pre">A10-0_Meta.csv</span></code> files under <code class="docutils literal notranslate"><span class="pre">.tests/integration/data/A10/</span></code> and group
+them into a single-session LRO:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">neurodent</span><span class="w"> </span><span class="kn">import</span> <span class="n">visualization</span>
+
+<span class="c1"># Multi-file pattern for paired bin/csv data</span>
+<span class="n">ao</span> <span class="o">=</span> <span class="n">visualization</span><span class="o">.</span><span class="n">AnimalOrganizer</span><span class="p">(</span>
+    <span class="n">pattern</span><span class="o">=</span><span class="p">[</span>
+        <span class="s2">&quot;../../.tests/integration/data/</span><span class="si">{animal}</span><span class="s2">/*_ColMajor.bin&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;../../.tests/integration/data/</span><span class="si">{animal}</span><span class="s2">/*_Meta.csv&quot;</span><span class="p">,</span>
+    <span class="p">],</span>
+    <span class="n">animal_id</span><span class="o">=</span><span class="s2">&quot;A10&quot;</span><span class="p">,</span>
+    <span class="n">assume_from_number</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">lro_kwargs</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;mode&quot;</span><span class="p">:</span> <span class="s2">&quot;si&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;extract_func&quot;</span><span class="p">:</span> <span class="s2">&quot;../../tests/integration/readers.py:read_bin_csv_pair&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;manual_datetimes&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="p">(</span><span class="mi">2023</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">13</span><span class="p">),</span>
+    <span class="p">},</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Animal Organizer created for </span><span class="si">{</span><span class="n">ao</span><span class="o">.</span><span class="n">animal_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>For single-file formats the pattern is just a string:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">ao</span> <span class="o">=</span> <span class="n">visualization</span><span class="o">.</span><span class="n">AnimalOrganizer</span><span class="p">(</span>
+    <span class="n">pattern</span><span class="o">=</span><span class="s2">&quot;/data/</span><span class="si">{animal}</span><span class="s2">/</span><span class="si">{session}</span><span class="s2">/*.edf&quot;</span><span class="p">,</span>
+    <span class="n">animal_id</span><span class="o">=</span><span class="s2">&quot;A10&quot;</span><span class="p">,</span>
+    <span class="n">lro_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;mode&quot;</span><span class="p">:</span> <span class="s2">&quot;si&quot;</span><span class="p">,</span> <span class="s2">&quot;extract_func&quot;</span><span class="p">:</span> <span class="s2">&quot;read_edf&quot;</span><span class="p">},</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="summary">
+<h2>Summary<a class="headerlink" href="#summary" title="Link to this heading">#</a></h2>
+<p>In this tutorial, you learned:</p>
+<ol class="arabic simple">
+<li><p>The different <code class="docutils literal notranslate"><span class="pre">item</span></code> types accepted by <code class="docutils literal notranslate"><span class="pre">LongRecordingOrganizer</span></code> (single path, list, <code class="docutils literal notranslate"><span class="pre">DiscoveredFile</span></code>, in-memory recording)</p></li>
+<li><p>How to load standard formats (EDF, Intan, NWB, MNE) and custom multi-file formats</p></li>
+<li><p>How to inspect loaded data via the <code class="docutils literal notranslate"><span class="pre">meta</span></code> attribute</p></li>
+<li><p>How <code class="docutils literal notranslate"><span class="pre">FileDiscoverer</span></code> finds and pairs recordings using placeholder patterns</p></li>
+<li><p>How <code class="docutils literal notranslate"><span class="pre">AnimalOrganizer</span></code> wraps discovery + LRO creation into a single step</p></li>
+</ol>
+</section>
+<section id="next-steps">
+<h2>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><strong><a class="reference internal" href="basic_usage.html"><span class="std std-doc">Basic Usage Tutorial</span></a></strong>: Complete workflow from loading to visualization</p></li>
+<li><p><strong><a class="reference internal" href="../tutorials/windowed_analysis.html"><span class="std std-doc">Windowed Analysis Tutorial</span></a></strong>: Extract features from loaded data</p></li>
+<li><p><strong><a class="reference internal" href="../tutorials/spike_analysis.html"><span class="std std-doc">Spike Analysis Tutorial</span></a></strong>: Work with spike-sorted data</p></li>
+</ul>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="basic_usage.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Basic Usage Tutorial</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="configuration.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Configuration and Tips</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#">Data Loading Tutorial</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#setup">Setup</a></li>
+</ul>
+</li>
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#part-1-longrecordingorganizer">Part 1 — <code class="docutils literal notranslate"><span class="pre">LongRecordingOrganizer</span></code></a><ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-lro-accepts-as-item">What LRO Accepts as <code class="docutils literal notranslate"><span class="pre">item</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#loading-a-standard-format-edf">1. Loading a Standard Format (EDF)</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#loading-multi-file-formats-with-discoveredfile">2. Loading Multi-File Formats with <code class="docutils literal notranslate"><span class="pre">DiscoveredFile</span></code></a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#file-path-string-alternative">File-path string alternative</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#other-standard-formats">3. Other Standard Formats</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#concatenating-multiple-files">4. Concatenating Multiple Files</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#pre-loaded-recording-objects">5. Pre-Loaded Recording Objects</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#inspecting-loaded-data">6. Inspecting Loaded Data</a></li>
+</ul>
+</li>
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#part-2-animalorganizer">Part 2 — <code class="docutils literal notranslate"><span class="pre">AnimalOrganizer</span></code></a><ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#pattern-placeholders">Pattern Placeholders</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#key-constructor-parameters">Key Constructor Parameters</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#filediscoverer-finding-recordings">7. FileDiscoverer — Finding Recordings</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#passing-patterns-to-animalorganizer">8. Passing Patterns to <code class="docutils literal notranslate"><span class="pre">AnimalOrganizer</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#summary">Summary</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#next-steps">Next Steps</a></li>
+</ul>
+</li>
+</ul>
+
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/quickstart/data_loading.ipynb.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025, Joseph Dong, Yongtaek Oh, Eric Marsh.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

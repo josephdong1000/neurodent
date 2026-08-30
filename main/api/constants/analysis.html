@@ -1,0 +1,1027 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Analysis Constants &#8212; Neurodent 0.4.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../_static/documentation_options.js?v=6c02275b"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'api/constants/analysis';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://josephdong1000.github.io/neurodent/_static/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.4.0';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner =
+            false;
+        </script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Configuration Constants" href="config.html" />
+    <link rel="prev" title="Constants" href="index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">NeuRodent</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../license/index.html">
+    License
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-2"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-2"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-2"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-2">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../license/index.html">
+    License
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-3"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-3"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-3"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-3">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../core/index.html">Core Module</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../core/recording_metadata.html">RecordingMetadata</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/long_recording_organizer.html">LongRecordingOrganizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/long_recording_analyzer.html">LongRecordingAnalyzer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/animal_analyzer.html">AnimalAnalyzer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/fragment_analyzer.html">FragmentAnalyzer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/frequency_domain_spike_detector.html">FrequencyDomainSpikeDetector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/zeitgeber.html">ZeitgeberAnalysisResult</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/utils.html">Utilities</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../visualization/index.html">Visualization Module</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../visualization/animal_organizer.html">AnimalOrganizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../visualization/window_analysis_result.html">WindowAnalysisResult</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../visualization/frequency_domain_spike_analysis_result.html">FrequencyDomainSpikeAnalysisResult</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../visualization/animal_plotter.html">AnimalPlotter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../visualization/experiment_plotter.html">ExperimentPlotter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../visualization/zeitgeber_plotter.html">ZeitgeberPlotter</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Constants</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Analysis Constants</a></li>
+<li class="toctree-l2"><a class="reference internal" href="config.html">Configuration Constants</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mappings.html">Mapping Constants</a></li>
+<li class="toctree-l2"><a class="reference internal" href="plotting.html">Plotting Constants</a></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../index.html" class="nav-link">API Reference</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Constants</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Analysis Constants</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="analysis-constants">
+<h1>Analysis Constants<a class="headerlink" href="#analysis-constants" title="Link to this heading">#</a></h1>
+<p>Feature definitions and frequency bands for signal processing.</p>
+<dl class="py class" id="module-neurodent.constants.analysis">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FeatureType">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">FeatureType</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/constants/analysis.html#FeatureType"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.constants.analysis.FeatureType" title="Link to this definition">#</a></dt>
+<dd><p>Enumeration of feature data shapes.</p>
+<p>Each feature in the system has exactly one <a class="reference internal" href="#neurodent.constants.analysis.FeatureType" title="neurodent.constants.analysis.FeatureType"><code class="xref py py-class docutils literal notranslate"><span class="pre">FeatureType</span></code></a> that describes
+how its data is stored and how common operations (averaging, filtering,
+channel remapping, plotting) should handle it.</p>
+<p>Using <a class="reference internal" href="#neurodent.constants.analysis.classify_feature" title="neurodent.constants.analysis.classify_feature"><code class="xref py py-func docutils literal notranslate"><span class="pre">classify_feature()</span></code></a> with this enum eliminates the need for
+scattered <code class="docutils literal notranslate"><span class="pre">match</span></code> / <code class="docutils literal notranslate"><span class="pre">if</span></code> blocks that hard-code feature name strings.</p>
+<p>Canonical extracted shapes (after stacking W windows via <code class="docutils literal notranslate"><span class="pre">extract_*</span></code>):</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Type              Extracted shape       Axis semantics
+──────────────    ────────────────      ──────────────────────────
+LINEAR            (W, C)                windows, channels
+LINEAR_2D         (W, C, K)             windows, channels, components
+BAND              (W, C, B)             windows, channels, bands
+SIMPLE_MATRIX     (W, C, C)             windows, ch_row, ch_col
+BANDED_MATRIX     (W, C, C, B)          windows, ch_row, ch_col, bands
+HIST              (W, C, F)             windows, channels, freq_bins
+</pre></div>
+</div>
+<p><strong>Convention</strong>: <code class="docutils literal notranslate"><span class="pre">W</span></code> is always axis 0.  Channel axes (<code class="docutils literal notranslate"><span class="pre">C</span></code>) always come
+next (axis 1, and axis 2 for matrix types).  Feature-specific semantic
+dimensions (bands <code class="docutils literal notranslate"><span class="pre">B</span></code>, components <code class="docutils literal notranslate"><span class="pre">K</span></code>, frequency bins <code class="docutils literal notranslate"><span class="pre">F</span></code>) are last.</p>
+<p>This means:</p>
+<ul class="simple">
+<li><p><strong>Channel collapse</strong> is always <code class="docutils literal notranslate"><span class="pre">axis=1</span></code> (or <code class="docutils literal notranslate"><span class="pre">axis=(1,</span> <span class="pre">2)</span></code> for matrices).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">vals[:,</span> <span class="pre">ch_idx]</span></code> gives one channel’s data for every feature type.</p></li>
+<li><p>Matches per-cell storage order: LINEAR stores <code class="docutils literal notranslate"><span class="pre">(C,)</span></code>, matrices store
+<code class="docutils literal notranslate"><span class="pre">(C,</span> <span class="pre">C)</span></code>, so stacking windows on axis 0 produces the canonical shape.</p></li>
+</ul>
+<p>Example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">neurodent.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">FeatureType</span><span class="p">,</span> <span class="n">classify_feature</span>
+
+<span class="n">ftype</span> <span class="o">=</span> <span class="n">classify_feature</span><span class="p">(</span><span class="s2">&quot;rms&quot;</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">ftype</span> <span class="ow">is</span> <span class="n">FeatureType</span><span class="o">.</span><span class="n">LINEAR</span>
+<span class="k">assert</span> <span class="n">ftype</span><span class="o">.</span><span class="n">extracted_shape</span> <span class="o">==</span> <span class="s2">&quot;W, C&quot;</span>
+<span class="k">assert</span> <span class="n">ftype</span><span class="o">.</span><span class="n">channel_axes</span> <span class="o">==</span> <span class="p">(</span><span class="mi">1</span><span class="p">,)</span>
+<span class="k">assert</span> <span class="ow">not</span> <span class="n">ftype</span><span class="o">.</span><span class="n">is_dict_stored</span>
+</pre></div>
+</div>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FeatureType.LINEAR">
+<span class="sig-name descname"><span class="pre">LINEAR</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'linear'</span></em><a class="headerlink" href="#neurodent.constants.analysis.FeatureType.LINEAR" title="Link to this definition">#</a></dt>
+<dd><p>Scalar per channel.  Stored as a list of floats (one per channel).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FeatureType.LINEAR_2D">
+<span class="sig-name descname"><span class="pre">LINEAR_2D</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'linear_2d'</span></em><a class="headerlink" href="#neurodent.constants.analysis.FeatureType.LINEAR_2D" title="Link to this definition">#</a></dt>
+<dd><p>Multi-component per channel.  Stored as a 2-D array <code class="docutils literal notranslate"><span class="pre">(n_channels,</span> <span class="pre">n_components)</span></code>.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FeatureType.BAND">
+<span class="sig-name descname"><span class="pre">BAND</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'band'</span></em><a class="headerlink" href="#neurodent.constants.analysis.FeatureType.BAND" title="Link to this definition">#</a></dt>
+<dd><p>Dict keyed by frequency-band name, values are per-channel arrays.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FeatureType.BANDED_MATRIX">
+<span class="sig-name descname"><span class="pre">BANDED_MATRIX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'banded_matrix'</span></em><a class="headerlink" href="#neurodent.constants.analysis.FeatureType.BANDED_MATRIX" title="Link to this definition">#</a></dt>
+<dd><p>Dict keyed by frequency-band name, values are 2-D (channel × channel) matrices.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FeatureType.SIMPLE_MATRIX">
+<span class="sig-name descname"><span class="pre">SIMPLE_MATRIX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'simple_matrix'</span></em><a class="headerlink" href="#neurodent.constants.analysis.FeatureType.SIMPLE_MATRIX" title="Link to this definition">#</a></dt>
+<dd><p>2-D (channel × channel) matrix without a frequency-band dimension.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FeatureType.HIST">
+<span class="sig-name descname"><span class="pre">HIST</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'hist'</span></em><a class="headerlink" href="#neurodent.constants.analysis.FeatureType.HIST" title="Link to this definition">#</a></dt>
+<dd><p>Histogram / spectral data stored as a <code class="docutils literal notranslate"><span class="pre">(frequencies,</span> <span class="pre">values)</span></code> tuple.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FeatureType.extracted_shape">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">extracted_shape</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#neurodent.constants.analysis.FeatureType.extracted_shape" title="Link to this definition">#</a></dt>
+<dd><p>Symbolic shape string after extraction (e.g. <code class="docutils literal notranslate"><span class="pre">'W,</span> <span class="pre">C,</span> <span class="pre">B'</span></code>).</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FeatureType.channel_axes">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">channel_axes</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#neurodent.constants.analysis.FeatureType.channel_axes" title="Link to this definition">#</a></dt>
+<dd><p>Axis indices corresponding to channel dimensions.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FeatureType.semantic_axes">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">semantic_axes</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#neurodent.constants.analysis.FeatureType.semantic_axes" title="Link to this definition">#</a></dt>
+<dd><p>Mapping of semantic dimension name to axis index.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FeatureType.is_linear">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_linear</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#neurodent.constants.analysis.FeatureType.is_linear" title="Link to this definition">#</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> for per-channel features (scalar or multi-component).</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FeatureType.is_matrix">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_matrix</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#neurodent.constants.analysis.FeatureType.is_matrix" title="Link to this definition">#</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> for features stored as channel × channel matrices.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FeatureType.is_dict_stored">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_dict_stored</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#neurodent.constants.analysis.FeatureType.is_dict_stored" title="Link to this definition">#</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> for features stored as dicts keyed by frequency band.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FEATURE_SHAPES">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">FEATURE_SHAPES</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#neurodent.constants.analysis.FeatureType" title="neurodent.constants.analysis.FeatureType"><span class="pre">FeatureType</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{FeatureType.BAND:</span> <span class="pre">{'cell_shape':</span> <span class="pre">'{band:</span> <span class="pre">(C,)}',</span> <span class="pre">'channel_axes':</span> <span class="pre">(1,),</span> <span class="pre">'description':</span> <span class="pre">'One</span> <span class="pre">value</span> <span class="pre">per</span> <span class="pre">band</span> <span class="pre">per</span> <span class="pre">channel</span> <span class="pre">(e.g.</span> <span class="pre">psdband,</span> <span class="pre">logpsdband)',</span> <span class="pre">'extracted_shape':</span> <span class="pre">'W,</span> <span class="pre">C,</span> <span class="pre">B',</span> <span class="pre">'semantic_axes':</span> <span class="pre">{'bands':</span> <span class="pre">2}},</span> <span class="pre">FeatureType.BANDED_MATRIX:</span> <span class="pre">{'cell_shape':</span> <span class="pre">'{band:</span> <span class="pre">(C,</span> <span class="pre">C)}',</span> <span class="pre">'channel_axes':</span> <span class="pre">(1,</span> <span class="pre">2),</span> <span class="pre">'description':</span> <span class="pre">'Channel</span> <span class="pre">x</span> <span class="pre">channel</span> <span class="pre">matrix</span> <span class="pre">per</span> <span class="pre">band</span> <span class="pre">(e.g.</span> <span class="pre">cohere,</span> <span class="pre">zcohere)',</span> <span class="pre">'extracted_shape':</span> <span class="pre">'W,</span> <span class="pre">C,</span> <span class="pre">C,</span> <span class="pre">B',</span> <span class="pre">'semantic_axes':</span> <span class="pre">{'bands':</span> <span class="pre">3}},</span> <span class="pre">FeatureType.HIST:</span> <span class="pre">{'cell_shape':</span> <span class="pre">'(F,),</span> <span class="pre">(C,</span> <span class="pre">F)',</span> <span class="pre">'channel_axes':</span> <span class="pre">(1,),</span> <span class="pre">'description':</span> <span class="pre">'Spectral</span> <span class="pre">histogram</span> <span class="pre">per</span> <span class="pre">channel</span> <span class="pre">(e.g.</span> <span class="pre">psd)',</span> <span class="pre">'extracted_shape':</span> <span class="pre">'W,</span> <span class="pre">C,</span> <span class="pre">F',</span> <span class="pre">'semantic_axes':</span> <span class="pre">{'freq_bins':</span> <span class="pre">2}},</span> <span class="pre">FeatureType.LINEAR:</span> <span class="pre">{'cell_shape':</span> <span class="pre">'C',</span> <span class="pre">'channel_axes':</span> <span class="pre">(1,),</span> <span class="pre">'description':</span> <span class="pre">'Scalar</span> <span class="pre">per</span> <span class="pre">channel</span> <span class="pre">(e.g.</span> <span class="pre">rms,</span> <span class="pre">ampvar)',</span> <span class="pre">'extracted_shape':</span> <span class="pre">'W,</span> <span class="pre">C',</span> <span class="pre">'semantic_axes':</span> <span class="pre">{}},</span> <span class="pre">FeatureType.LINEAR_2D:</span> <span class="pre">{'cell_shape':</span> <span class="pre">'C,</span> <span class="pre">K',</span> <span class="pre">'channel_axes':</span> <span class="pre">(1,),</span> <span class="pre">'description':</span> <span class="pre">'K</span> <span class="pre">components</span> <span class="pre">per</span> <span class="pre">channel</span> <span class="pre">(e.g.</span> <span class="pre">psdslope)',</span> <span class="pre">'extracted_shape':</span> <span class="pre">'W,</span> <span class="pre">C,</span> <span class="pre">K',</span> <span class="pre">'semantic_axes':</span> <span class="pre">{'components':</span> <span class="pre">2}},</span> <span class="pre">FeatureType.SIMPLE_MATRIX:</span> <span class="pre">{'cell_shape':</span> <span class="pre">'C,</span> <span class="pre">C',</span> <span class="pre">'channel_axes':</span> <span class="pre">(1,</span> <span class="pre">2),</span> <span class="pre">'description':</span> <span class="pre">'Channel</span> <span class="pre">x</span> <span class="pre">channel</span> <span class="pre">matrix</span> <span class="pre">(e.g.</span> <span class="pre">pcorr,</span> <span class="pre">zpcorr)',</span> <span class="pre">'extracted_shape':</span> <span class="pre">'W,</span> <span class="pre">C,</span> <span class="pre">C',</span> <span class="pre">'semantic_axes':</span> <span class="pre">{}}}</span></em><a class="headerlink" href="#neurodent.constants.analysis.FEATURE_SHAPES" title="Link to this definition">#</a></dt>
+<dd><p>Canonical shape metadata for each <a class="reference internal" href="#neurodent.constants.analysis.FeatureType" title="neurodent.constants.analysis.FeatureType"><code class="xref py py-class docutils literal notranslate"><span class="pre">FeatureType</span></code></a>.</p>
+<p>Keys per entry:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">extracted_shape</span></code>: Symbolic shape after stacking W windows.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cell_shape</span></code>: Shape of a single cell in the WAR DataFrame.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">channel_axes</span></code>: Tuple of axis indices that are channel dimensions.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">semantic_axes</span></code>: Dict mapping semantic dimension names to axis indices.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">description</span></code>: Human-readable description.</p></li>
+</ul>
+<p><strong>Shape convention</strong>: <code class="docutils literal notranslate"><span class="pre">(W,</span> <span class="pre">C,</span> <span class="pre">[C₂],</span> <span class="pre">...semantic)</span></code>.
+Windows (W) is always axis 0.  Channel axes (C) always follow immediately.
+Semantic dimensions (bands, components, freq bins) are trailing.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.LinearFeatureName">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">LinearFeatureName</span></span><a class="headerlink" href="#neurodent.constants.analysis.LinearFeatureName" title="Link to this definition">#</a></dt>
+<dd><p>Valid names for linear (scalar) features.</p>
+<p>alias of <code class="xref py py-obj docutils literal notranslate"><span class="pre">Literal</span></code>[‘rms’, ‘ampvar’, ‘psdtotal’, ‘nspike’, ‘logrms’, ‘logampvar’, ‘logpsdtotal’, ‘lognspike’]</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.LINEAR_FEATURES">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">LINEAR_FEATURES</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">['rms',</span> <span class="pre">'ampvar',</span> <span class="pre">'psdtotal',</span> <span class="pre">'nspike',</span> <span class="pre">'logrms',</span> <span class="pre">'logampvar',</span> <span class="pre">'logpsdtotal',</span> <span class="pre">'lognspike']</span></em><a class="headerlink" href="#neurodent.constants.analysis.LINEAR_FEATURES" title="Link to this definition">#</a></dt>
+<dd><p>List of linear (scalar) feature names computed per channel.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.Linear2DFeatureName">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">Linear2DFeatureName</span></span><a class="headerlink" href="#neurodent.constants.analysis.Linear2DFeatureName" title="Link to this definition">#</a></dt>
+<dd><p>Valid names for multi-component linear features.</p>
+<p>alias of <code class="xref py py-obj docutils literal notranslate"><span class="pre">Literal</span></code>[‘psdslope’]</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.LINEAR_2D_FEATURES">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">LINEAR_2D_FEATURES</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">['psdslope']</span></em><a class="headerlink" href="#neurodent.constants.analysis.LINEAR_2D_FEATURES" title="Link to this definition">#</a></dt>
+<dd><p>List of multi-component linear features (stored as 2-D arrays per channel).</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.BandFeatureName">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">BandFeatureName</span></span><a class="headerlink" href="#neurodent.constants.analysis.BandFeatureName" title="Link to this definition">#</a></dt>
+<dd><p>Valid names for frequency-band features.</p>
+<p>alias of <code class="xref py py-obj docutils literal notranslate"><span class="pre">Literal</span></code>[‘psdband’, ‘psdfrac’, ‘logpsdband’, ‘logpsdfrac’]</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.BAND_FEATURES">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">BAND_FEATURES</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">['psdband',</span> <span class="pre">'psdfrac',</span> <span class="pre">'logpsdband',</span> <span class="pre">'logpsdfrac']</span></em><a class="headerlink" href="#neurodent.constants.analysis.BAND_FEATURES" title="Link to this definition">#</a></dt>
+<dd><p>List of frequency-band feature names (one value per band).</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.BandedMatrixFeatureName">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">BandedMatrixFeatureName</span></span><a class="headerlink" href="#neurodent.constants.analysis.BandedMatrixFeatureName" title="Link to this definition">#</a></dt>
+<dd><p>Valid names for matrix features with a frequency band dimension.</p>
+<p>alias of <code class="xref py py-obj docutils literal notranslate"><span class="pre">Literal</span></code>[‘cohere’, ‘zcohere’, ‘imcoh’, ‘zimcoh’]</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.BANDED_MATRIX_FEATURES">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">BANDED_MATRIX_FEATURES</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">['cohere',</span> <span class="pre">'zcohere',</span> <span class="pre">'imcoh',</span> <span class="pre">'zimcoh']</span></em><a class="headerlink" href="#neurodent.constants.analysis.BANDED_MATRIX_FEATURES" title="Link to this definition">#</a></dt>
+<dd><p>Matrix features with frequency band dimension (stored as dict with band keys).</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.SimpleMatrixFeatureName">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">SimpleMatrixFeatureName</span></span><a class="headerlink" href="#neurodent.constants.analysis.SimpleMatrixFeatureName" title="Link to this definition">#</a></dt>
+<dd><p>Valid names for matrix features without a frequency band dimension.</p>
+<p>alias of <code class="xref py py-obj docutils literal notranslate"><span class="pre">Literal</span></code>[‘pcorr’, ‘zpcorr’]</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.SIMPLE_MATRIX_FEATURES">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">SIMPLE_MATRIX_FEATURES</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">['pcorr',</span> <span class="pre">'zpcorr']</span></em><a class="headerlink" href="#neurodent.constants.analysis.SIMPLE_MATRIX_FEATURES" title="Link to this definition">#</a></dt>
+<dd><p>Matrix features without frequency bands (single 2D correlation matrix).</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.MatrixFeatureName">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">MatrixFeatureName</span></span><a class="headerlink" href="#neurodent.constants.analysis.MatrixFeatureName" title="Link to this definition">#</a></dt>
+<dd><p>Valid names for connectivity/matrix features.</p>
+<p>alias of <code class="xref py py-obj docutils literal notranslate"><span class="pre">Literal</span></code>[‘cohere’, ‘zcohere’, ‘imcoh’, ‘zimcoh’, ‘pcorr’, ‘zpcorr’]</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.MATRIX_FEATURES">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">MATRIX_FEATURES</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">['cohere',</span> <span class="pre">'zcohere',</span> <span class="pre">'imcoh',</span> <span class="pre">'zimcoh',</span> <span class="pre">'pcorr',</span> <span class="pre">'zpcorr']</span></em><a class="headerlink" href="#neurodent.constants.analysis.MATRIX_FEATURES" title="Link to this definition">#</a></dt>
+<dd><p>List of connectivity/matrix feature names (channel pairs).</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.HistFeatureName">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">HistFeatureName</span></span><a class="headerlink" href="#neurodent.constants.analysis.HistFeatureName" title="Link to this definition">#</a></dt>
+<dd><p>Valid names for histogram/spectral features.</p>
+<p>alias of <code class="xref py py-obj docutils literal notranslate"><span class="pre">Literal</span></code>[‘psd’]</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.HIST_FEATURES">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">HIST_FEATURES</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">['psd']</span></em><a class="headerlink" href="#neurodent.constants.analysis.HIST_FEATURES" title="Link to this definition">#</a></dt>
+<dd><p>List of histogram/spectral feature names.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.PlottableFeatureName">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">PlottableFeatureName</span></span><a class="headerlink" href="#neurodent.constants.analysis.PlottableFeatureName" title="Link to this definition">#</a></dt>
+<dd><p>Every feature except <code class="docutils literal notranslate"><span class="pre">psd</span></code>, which needs its own plot:
+<a class="reference internal" href="../visualization/animal_plotter.html#neurodent.plotting.AnimalPlotter.plot_psd_histogram" title="neurodent.plotting.AnimalPlotter.plot_psd_histogram"><code class="xref py py-meth docutils literal notranslate"><span class="pre">plot_psd_histogram()</span></code></a> or
+<a class="reference internal" href="../visualization/animal_plotter.html#neurodent.plotting.AnimalPlotter.plot_psd_spectrogram" title="neurodent.plotting.AnimalPlotter.plot_psd_spectrogram"><code class="xref py py-meth docutils literal notranslate"><span class="pre">plot_psd_spectrogram()</span></code></a>.</p>
+<p>alias of <code class="xref py py-obj docutils literal notranslate"><span class="pre">Literal</span></code>[‘rms’, ‘ampvar’, ‘psdtotal’, ‘nspike’, ‘logrms’, ‘logampvar’, ‘logpsdtotal’, ‘lognspike’, ‘psdslope’, ‘psdband’, ‘psdfrac’, ‘logpsdband’, ‘logpsdfrac’, ‘cohere’, ‘zcohere’, ‘imcoh’, ‘zimcoh’, ‘pcorr’, ‘zpcorr’]</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FeatureName">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">FeatureName</span></span><a class="headerlink" href="#neurodent.constants.analysis.FeatureName" title="Link to this definition">#</a></dt>
+<dd><p>Every valid feature name. Annotate feature parameters with this.</p>
+<p>alias of <code class="xref py py-obj docutils literal notranslate"><span class="pre">Literal</span></code>[‘rms’, ‘ampvar’, ‘psdtotal’, ‘nspike’, ‘logrms’, ‘logampvar’, ‘logpsdtotal’, ‘lognspike’, ‘psdslope’, ‘psdband’, ‘psdfrac’, ‘logpsdband’, ‘logpsdfrac’, ‘cohere’, ‘zcohere’, ‘imcoh’, ‘zimcoh’, ‘pcorr’, ‘zpcorr’, ‘psd’]</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FeatureNames">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">FeatureNames</span></span><a class="headerlink" href="#neurodent.constants.analysis.FeatureNames" title="Link to this definition">#</a></dt>
+<dd><p>One feature name or a list of them. Names not present are skipped.</p>
+<p>alias of <code class="xref py py-class docutils literal notranslate"><span class="pre">Sequence</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">Literal</span></code>[‘rms’, ‘ampvar’, ‘psdtotal’, ‘nspike’, ‘logrms’, ‘logampvar’, ‘logpsdtotal’, ‘lognspike’, ‘psdslope’, ‘psdband’, ‘psdfrac’, ‘logpsdband’, ‘logpsdfrac’, ‘cohere’, ‘zcohere’, ‘imcoh’, ‘zimcoh’, ‘pcorr’, ‘zpcorr’, ‘psd’]] | <code class="xref py py-obj docutils literal notranslate"><span class="pre">Literal</span></code>[‘rms’, ‘ampvar’, ‘psdtotal’, ‘nspike’, ‘logrms’, ‘logampvar’, ‘logpsdtotal’, ‘lognspike’, ‘psdslope’, ‘psdband’, ‘psdfrac’, ‘logpsdband’, ‘logpsdfrac’, ‘cohere’, ‘zcohere’, ‘imcoh’, ‘zimcoh’, ‘pcorr’, ‘zpcorr’, ‘psd’] | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FeatureRequest">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">FeatureRequest</span></span><a class="headerlink" href="#neurodent.constants.analysis.FeatureRequest" title="Link to this definition">#</a></dt>
+<dd><p>One feature name, a list of them, or <code class="docutils literal notranslate"><span class="pre">&quot;all&quot;</span></code>. <code class="docutils literal notranslate"><span class="pre">None</span></code> means all.</p>
+<p>alias of <code class="xref py py-class docutils literal notranslate"><span class="pre">Sequence</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">Literal</span></code>[‘rms’, ‘ampvar’, ‘psdtotal’, ‘nspike’, ‘logrms’, ‘logampvar’, ‘logpsdtotal’, ‘lognspike’, ‘psdslope’, ‘psdband’, ‘psdfrac’, ‘logpsdband’, ‘logpsdfrac’, ‘cohere’, ‘zcohere’, ‘imcoh’, ‘zimcoh’, ‘pcorr’, ‘zpcorr’, ‘psd’] | <code class="xref py py-obj docutils literal notranslate"><span class="pre">Literal</span></code>[‘all’]] | <code class="xref py py-obj docutils literal notranslate"><span class="pre">Literal</span></code>[‘rms’, ‘ampvar’, ‘psdtotal’, ‘nspike’, ‘logrms’, ‘logampvar’, ‘logpsdtotal’, ‘lognspike’, ‘psdslope’, ‘psdband’, ‘psdfrac’, ‘logpsdband’, ‘logpsdfrac’, ‘cohere’, ‘zcohere’, ‘imcoh’, ‘zimcoh’, ‘pcorr’, ‘zpcorr’, ‘psd’] | <code class="xref py py-obj docutils literal notranslate"><span class="pre">Literal</span></code>[‘all’] | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FEATURES">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">FEATURES</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">['rms',</span> <span class="pre">'ampvar',</span> <span class="pre">'psdtotal',</span> <span class="pre">'nspike',</span> <span class="pre">'logrms',</span> <span class="pre">'logampvar',</span> <span class="pre">'logpsdtotal',</span> <span class="pre">'lognspike',</span> <span class="pre">'psdslope',</span> <span class="pre">'psdband',</span> <span class="pre">'psdfrac',</span> <span class="pre">'logpsdband',</span> <span class="pre">'logpsdfrac',</span> <span class="pre">'cohere',</span> <span class="pre">'zcohere',</span> <span class="pre">'imcoh',</span> <span class="pre">'zimcoh',</span> <span class="pre">'pcorr',</span> <span class="pre">'zpcorr',</span> <span class="pre">'psd']</span></em><a class="headerlink" href="#neurodent.constants.analysis.FEATURES" title="Link to this definition">#</a></dt>
+<dd><p>Complete list of all available features.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.WAR_FEATURES">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">WAR_FEATURES</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">['rms',</span> <span class="pre">'ampvar',</span> <span class="pre">'psdtotal',</span> <span class="pre">'logrms',</span> <span class="pre">'logampvar',</span> <span class="pre">'logpsdtotal',</span> <span class="pre">'psdslope',</span> <span class="pre">'psdband',</span> <span class="pre">'psdfrac',</span> <span class="pre">'logpsdband',</span> <span class="pre">'logpsdfrac',</span> <span class="pre">'cohere',</span> <span class="pre">'zcohere',</span> <span class="pre">'imcoh',</span> <span class="pre">'zimcoh',</span> <span class="pre">'pcorr',</span> <span class="pre">'zpcorr',</span> <span class="pre">'psd']</span></em><a class="headerlink" href="#neurodent.constants.analysis.WAR_FEATURES" title="Link to this definition">#</a></dt>
+<dd><p>Features available in WindowAnalysisResult (excludes spike-related).</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FEATURE_TYPES">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">FEATURE_TYPES</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#neurodent.constants.analysis.FeatureType" title="neurodent.constants.analysis.FeatureType"><span class="pre">FeatureType</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'ampvar':</span> <span class="pre">FeatureType.LINEAR,</span> <span class="pre">'cohere':</span> <span class="pre">FeatureType.BANDED_MATRIX,</span> <span class="pre">'imcoh':</span> <span class="pre">FeatureType.BANDED_MATRIX,</span> <span class="pre">'logampvar':</span> <span class="pre">FeatureType.LINEAR,</span> <span class="pre">'lognspike':</span> <span class="pre">FeatureType.LINEAR,</span> <span class="pre">'logpsdband':</span> <span class="pre">FeatureType.BAND,</span> <span class="pre">'logpsdfrac':</span> <span class="pre">FeatureType.BAND,</span> <span class="pre">'logpsdtotal':</span> <span class="pre">FeatureType.LINEAR,</span> <span class="pre">'logrms':</span> <span class="pre">FeatureType.LINEAR,</span> <span class="pre">'nspike':</span> <span class="pre">FeatureType.LINEAR,</span> <span class="pre">'pcorr':</span> <span class="pre">FeatureType.SIMPLE_MATRIX,</span> <span class="pre">'psd':</span> <span class="pre">FeatureType.HIST,</span> <span class="pre">'psdband':</span> <span class="pre">FeatureType.BAND,</span> <span class="pre">'psdfrac':</span> <span class="pre">FeatureType.BAND,</span> <span class="pre">'psdslope':</span> <span class="pre">FeatureType.LINEAR_2D,</span> <span class="pre">'psdtotal':</span> <span class="pre">FeatureType.LINEAR,</span> <span class="pre">'rms':</span> <span class="pre">FeatureType.LINEAR,</span> <span class="pre">'zcohere':</span> <span class="pre">FeatureType.BANDED_MATRIX,</span> <span class="pre">'zimcoh':</span> <span class="pre">FeatureType.BANDED_MATRIX,</span> <span class="pre">'zpcorr':</span> <span class="pre">FeatureType.SIMPLE_MATRIX}</span></em><a class="headerlink" href="#neurodent.constants.analysis.FEATURE_TYPES" title="Link to this definition">#</a></dt>
+<dd><p>Mapping from every known feature name to its <a class="reference internal" href="#neurodent.constants.analysis.FeatureType" title="neurodent.constants.analysis.FeatureType"><code class="xref py py-class docutils literal notranslate"><span class="pre">FeatureType</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.classify_feature">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">classify_feature</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">feature_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#neurodent.constants.analysis.FeatureType" title="neurodent.constants.analysis.FeatureType"><span class="pre">FeatureType</span></a></span></span><a class="reference internal" href="../../_modules/neurodent/constants/analysis.html#classify_feature"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.constants.analysis.classify_feature" title="Link to this definition">#</a></dt>
+<dd><p>Return the <a class="reference internal" href="#neurodent.constants.analysis.FeatureType" title="neurodent.constants.analysis.FeatureType"><code class="xref py py-class docutils literal notranslate"><span class="pre">FeatureType</span></code></a> for a given feature name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>feature_name</strong> – Name of the feature (e.g. <code class="docutils literal notranslate"><span class="pre">'rms'</span></code>, <code class="docutils literal notranslate"><span class="pre">'psdband'</span></code>, <code class="docutils literal notranslate"><span class="pre">'cohere'</span></code>).</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The corresponding <a class="reference internal" href="#neurodent.constants.analysis.FeatureType" title="neurodent.constants.analysis.FeatureType"><code class="xref py py-class docutils literal notranslate"><span class="pre">FeatureType</span></code></a> enum member.</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>ValueError</strong> – If <em>feature_name</em> is not a recognised feature.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FREQ_BANDS">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">FREQ_BANDS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'alpha':</span> <span class="pre">(8,</span> <span class="pre">13),</span> <span class="pre">'beta':</span> <span class="pre">(13,</span> <span class="pre">25),</span> <span class="pre">'delta':</span> <span class="pre">(1,</span> <span class="pre">4),</span> <span class="pre">'gamma':</span> <span class="pre">(25,</span> <span class="pre">40),</span> <span class="pre">'theta':</span> <span class="pre">(4,</span> <span class="pre">8)}</span></em><a class="headerlink" href="#neurodent.constants.analysis.FREQ_BANDS" title="Link to this definition">#</a></dt>
+<dd><p>Dictionary mapping frequency band names to (min_hz, max_hz) tuples.</p>
+<p>Delta band adjusted to 1-4 Hz (changed from 0.1-4 Hz) for reliable coherence
+estimation with short epochs and to avoid insufficient cycles warnings.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.BAND_NAMES">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">BAND_NAMES</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">['delta',</span> <span class="pre">'theta',</span> <span class="pre">'alpha',</span> <span class="pre">'beta',</span> <span class="pre">'gamma']</span></em><a class="headerlink" href="#neurodent.constants.analysis.BAND_NAMES" title="Link to this definition">#</a></dt>
+<dd><p>[‘delta’, ‘theta’, ‘alpha’, ‘beta’, ‘gamma’].</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Ordered list of frequency band names</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.COMPONENT_LABELS">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">COMPONENT_LABELS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'psdslope':</span> <span class="pre">['slope',</span> <span class="pre">'intercept']}</span></em><a class="headerlink" href="#neurodent.constants.analysis.COMPONENT_LABELS" title="Link to this definition">#</a></dt>
+<dd><p>Mapping of feature names to their component dimension labels.</p>
+<p>For LINEAR_2D features that have multiple components (e.g., psdslope has slope
+and intercept), this provides human-readable labels for each component.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FREQ_BAND_TOTAL">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">FREQ_BAND_TOTAL</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">(1,</span> <span class="pre">40)</span></em><a class="headerlink" href="#neurodent.constants.analysis.FREQ_BAND_TOTAL" title="Link to this definition">#</a></dt>
+<dd><p>Total frequency range covered by all bands (min, max) in Hz.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FREQ_MINS">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">FREQ_MINS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[1,</span> <span class="pre">4,</span> <span class="pre">8,</span> <span class="pre">13,</span> <span class="pre">25]</span></em><a class="headerlink" href="#neurodent.constants.analysis.FREQ_MINS" title="Link to this definition">#</a></dt>
+<dd><p>List of minimum frequencies for each band.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.analysis.FREQ_MAXS">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.analysis.</span></span><span class="sig-name descname"><span class="pre">FREQ_MAXS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[4,</span> <span class="pre">8,</span> <span class="pre">13,</span> <span class="pre">25,</span> <span class="pre">40]</span></em><a class="headerlink" href="#neurodent.constants.analysis.FREQ_MAXS" title="Link to this definition">#</a></dt>
+<dd><p>List of maximum frequencies for each band.</p>
+</dd></dl>
+
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Constants</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="config.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Configuration Constants</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FeatureType"><code class="docutils literal notranslate"><span class="pre">FeatureType</span></code></a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FeatureType.LINEAR"><code class="docutils literal notranslate"><span class="pre">FeatureType.LINEAR</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FeatureType.LINEAR_2D"><code class="docutils literal notranslate"><span class="pre">FeatureType.LINEAR_2D</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FeatureType.BAND"><code class="docutils literal notranslate"><span class="pre">FeatureType.BAND</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FeatureType.BANDED_MATRIX"><code class="docutils literal notranslate"><span class="pre">FeatureType.BANDED_MATRIX</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FeatureType.SIMPLE_MATRIX"><code class="docutils literal notranslate"><span class="pre">FeatureType.SIMPLE_MATRIX</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FeatureType.HIST"><code class="docutils literal notranslate"><span class="pre">FeatureType.HIST</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FeatureType.extracted_shape"><code class="docutils literal notranslate"><span class="pre">FeatureType.extracted_shape</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FeatureType.channel_axes"><code class="docutils literal notranslate"><span class="pre">FeatureType.channel_axes</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FeatureType.semantic_axes"><code class="docutils literal notranslate"><span class="pre">FeatureType.semantic_axes</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FeatureType.is_linear"><code class="docutils literal notranslate"><span class="pre">FeatureType.is_linear</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FeatureType.is_matrix"><code class="docutils literal notranslate"><span class="pre">FeatureType.is_matrix</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FeatureType.is_dict_stored"><code class="docutils literal notranslate"><span class="pre">FeatureType.is_dict_stored</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FEATURE_SHAPES"><code class="docutils literal notranslate"><span class="pre">FEATURE_SHAPES</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.LinearFeatureName"><code class="docutils literal notranslate"><span class="pre">LinearFeatureName</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.LINEAR_FEATURES"><code class="docutils literal notranslate"><span class="pre">LINEAR_FEATURES</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.Linear2DFeatureName"><code class="docutils literal notranslate"><span class="pre">Linear2DFeatureName</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.LINEAR_2D_FEATURES"><code class="docutils literal notranslate"><span class="pre">LINEAR_2D_FEATURES</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.BandFeatureName"><code class="docutils literal notranslate"><span class="pre">BandFeatureName</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.BAND_FEATURES"><code class="docutils literal notranslate"><span class="pre">BAND_FEATURES</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.BandedMatrixFeatureName"><code class="docutils literal notranslate"><span class="pre">BandedMatrixFeatureName</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.BANDED_MATRIX_FEATURES"><code class="docutils literal notranslate"><span class="pre">BANDED_MATRIX_FEATURES</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.SimpleMatrixFeatureName"><code class="docutils literal notranslate"><span class="pre">SimpleMatrixFeatureName</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.SIMPLE_MATRIX_FEATURES"><code class="docutils literal notranslate"><span class="pre">SIMPLE_MATRIX_FEATURES</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.MatrixFeatureName"><code class="docutils literal notranslate"><span class="pre">MatrixFeatureName</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.MATRIX_FEATURES"><code class="docutils literal notranslate"><span class="pre">MATRIX_FEATURES</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.HistFeatureName"><code class="docutils literal notranslate"><span class="pre">HistFeatureName</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.HIST_FEATURES"><code class="docutils literal notranslate"><span class="pre">HIST_FEATURES</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.PlottableFeatureName"><code class="docutils literal notranslate"><span class="pre">PlottableFeatureName</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FeatureName"><code class="docutils literal notranslate"><span class="pre">FeatureName</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FeatureNames"><code class="docutils literal notranslate"><span class="pre">FeatureNames</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FeatureRequest"><code class="docutils literal notranslate"><span class="pre">FeatureRequest</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FEATURES"><code class="docutils literal notranslate"><span class="pre">FEATURES</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.WAR_FEATURES"><code class="docutils literal notranslate"><span class="pre">WAR_FEATURES</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FEATURE_TYPES"><code class="docutils literal notranslate"><span class="pre">FEATURE_TYPES</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.classify_feature"><code class="docutils literal notranslate"><span class="pre">classify_feature()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FREQ_BANDS"><code class="docutils literal notranslate"><span class="pre">FREQ_BANDS</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.BAND_NAMES"><code class="docutils literal notranslate"><span class="pre">BAND_NAMES</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.COMPONENT_LABELS"><code class="docutils literal notranslate"><span class="pre">COMPONENT_LABELS</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FREQ_BAND_TOTAL"><code class="docutils literal notranslate"><span class="pre">FREQ_BAND_TOTAL</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FREQ_MINS"><code class="docutils literal notranslate"><span class="pre">FREQ_MINS</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.analysis.FREQ_MAXS"><code class="docutils literal notranslate"><span class="pre">FREQ_MAXS</span></code></a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/api/constants/analysis.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025, Joseph Dong, Yongtaek Oh, Eric Marsh.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

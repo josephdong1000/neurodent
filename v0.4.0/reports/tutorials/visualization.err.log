@@ -1,0 +1,58 @@
+Traceback (most recent call last):
+  File "/home/runner/work/neurodent/neurodent/.venv/lib/python3.10/site-packages/jupyter_cache/executors/utils.py", line 58, in single_nb_execution
+    executenb(
+  File "/home/runner/work/neurodent/neurodent/.venv/lib/python3.10/site-packages/nbclient/client.py", line 1319, in execute
+    return NotebookClient(nb=nb, resources=resources, km=km, **kwargs).execute()
+  File "/home/runner/work/neurodent/neurodent/.venv/lib/python3.10/site-packages/jupyter_core/utils/__init__.py", line 165, in wrapped
+    return loop.run_until_complete(inner)
+  File "/home/runner/work/_temp/uv-python-dir/cpython-3.10.8-linux-x86_64-gnu/lib/python3.10/asyncio/base_events.py", line 649, in run_until_complete
+    return future.result()
+  File "/home/runner/work/neurodent/neurodent/.venv/lib/python3.10/site-packages/nbclient/client.py", line 709, in async_execute
+    await self.async_execute_cell(
+  File "/home/runner/work/neurodent/neurodent/.venv/lib/python3.10/site-packages/nbclient/client.py", line 1062, in async_execute_cell
+    await self._check_raise_for_error(cell, cell_index, exec_reply)
+  File "/home/runner/work/neurodent/neurodent/.venv/lib/python3.10/site-packages/nbclient/client.py", line 918, in _check_raise_for_error
+    raise CellExecutionError.from_cell_and_msg(cell, exec_reply_content)
+nbclient.exceptions.CellExecutionError: An error occurred while executing the following cell:
+------------------
+# Load WAR for a single animal
+war_path = Path("/path/to/war/animal_001")
+war = WindowAnalysisResult.load_pickle_and_json(war_path)
+
+# Create plotter
+ap = AnimalPlotter(war)
+------------------
+
+----- stderr -----
+/tmp/ipykernel_4062/1815618310.py:3: DeprecationWarning: load_pickle_and_json is deprecated; use load_parquet_and_json instead.
+  war = WindowAnalysisResult.load_pickle_and_json(war_path)
+------------------
+
+[0;31m---------------------------------------------------------------------------[0m
+[0;31mValueError[0m                                Traceback (most recent call last)
+Cell [0;32mIn[2], line 3[0m
+[1;32m      1[0m [38;5;66;03m# Load WAR for a single animal[39;00m
+[1;32m      2[0m war_path [38;5;241m=[39m Path([38;5;124m"[39m[38;5;124m/path/to/war/animal_001[39m[38;5;124m"[39m)
+[0;32m----> 3[0m war [38;5;241m=[39m [43mWindowAnalysisResult[49m[38;5;241;43m.[39;49m[43mload_pickle_and_json[49m[43m([49m[43mwar_path[49m[43m)[49m
+[1;32m      5[0m [38;5;66;03m# Create plotter[39;00m
+[1;32m      6[0m ap [38;5;241m=[39m AnimalPlotter(war)
+
+File [0;32m~/work/neurodent/neurodent/src/neurodent/results/war_serialization.py:537[0m, in [0;36mWARSerializationMixin.load_pickle_and_json[0;34m(cls, folder_path, pickle_name, json_name)[0m
+[1;32m    535[0m     p [38;5;241m=[39m Path(pickle_name)
+[1;32m    536[0m     parquet_name [38;5;241m=[39m [38;5;28mstr[39m(p[38;5;241m.[39mwith_suffix([38;5;124m"[39m[38;5;124m.parquet[39m[38;5;124m"[39m))
+[0;32m--> 537[0m [38;5;28;01mreturn[39;00m [38;5;28;43mcls[39;49m[38;5;241;43m.[39;49m[43mload_parquet_and_json[49m[43m([49m
+[1;32m    538[0m [43m    [49m[43mfolder_path[49m[38;5;241;43m=[39;49m[43mfolder_path[49m[43m,[49m
+[1;32m    539[0m [43m    [49m[43mparquet_name[49m[38;5;241;43m=[39;49m[43mparquet_name[49m[43m,[49m
+[1;32m    540[0m [43m    [49m[43mjson_name[49m[38;5;241;43m=[39;49m[43mjson_name[49m[43m,[49m
+[1;32m    541[0m [43m[49m[43m)[49m
+
+File [0;32m~/work/neurodent/neurodent/src/neurodent/results/war_serialization.py:390[0m, in [0;36mWARSerializationMixin.load_parquet_and_json[0;34m(cls, folder_path, parquet_name, json_name, filename)[0m
+[1;32m    388[0m folder_path [38;5;241m=[39m Path(folder_path)
+[1;32m    389[0m [38;5;28;01mif[39;00m [38;5;129;01mnot[39;00m folder_path[38;5;241m.[39mexists():
+[0;32m--> 390[0m     [38;5;28;01mraise[39;00m [38;5;167;01mValueError[39;00m([38;5;124mf[39m[38;5;124m"[39m[38;5;124mFolder path [39m[38;5;132;01m{[39;00mfolder_path[38;5;132;01m}[39;00m[38;5;124m does not exist[39m[38;5;124m"[39m)
+[1;32m    392[0m [38;5;28;01mif[39;00m parquet_name [38;5;129;01mis[39;00m [38;5;129;01mnot[39;00m [38;5;28;01mNone[39;00m:
+[1;32m    393[0m     [38;5;66;03m# Handle parquet_name as either absolute path or relative to folder_path[39;00m
+[1;32m    394[0m     p [38;5;241m=[39m Path(parquet_name)
+
+[0;31mValueError[0m: Folder path /path/to/war/animal_001 does not exist
+

@@ -1,0 +1,1182 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>neurodent.results.window_analysis_result &#8212; Neurodent 0.4.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../_static/documentation_options.js?v=6c02275b"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/neurodent/results/window_analysis_result';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://josephdong1000.github.io/neurodent/_static/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.4.0';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner =
+            false;
+        </script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">NeuRodent</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../license/index.html">
+    License
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-2"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-2"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-2"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-2">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../license/index.html">
+    License
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-3"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-3"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-3"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-3">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">neurodent.results.window_analysis_result</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for neurodent.results.window_analysis_result</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Windowed feature analysis results.</span>
+
+<span class="sd">``WindowAnalysisResult`` wraps the windowed feature DataFrame produced by</span>
+<span class="sd">:meth:`neurodent.analysis.animal_analyzer.AnimalAnalyzer.compute_windowed_analysis`.</span>
+<span class="sd">Its behavior is composed from mixins in ``results/war_*.py``; this module keeps the</span>
+<span class="sd">base methods, the class definition, and the module-level feature/spike helpers that</span>
+<span class="sd">external code imports from this path.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">copy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">neurodent</span><span class="w"> </span><span class="kn">import</span> <span class="n">constants</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neurodent.core.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_channel</span><span class="p">,</span> <span class="n">slugify</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.feature_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">average_feature</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.feature_handlers</span><span class="w"> </span><span class="kn">import</span> <span class="n">handler_for</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_sanitize_feature_request</span><span class="p">(</span>
+    <span class="n">features</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">exclude</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Sanitizes a list of requested features for WindowAnalysisResult</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        features (list[str] | str | None): List of features to include, a single feature</span>
+<span class="sd">            name as a string, or None to include all features. If ``&quot;all&quot;``, include all</span>
+<span class="sd">            features in constants.FEATURES except for those in ``exclude``.</span>
+<span class="sd">        exclude (list[str] | str, optional): Feature or list of features to exclude.</span>
+<span class="sd">            Defaults to [].</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list[str]: Sanitized list of features.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">features</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">features</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;all&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">features</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">features</span> <span class="o">=</span> <span class="p">[</span><span class="n">features</span><span class="p">]</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exclude</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">exclude</span> <span class="o">=</span> <span class="p">[</span><span class="n">exclude</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">features</span> <span class="o">==</span> <span class="p">[</span><span class="s2">&quot;all&quot;</span><span class="p">]:</span>
+        <span class="n">feat</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">constants</span><span class="o">.</span><span class="n">FEATURES</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="ow">not</span> <span class="n">features</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Features cannot be empty&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">f</span> <span class="ow">in</span> <span class="n">constants</span><span class="o">.</span><span class="n">FEATURES</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">features</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Available features are: </span><span class="si">{</span><span class="n">constants</span><span class="o">.</span><span class="n">FEATURES</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">feat</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">features</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">exclude</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">exclude</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">feat</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="k">pass</span>
+    <span class="k">return</span> <span class="n">feat</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">bin_spike_times</span><span class="p">(</span>
+    <span class="n">spike_times</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span> <span class="n">fragment_durations</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Bin spike times into counts based on fragment durations.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        spike_times (list[float]): List of spike timestamps in seconds</span>
+<span class="sd">        fragment_durations (list[float]): List of fragment durations in seconds</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list[int]: List of spike counts per fragment</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Convert fragment durations to bin edges</span>
+    <span class="n">bin_edges</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">([</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">fragment_durations</span><span class="p">)</span>
+
+    <span class="c1"># Use numpy&#39;s histogram function to count spikes in each bin</span>
+    <span class="n">counts</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogram</span><span class="p">(</span><span class="n">spike_times</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="n">bin_edges</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">counts</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_bin_spike_df</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">spikes_channel</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Bins spike times into a matrix of shape (n_windows, n_channels), based on duration of each window in df</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">durations</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;duration&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">durations</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">spikes_channel</span><span class="p">)))</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">spike_times</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">spikes_channel</span><span class="p">):</span>
+        <span class="n">out</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">bin_spike_times</span><span class="p">(</span><span class="n">spike_times</span><span class="p">,</span> <span class="n">durations</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">out</span>
+
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.war_features</span><span class="w"> </span><span class="kn">import</span> <span class="n">WARFeatureMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.war_filtering</span><span class="w"> </span><span class="kn">import</span> <span class="n">WARFilterMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.war_lof</span><span class="w"> </span><span class="kn">import</span> <span class="n">WARLofMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.war_serialization</span><span class="w"> </span><span class="kn">import</span> <span class="n">WARSerializationMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.war_spikes</span><span class="w"> </span><span class="kn">import</span> <span class="n">WARSpikeMixin</span>
+
+
+<div class="viewcode-block" id="WindowAnalysisResult">
+<a class="viewcode-back" href="../../../api/visualization/window_analysis_result.html#neurodent.results.WindowAnalysisResult">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">WindowAnalysisResult</span><span class="p">(</span>
+    <span class="n">WARFeatureMixin</span><span class="p">,</span>
+    <span class="n">WARFilterMixin</span><span class="p">,</span>
+    <span class="n">WARLofMixin</span><span class="p">,</span>
+    <span class="n">WARSerializationMixin</span><span class="p">,</span>
+    <span class="n">WARSpikeMixin</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Wrapper for output of windowed analysis. Has useful functions like group-wise and global averaging, filtering, and saving</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        result (pd.DataFrame): Result comes from AnimalAnalyzer.compute_windowed_analysis()</span>
+<span class="sd">        animal_id (str, optional): Identifier for the animal where result was computed from. Defaults to None.</span>
+<span class="sd">        genotype (str, optional): Genotype of animal. Defaults to None.</span>
+<span class="sd">        channel_names (list[str], optional): The recording&#39;s channel labels (raw names as</span>
+<span class="sd">            they appear in the data). Defaults to None.</span>
+<span class="sd">        bad_channels_dict (dict[str, list[str]], optional): Dictionary of channels to reject for each recording session. Defaults to {}.</span>
+<span class="sd">        suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps. Useful for aggregated WARs with large window sizes. Defaults to False.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        result (pd.DataFrame): DataFrame containing the windowed analysis results.</span>
+<span class="sd">        animal_id (str): Identifier for the animal.</span>
+<span class="sd">        genotype (str): Genotype of the animal.</span>
+<span class="sd">        channel_names (list[str]): The *current working* channel labels — the raw names at</span>
+<span class="sd">            construction, or the canonical abbreviations after :meth:`reorder_and_pad_channels`</span>
+<span class="sd">            is run with ``use_abbrevs=True``.</span>
+<span class="sd">        channel_abbrevs (list[str]): The canonical channel abbreviations, always derived from</span>
+<span class="sd">            ``channel_names`` via :func:`~neurodent.core.resolve_channel` (exact lookup).</span>
+<span class="sd">        bad_channels_dict (dict): Dictionary mapping sessions to bad channel names.</span>
+<span class="sd">        lof_scores_dict (dict): Dictionary of LOF scores for outage detection.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="WindowAnalysisResult.__init__">
+<a class="viewcode-back" href="../../../api/visualization/window_analysis_result.html#neurodent.results.WindowAnalysisResult.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">result</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span>
+        <span class="n">animal_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">genotype</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">sex</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Unknown&quot;</span><span class="p">,</span>
+        <span class="n">channel_names</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">bad_channels_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{},</span>
+        <span class="n">suppress_short_interval_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">lof_scores_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="p">{},</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">result</span> <span class="o">=</span> <span class="n">result</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">animal_id</span> <span class="o">=</span> <span class="n">animal_id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">genotype</span> <span class="o">=</span> <span class="n">genotype</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sex</span> <span class="o">=</span> <span class="n">sex</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">channel_names</span> <span class="o">=</span> <span class="n">channel_names</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bad_channels_dict</span> <span class="o">=</span> <span class="n">bad_channels_dict</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">suppress_short_interval_error</span> <span class="o">=</span> <span class="n">suppress_short_interval_error</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lof_scores_dict</span> <span class="o">=</span> <span class="n">lof_scores_dict</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_update_instance_vars</span><span class="p">()</span>
+
+        <span class="c1"># Single source of truth: re-enrich sex/genotype from the active config</span>
+        <span class="c1"># (constants.ANIMAL_METADATA) so every WAR construction — generation, disk</span>
+        <span class="c1"># load, copy — yields metadata consistent with the config.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_enrich_metadata_from_constants</span><span class="p">()</span>
+
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Channel names: </span><span class="se">\t</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">channel_names</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Channel abbreviations: </span><span class="se">\t</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">channel_abbrevs</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_enrich_metadata_from_constants</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Overwrite ``sex``/``genotype`` from ``constants.ANIMAL_METADATA``.</span>
+
+<span class="sd">        Makes the dataset config (loaded into ``constants.ANIMAL_METADATA`` by</span>
+<span class="sd">        ``apply_samples_config``) the single source of truth for per-animal</span>
+<span class="sd">        metadata, applied identically to ``sex`` and ``genotype`` at every WAR</span>
+<span class="sd">        construction. Updates BOTH the object attributes AND the per-row</span>
+<span class="sd">        ``result[&quot;sex&quot;]``/``result[&quot;genotype&quot;]`` columns (downstream renderers read</span>
+<span class="sd">        the columns, not the attributes).</span>
+
+<span class="sd">        Guarded for portability: if the animal is absent from</span>
+<span class="sd">        ``constants.ANIMAL_METADATA`` (e.g. a standalone load without</span>
+<span class="sd">        ``apply_samples_config``), the baked values are left untouched. A metadata</span>
+<span class="sd">        field that is ``None`` does not overwrite a baked value.</span>
+
+<span class="sd">        Note: the ``ANIMAL_METADATA`` key and the WAR&#39;s canonical attribute/column are</span>
+<span class="sd">        both ``&quot;genotype&quot;``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">animal_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">animal_id</span>
+        <span class="k">if</span> <span class="n">animal_id</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">animal_id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">constants</span><span class="o">.</span><span class="n">ANIMAL_METADATA</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">meta</span> <span class="o">=</span> <span class="n">constants</span><span class="o">.</span><span class="n">ANIMAL_METADATA</span><span class="p">[</span><span class="n">animal_id</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">attr</span><span class="p">,</span> <span class="n">new_val</span> <span class="ow">in</span> <span class="p">((</span><span class="s2">&quot;genotype&quot;</span><span class="p">,</span> <span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;genotype&quot;</span><span class="p">)),</span> <span class="p">(</span><span class="s2">&quot;sex&quot;</span><span class="p">,</span> <span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sex&quot;</span><span class="p">))):</span>
+            <span class="k">if</span> <span class="n">new_val</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">continue</span>  <span class="c1"># don&#39;t overwrite a baked value with None</span>
+            <span class="n">old_val</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">old_val</span> <span class="o">!=</span> <span class="n">new_val</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Re-enriched </span><span class="si">{</span><span class="n">animal_id</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">attr</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">old_val</span><span class="si">!r}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="n">new_val</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="n">new_val</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="n">attr</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_val</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">animaldays</span><span class="si">}</span><span class="s2">&quot;</span>
+
+<div class="viewcode-block" id="WindowAnalysisResult.copy">
+<a class="viewcode-back" href="../../../api/visualization/window_analysis_result.html#neurodent.results.WindowAnalysisResult.copy">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create a deep copy of the WindowAnalysisResult object.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            WindowAnalysisResult: A deep copy of the current instance with all attributes copied.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">WindowAnalysisResult</span><span class="p">(</span>
+            <span class="n">result</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">deep</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+            <span class="n">animal_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">animal_id</span><span class="p">,</span>
+            <span class="n">genotype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">genotype</span><span class="p">,</span>
+            <span class="n">sex</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sex</span><span class="p">,</span>
+            <span class="n">channel_names</span><span class="o">=</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">channel_names</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">channel_names</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="p">),</span>
+            <span class="n">bad_channels_dict</span><span class="o">=</span><span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bad_channels_dict</span><span class="p">),</span>
+            <span class="n">suppress_short_interval_error</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">suppress_short_interval_error</span><span class="p">,</span>
+            <span class="n">lof_scores_dict</span><span class="o">=</span><span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lof_scores_dict</span><span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_from_existing</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span> <span class="n">source</span><span class="p">:</span> <span class="s2">&quot;WindowAnalysisResult&quot;</span><span class="p">,</span> <span class="n">result</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;WindowAnalysisResult&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a new WindowAnalysisResult by copying metadata from an existing instance.</span>
+
+<span class="sd">        This is a shallow copy path: it reuses the source&#39;s metadata (animal_id, genotype,</span>
+<span class="sd">        channel_names, etc.) with a new result DataFrame, without re-running __init__ logging.</span>
+<span class="sd">        Used by filtering methods to avoid redundant log output during chained operations.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            source: The existing WindowAnalysisResult to copy metadata from.</span>
+<span class="sd">            result: The new result DataFrame for the new instance.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A new WindowAnalysisResult with the given result and source&#39;s metadata.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">new_war</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
+        <span class="n">new_war</span><span class="o">.</span><span class="n">result</span> <span class="o">=</span> <span class="n">result</span>
+        <span class="n">new_war</span><span class="o">.</span><span class="n">animal_id</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">animal_id</span>
+        <span class="n">new_war</span><span class="o">.</span><span class="n">genotype</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">genotype</span>
+        <span class="n">new_war</span><span class="o">.</span><span class="n">sex</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">sex</span>
+        <span class="n">new_war</span><span class="o">.</span><span class="n">channel_names</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">channel_names</span>
+        <span class="n">new_war</span><span class="o">.</span><span class="n">bad_channels_dict</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">bad_channels_dict</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">new_war</span><span class="o">.</span><span class="n">suppress_short_interval_error</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">suppress_short_interval_error</span>
+        <span class="n">new_war</span><span class="o">.</span><span class="n">lof_scores_dict</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">lof_scores_dict</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">new_war</span><span class="o">.</span><span class="n">_update_instance_vars</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">new_war</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_update_instance_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run after updating self.result, or other init values&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="s2">&quot;index&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;Dropping column &#39;index&#39;&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;index&quot;</span><span class="p">])</span>
+
+        <span class="c1"># Check if timestamps are sorted and sort if needed</span>
+        <span class="k">if</span> <span class="s2">&quot;timestamp&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">is_monotonic_increasing</span><span class="p">:</span>
+                <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                    <span class="s2">&quot;Timestamps are not sorted. Sorting result DataFrame by timestamp.&quot;</span>
+                <span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s2">&quot;timestamp&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Check for unusually short intervals between timestamps</span>
+        <span class="k">if</span> <span class="s2">&quot;timestamp&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">columns</span> <span class="ow">and</span> <span class="s2">&quot;duration&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">median_duration</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;duration&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">median</span><span class="p">()</span>
+            <span class="n">timestamp_diffs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">diff</span><span class="p">()</span>
+            <span class="n">short_intervals</span> <span class="o">=</span> <span class="n">timestamp_diffs</span> <span class="o">&lt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Timedelta</span><span class="p">(</span><span class="n">seconds</span><span class="o">=</span><span class="n">median_duration</span><span class="p">)</span>
+
+            <span class="c1"># Skip first row since diff() produces NaT</span>
+            <span class="n">short_intervals</span> <span class="o">=</span> <span class="n">short_intervals</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+
+            <span class="k">if</span> <span class="n">short_intervals</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+                <span class="n">n_short</span> <span class="o">=</span> <span class="n">short_intervals</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+                <span class="n">pct_short</span> <span class="o">=</span> <span class="p">(</span><span class="n">n_short</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">short_intervals</span><span class="p">))</span> <span class="o">*</span> <span class="mi">100</span>
+
+                <span class="n">warning_msg</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Found </span><span class="si">{</span><span class="n">n_short</span><span class="si">}</span><span class="s2"> intervals (</span><span class="si">{</span><span class="n">pct_short</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">%) between timestamps &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;that are shorter than the median duration of </span><span class="si">{</span><span class="n">median_duration</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">s&quot;</span>
+                <span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">pct_short</span> <span class="o">&gt;</span> <span class="mf">1.0</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">suppress_short_interval_error</span><span class="p">:</span>
+                    <span class="c1"># Build a diagnostic showing the first few overlapping pairs</span>
+                    <span class="c1"># so the user can identify which sessions have bad timestamps.</span>
+                    <span class="n">short_positions</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">short_intervals</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">())[:</span><span class="mi">5</span><span class="p">]</span>
+                    <span class="n">diag_lines</span> <span class="o">=</span> <span class="p">[]</span>
+                    <span class="n">has_animalday</span> <span class="o">=</span> <span class="s2">&quot;animalday&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">columns</span>
+                    <span class="k">for</span> <span class="n">pos</span> <span class="ow">in</span> <span class="n">short_positions</span><span class="p">:</span>
+                        <span class="c1"># Offset by 1 to map from sliced short_intervals (which</span>
+                        <span class="c1"># dropped the first NaT row) back to original DataFrame</span>
+                        <span class="c1"># positions. Without this, pos=0 wraps to iloc[-1].</span>
+                        <span class="n">actual_pos</span> <span class="o">=</span> <span class="n">pos</span> <span class="o">+</span> <span class="mi">1</span>
+                        <span class="n">prev_row</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">actual_pos</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+                        <span class="n">curr_row</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">actual_pos</span><span class="p">]</span>
+                        <span class="n">gap</span> <span class="o">=</span> <span class="n">timestamp_diffs</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">actual_pos</span><span class="p">]</span>
+                        <span class="n">prev_ad</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot; (</span><span class="si">{</span><span class="n">prev_row</span><span class="p">[</span><span class="s1">&#39;animalday&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">)&quot;</span> <span class="k">if</span> <span class="n">has_animalday</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+                        <span class="n">curr_ad</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot; (</span><span class="si">{</span><span class="n">curr_row</span><span class="p">[</span><span class="s1">&#39;animalday&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">)&quot;</span> <span class="k">if</span> <span class="n">has_animalday</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+                        <span class="n">diag_lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">prev_row</span><span class="p">[</span><span class="s1">&#39;timestamp&#39;</span><span class="p">]</span><span class="si">}{</span><span class="n">prev_ad</span><span class="si">}</span><span class="s2"> -&gt; &quot;</span>
+                            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">curr_row</span><span class="p">[</span><span class="s1">&#39;timestamp&#39;</span><span class="p">]</span><span class="si">}{</span><span class="n">curr_ad</span><span class="si">}</span><span class="s2">: gap=</span><span class="si">{</span><span class="n">gap</span><span class="si">}</span><span class="s2">&quot;</span>
+                        <span class="p">)</span>
+                    <span class="n">diag</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">diag_lines</span><span class="p">)</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">warning_msg</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;First overlapping pairs (of </span><span class="si">{</span><span class="n">n_short</span><span class="si">}</span><span class="s2"> total):</span><span class="se">\n</span><span class="si">{</span><span class="n">diag</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;Hint: if using datetimes_are_start=False, the backward &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;computation assumes contiguous files. Large gaps between &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;files in a session will push computed start times too far &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;back, overlapping adjacent sessions. Consider providing &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;per-file timestamps or set suppress_short_interval_error=True &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;to downgrade this to a warning.&quot;</span>
+                    <span class="p">)</span>
+                <span class="k">elif</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">suppress_short_interval_error</span><span class="p">:</span>
+                    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="n">warning_msg</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s2">&quot;animal&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">unique_animals</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;animal&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">unique_animals</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Multiple animals found in result: </span><span class="si">{</span><span class="n">unique_animals</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">unique_animals</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">animal_id</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Animal ID mismatch: result has </span><span class="si">{</span><span class="n">unique_animals</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">, but self.animal_id is </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">animal_id</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_feature_columns</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">constants</span><span class="o">.</span><span class="n">FEATURES</span>
+        <span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_nonfeature_columns</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">x</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">constants</span><span class="o">.</span><span class="n">FEATURES</span>
+        <span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">animaldays</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="s2">&quot;animalday&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
+
+        <span class="c1"># Ensure bad_channels_dict and lof_scores_dict have entries for all animaldays</span>
+        <span class="c1"># This fixes the issue where windowed analysis creates per-date animaldays</span>
+        <span class="c1"># but bad_channels_dict only has LRO-level (per-folder) entries</span>
+        <span class="k">for</span> <span class="n">animalday</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">animaldays</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">animalday</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">bad_channels_dict</span><span class="p">:</span>
+                <span class="c1"># Add missing animalday with empty bad channels list</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">bad_channels_dict</span><span class="p">[</span><span class="n">animalday</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Added missing animalday to bad_channels_dict: </span><span class="si">{</span><span class="n">animalday</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">animalday</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">lof_scores_dict</span><span class="p">:</span>
+                <span class="c1"># Add missing animalday with empty LOF scores</span>
+                <span class="c1"># NOTE: Both lof_scores AND channel_names must be empty to maintain invariant!</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">lof_scores_dict</span><span class="p">[</span><span class="n">animalday</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;lof_scores&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                    <span class="s2">&quot;channel_names&quot;</span><span class="p">:</span> <span class="p">[],</span>  <span class="c1"># Must be empty to match empty lof_scores!</span>
+                <span class="p">}</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Added missing animalday to lof_scores_dict: </span><span class="si">{</span><span class="n">animalday</span><span class="si">}</span><span class="s2">. &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;This indicates LOF scores were not computed for this session. &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;It will be excluded from LOF-based analysis.&quot;</span>
+                <span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">channel_abbrevs</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">resolve_channel</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">channel_names</span>
+            <span class="p">]</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="nb">type</span><span class="p">(</span><span class="n">e</span><span class="p">)(</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="se">\n\n</span><span class="s2">Channel names in data: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">channel_names</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
+
+<div class="viewcode-block" id="WindowAnalysisResult.reorder_and_pad_channels">
+<a class="viewcode-back" href="../../../api/visualization/window_analysis_result.html#neurodent.results.WindowAnalysisResult.reorder_and_pad_channels">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">reorder_and_pad_channels</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">target_channels</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">use_abbrevs</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">inplace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Reorder and pad channels to match a target channel list.</span>
+
+<span class="sd">        This method ensures that the data has a consistent channel order and structure</span>
+<span class="sd">        by reordering existing channels and padding missing channels with NaNs. Channels</span>
+<span class="sd">        present in the data but **absent from** ``target_channels`` are dropped; a warning</span>
+<span class="sd">        names them so a montage gap can never silently discard data.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            target_channels (list[str], optional): List of target channel names to match.</span>
+<span class="sd">                Defaults to :data:`neurodent.constants.CHANNEL_ABBREVS` (the canonical</span>
+<span class="sd">                channel list) when omitted.</span>
+<span class="sd">            use_abbrevs (bool, optional): If True, target channel names are read as channel abbreviations instead of channel names. Defaults to True.</span>
+<span class="sd">            inplace (bool, optional): If True, modify the result in place. Defaults to True.</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            pd.DataFrame: DataFrame with reordered and padded channels</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">target_channels</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">target_channels</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">constants</span><span class="o">.</span><span class="n">CHANNEL_ABBREVS</span><span class="p">)</span>
+
+        <span class="n">duplicates</span> <span class="o">=</span> <span class="p">[</span><span class="n">ch</span> <span class="k">for</span> <span class="n">ch</span> <span class="ow">in</span> <span class="n">target_channels</span> <span class="k">if</span> <span class="n">target_channels</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="n">ch</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">duplicates</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Target channels must be unique. Found duplicates: </span><span class="si">{</span><span class="n">duplicates</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">inplace</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="n">channel_map</span> <span class="o">=</span> <span class="p">{</span><span class="n">ch</span><span class="p">:</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">ch</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">target_channels</span><span class="p">)}</span>
+        <span class="n">channel_names</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">channel_names</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">use_abbrevs</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">channel_abbrevs</span>
+
+        <span class="n">valid_channels</span> <span class="o">=</span> <span class="p">[</span><span class="n">ch</span> <span class="k">for</span> <span class="n">ch</span> <span class="ow">in</span> <span class="n">channel_names</span> <span class="k">if</span> <span class="n">ch</span> <span class="ow">in</span> <span class="n">channel_map</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">valid_channels</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;None of the channel names </span><span class="si">{</span><span class="n">channel_names</span><span class="si">}</span><span class="s2"> were found in target channels </span><span class="si">{</span><span class="n">target_channels</span><span class="si">}</span><span class="s2">. Is use_abbrevs correctly set?&quot;</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">dropped</span> <span class="o">=</span> <span class="p">[</span><span class="n">ch</span> <span class="k">for</span> <span class="n">ch</span> <span class="ow">in</span> <span class="n">channel_names</span> <span class="k">if</span> <span class="n">ch</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">channel_map</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">dropped</span><span class="p">:</span>
+                <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Standardization dropping channels not in the target montage: </span><span class="si">{</span><span class="n">dropped</span><span class="si">}</span><span class="s2">. &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Target channels: </span><span class="si">{</span><span class="n">target_channels</span><span class="si">}</span><span class="s2">. Add them to the channel config &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;(CHANNEL_MAP / `channels`) if this data should be kept.&quot;</span>
+                <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">feature</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_feature_columns</span><span class="p">:</span>
+            <span class="n">handler</span> <span class="o">=</span> <span class="n">handler_for</span><span class="p">(</span><span class="n">feature</span><span class="p">)</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">feature</span><span class="p">]</span> <span class="o">=</span> <span class="n">handler</span><span class="o">.</span><span class="n">reorder_pad</span><span class="p">(</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">feature</span><span class="p">],</span> <span class="n">channel_map</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">channel_names</span><span class="p">),</span> <span class="n">target_channels</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">inplace</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">result</span> <span class="o">=</span> <span class="n">result</span>
+
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Old channel names: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">channel_names</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">channel_names</span> <span class="o">=</span> <span class="n">target_channels</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;New channel names: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">channel_names</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Old channel abbreviations: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">channel_abbrevs</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_update_instance_vars</span><span class="p">()</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;New channel abbreviations: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">channel_abbrevs</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="WindowAnalysisResult.select_channels">
+<a class="viewcode-back" href="../../../api/visualization/window_analysis_result.html#neurodent.results.WindowAnalysisResult.select_channels">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">select_channels</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">channels</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+        <span class="n">use_abbrevs</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">inplace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Subset and reorder the WAR&#39;s channels to *channels*.</span>
+
+<span class="sd">        Every name in *channels* must be present in the WAR&#39;s current</span>
+<span class="sd">        channel list; missing names raise.  Source channels not in</span>
+<span class="sd">        *channels* are dropped.  Args mirror</span>
+<span class="sd">        :meth:`reorder_and_pad_channels` — use that one if you want</span>
+<span class="sd">        NaN-padding for missing target channels.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: if any name in *channels* is not present.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">available</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">channel_abbrevs</span> <span class="k">if</span> <span class="n">use_abbrevs</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">channel_names</span>
+        <span class="n">missing</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">channels</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">available</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">missing</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Requested channels not present in WAR (use &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;reorder_and_pad_channels for NaN-padding behaviour): &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">missing</span><span class="si">}</span><span class="s2">. Available: </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">available</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">reorder_and_pad_channels</span><span class="p">(</span>
+            <span class="n">channels</span><span class="p">,</span> <span class="n">use_abbrevs</span><span class="o">=</span><span class="n">use_abbrevs</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="n">inplace</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="WindowAnalysisResult.get_info">
+<a class="viewcode-back" href="../../../api/visualization/window_analysis_result.html#neurodent.results.WindowAnalysisResult.get_info">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_info</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a formatted string with basic information about the WindowAnalysisResult object&quot;&quot;&quot;</span>
+        <span class="n">info</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;feature names: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_feature_columns</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;animaldays: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;animalday&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;animal_id: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;animal&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="s1">&#39;animal&#39;</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">columns</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">animal_id</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;genotype: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;genotype&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="s1">&#39;genotype&#39;</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">columns</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">genotype</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;sex: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">sex</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;channel_names: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">channel_names</span><span class="p">)</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">channel_names</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;None&#39;</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">info</span><span class="p">)</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">path_safe_animal_id</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Slugified :attr:`animal_id` for filesystem paths.</span>
+
+<span class="sd">        Use this property whenever building a ``Path`` or filename component</span>
+<span class="sd">        from the animal id.  ``animal_id`` itself stays in its display form</span>
+<span class="sd">        (which may contain ``/``, ``;``, spaces) for logs and plot labels;</span>
+<span class="sd">        ``slugify`` is applied here so callers don&#39;t have to remember.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">slugify</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">animal_id</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">path_safe_animaldays</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Slugified :attr:`animaldays` for filesystem paths.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">slugify</span><span class="p">(</span><span class="n">ad</span><span class="p">)</span> <span class="k">for</span> <span class="n">ad</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">animaldays</span><span class="p">]</span>
+
+<div class="viewcode-block" id="WindowAnalysisResult.aggregate_time_windows">
+<a class="viewcode-back" href="../../../api/visualization/window_analysis_result.html#neurodent.results.WindowAnalysisResult.aggregate_time_windows">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">aggregate_time_windows</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">groupby</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;animalday&quot;</span><span class="p">,</span> <span class="s2">&quot;isday&quot;</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Aggregate time windows into a single data point per groupby by averaging features. This reduces the number of rows in the result.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            groupby (list[str] | str, optional): Columns to group by. Defaults to [&#39;animalday&#39;, &#39;isday&#39;], which groups by animalday (recording session) and isday (day/night).</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: groupby must be from [&#39;animalday&#39;, &#39;isday&#39;]</span>
+<span class="sd">            ValueError: Columns in groupby not found in result</span>
+<span class="sd">            ValueError: Columns in groupby are not constant in groups</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">groupby</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">groupby</span> <span class="o">=</span> <span class="p">[</span><span class="n">groupby</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">col</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;animalday&quot;</span><span class="p">,</span> <span class="s2">&quot;isday&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">groupby</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;groupby must be from [&#39;animalday&#39;, &#39;isday&#39;]. Got </span><span class="si">{</span><span class="n">groupby</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">col</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">columns</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">groupby</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Columns </span><span class="si">{</span><span class="n">groupby</span><span class="si">}</span><span class="s2"> not found in result. Columns: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">features</span> <span class="o">=</span> <span class="p">[</span><span class="n">f</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">constants</span><span class="o">.</span><span class="n">FEATURES</span> <span class="k">if</span> <span class="n">f</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">columns</span><span class="p">]</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Aggregating </span><span class="si">{</span><span class="n">features</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">result_grouped</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">groupby</span><span class="p">)</span>
+
+        <span class="n">agg_dict</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">if</span> <span class="s2">&quot;animalday&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">groupby</span><span class="p">:</span>
+            <span class="n">agg_dict</span><span class="p">[</span><span class="s2">&quot;animalday&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">df</span><span class="p">:</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="s2">&quot;isday&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">groupby</span><span class="p">:</span>
+            <span class="n">agg_dict</span><span class="p">[</span><span class="s2">&quot;isday&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">df</span><span class="p">:</span> <span class="kc">None</span>
+
+        <span class="n">special_agg_cols</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;animalday&quot;</span><span class="p">,</span> <span class="s2">&quot;isday&quot;</span><span class="p">,</span> <span class="s2">&quot;duration&quot;</span><span class="p">,</span> <span class="s2">&quot;endfile&quot;</span><span class="p">,</span> <span class="s2">&quot;timestamp&quot;</span><span class="p">}</span>
+        <span class="n">constant_cols</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">col</span>
+            <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_nonfeature_columns</span>
+            <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">groupby</span> <span class="ow">and</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">special_agg_cols</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">constant_cols</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">col</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="n">is_constant</span> <span class="o">=</span> <span class="n">result_grouped</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">is_constant</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+                    <span class="n">non_constant_groups</span> <span class="o">=</span> <span class="n">is_constant</span><span class="p">[</span><span class="o">~</span><span class="n">is_constant</span><span class="p">]</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Column </span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2"> is not constant in groups: </span><span class="si">{</span><span class="n">non_constant_groups</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="p">)</span>
+                <span class="n">agg_dict</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">df</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="n">col</span><span class="p">:</span> <span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="s2">&quot;duration&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">agg_dict</span><span class="p">[</span><span class="s2">&quot;duration&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">df</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;duration&quot;</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="s2">&quot;endfile&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">agg_dict</span><span class="p">[</span><span class="s2">&quot;endfile&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">df</span><span class="p">:</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;endfile&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="s2">&quot;timestamp&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">agg_dict</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">df</span><span class="p">:</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">feat</span> <span class="ow">in</span> <span class="n">features</span><span class="p">:</span>
+            <span class="n">agg_dict</span><span class="p">[</span><span class="n">feat</span><span class="p">]</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">df</span><span class="p">,</span> <span class="n">feat</span><span class="o">=</span><span class="n">feat</span><span class="p">:</span> <span class="n">average_feature</span><span class="p">(</span>
+                <span class="n">df</span><span class="p">,</span> <span class="n">feat</span><span class="p">,</span> <span class="s2">&quot;duration&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">aggregated_df</span> <span class="o">=</span> <span class="n">result_grouped</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span>
+            <span class="k">lambda</span> <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="n">col</span><span class="p">:</span> <span class="n">agg_dict</span><span class="p">[</span><span class="n">col</span><span class="p">](</span><span class="n">df</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">columns</span>
+                    <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">groupby</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">result</span> <span class="o">=</span> <span class="n">aggregated_df</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span>
+            <span class="n">drop</span><span class="o">=</span><span class="kc">False</span>
+        <span class="p">)</span>  <span class="c1"># Keep animalday/isday as a column</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">suppress_short_interval_error</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Setting suppress_short_interval_error to True&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_update_instance_vars</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="WindowAnalysisResult.add_unique_hash">
+<a class="viewcode-back" href="../../../api/visualization/window_analysis_result.html#neurodent.results.WindowAnalysisResult.add_unique_hash">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_unique_hash</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">nbytes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Adds a hex hash to the animal ID to ensure uniqueness. This prevents collisions when, for example, multiple animals in ExperimentPlotter have the same animal ID.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            nbytes (int, optional): Number of bytes to generate. This is passed directly to secrets.token_hex(). Defaults to None, which generates 16 hex characters (8 bytes).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">secrets</span>
+
+        <span class="n">hash_suffix</span> <span class="o">=</span> <span class="n">secrets</span><span class="o">.</span><span class="n">token_hex</span><span class="p">(</span><span class="n">nbytes</span><span class="p">)</span>
+        <span class="n">new_animal_id</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">animal_id</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">hash_suffix</span><span class="si">}</span><span class="s2">&quot;</span>
+
+        <span class="k">if</span> <span class="s2">&quot;animal&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;animal&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_animal_id</span>
+        <span class="k">if</span> <span class="s2">&quot;animalday&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;animalday&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;animalday&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">animal_id</span><span class="p">,</span> <span class="n">new_animal_id</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">animal_id</span> <span class="o">=</span> <span class="n">new_animal_id</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_update_instance_vars</span><span class="p">()</span></div>
+</div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025, Joseph Dong, Yongtaek Oh, Eric Marsh.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

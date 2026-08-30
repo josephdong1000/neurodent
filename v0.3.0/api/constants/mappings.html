@@ -1,0 +1,723 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Mapping Constants &#8212; Neurodent 0.3.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../_static/documentation_options.js?v=e259d695"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'api/constants/mappings';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://josephdong1000.github.io/neurodent/_static/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.4.0';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner =
+            false;
+        </script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Plotting Constants" href="plotting.html" />
+    <link rel="prev" title="Configuration Constants" href="config.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">NeuRodent</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../license/index.html">
+    License
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-2"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-2"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-2"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-2">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../license/index.html">
+    License
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-3"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-3"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-3"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-3">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../core/index.html">Core Module</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../core/recording_metadata.html">RecordingMetadata</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/ddf_binary_metadata.html">DDFBinaryMetadata (Deprecated)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/long_recording_organizer.html">LongRecordingOrganizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/long_recording_analyzer.html">LongRecordingAnalyzer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/fragment_analyzer.html">FragmentAnalyzer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/frequency_domain_spike_detector.html">FrequencyDomainSpikeDetector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/zeitgeber.html">ZeitgeberAnalysisResult</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/utils.html">Utilities</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../visualization/index.html">Visualization Module</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../visualization/animal_organizer.html">AnimalOrganizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../visualization/window_analysis_result.html">WindowAnalysisResult</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../visualization/frequency_domain_spike_analysis_result.html">FrequencyDomainSpikeAnalysisResult</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../visualization/animal_plotter.html">AnimalPlotter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../visualization/experiment_plotter.html">ExperimentPlotter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../visualization/zeitgeber_plotter.html">ZeitgeberPlotter</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Constants</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="analysis.html">Analysis Constants</a></li>
+<li class="toctree-l2"><a class="reference internal" href="config.html">Configuration Constants</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Mapping Constants</a></li>
+<li class="toctree-l2"><a class="reference internal" href="plotting.html">Plotting Constants</a></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../index.html" class="nav-link">API Reference</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Constants</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Mapping Constants</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="mapping-constants">
+<h1>Mapping Constants<a class="headerlink" href="#mapping-constants" title="Link to this heading">#</a></h1>
+<p>Channel mappings, aliases, and sort orders.</p>
+<p id="module-neurodent.constants.mappings">Channel and metadata mapping constants.</p>
+<p>Includes channel ID mappings, naming aliases, and sort orders.</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.mappings.DEFAULT_ID_TO_LR">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.mappings.</span></span><span class="sig-name descname"><span class="pre">DEFAULT_ID_TO_LR</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{9:</span> <span class="pre">'L',</span> <span class="pre">10:</span> <span class="pre">'L',</span> <span class="pre">12:</span> <span class="pre">'L',</span> <span class="pre">14:</span> <span class="pre">'L',</span> <span class="pre">15:</span> <span class="pre">'L',</span> <span class="pre">16:</span> <span class="pre">'R',</span> <span class="pre">17:</span> <span class="pre">'R',</span> <span class="pre">19:</span> <span class="pre">'R',</span> <span class="pre">21:</span> <span class="pre">'R',</span> <span class="pre">22:</span> <span class="pre">'R'}</span></em><a class="headerlink" href="#neurodent.constants.mappings.DEFAULT_ID_TO_LR" title="Link to this definition">#</a></dt>
+<dd><p>Maps Intan channel IDs to hemisphere (L/R).</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.mappings.GENOTYPE_ALIASES">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.mappings.</span></span><span class="sig-name descname"><span class="pre">GENOTYPE_ALIASES</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'KO':</span> <span class="pre">['KO',</span> <span class="pre">'knockout'],</span> <span class="pre">'WT':</span> <span class="pre">['WT',</span> <span class="pre">'wildtype']}</span></em><a class="headerlink" href="#neurodent.constants.mappings.GENOTYPE_ALIASES" title="Link to this definition">#</a></dt>
+<dd><p>Canonical genotype names mapped to their aliases.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.mappings.SEX_ALIASES">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.mappings.</span></span><span class="sig-name descname"><span class="pre">SEX_ALIASES</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'Female':</span> <span class="pre">['Female',</span> <span class="pre">'female',</span> <span class="pre">'F',</span> <span class="pre">'f'],</span> <span class="pre">'Male':</span> <span class="pre">['Male',</span> <span class="pre">'male',</span> <span class="pre">'M',</span> <span class="pre">'m']}</span></em><a class="headerlink" href="#neurodent.constants.mappings.SEX_ALIASES" title="Link to this definition">#</a></dt>
+<dd><p>Canonical sex values mapped to their aliases.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.mappings.CHNAME_ALIASES">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.mappings.</span></span><span class="sig-name descname"><span class="pre">CHNAME_ALIASES</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'Aud':</span> <span class="pre">['Aud',</span> <span class="pre">'aud',</span> <span class="pre">'AUD'],</span> <span class="pre">'Bar':</span> <span class="pre">['Bar',</span> <span class="pre">'bar',</span> <span class="pre">'BAR'],</span> <span class="pre">'Hip':</span> <span class="pre">['Hip',</span> <span class="pre">'hip',</span> <span class="pre">'HIP'],</span> <span class="pre">'Mot':</span> <span class="pre">['Mot',</span> <span class="pre">'mot',</span> <span class="pre">'MOT'],</span> <span class="pre">'Vis':</span> <span class="pre">['Vis',</span> <span class="pre">'vis',</span> <span class="pre">'VIS']}</span></em><a class="headerlink" href="#neurodent.constants.mappings.CHNAME_ALIASES" title="Link to this definition">#</a></dt>
+<dd><p>Canonical brain region names mapped to their aliases.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.mappings.LR_ALIASES">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.mappings.</span></span><span class="sig-name descname"><span class="pre">LR_ALIASES</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'L':</span> <span class="pre">['left',</span> <span class="pre">'Left',</span> <span class="pre">'LEFT',</span> <span class="pre">'L</span> <span class="pre">',</span> <span class="pre">'</span> <span class="pre">L'],</span> <span class="pre">'R':</span> <span class="pre">['right',</span> <span class="pre">'Right',</span> <span class="pre">'RIGHT',</span> <span class="pre">'R</span> <span class="pre">',</span> <span class="pre">'</span> <span class="pre">R']}</span></em><a class="headerlink" href="#neurodent.constants.mappings.LR_ALIASES" title="Link to this definition">#</a></dt>
+<dd><p>Canonical hemisphere names mapped to their aliases.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.mappings.DEFAULT_ID_TO_NAME">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.mappings.</span></span><span class="sig-name descname"><span class="pre">DEFAULT_ID_TO_NAME</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{9:</span> <span class="pre">'LAud',</span> <span class="pre">10:</span> <span class="pre">'LVis',</span> <span class="pre">12:</span> <span class="pre">'LHip',</span> <span class="pre">14:</span> <span class="pre">'LBar',</span> <span class="pre">15:</span> <span class="pre">'LMot',</span> <span class="pre">16:</span> <span class="pre">'RMot',</span> <span class="pre">17:</span> <span class="pre">'RBar',</span> <span class="pre">19:</span> <span class="pre">'RHip',</span> <span class="pre">21:</span> <span class="pre">'RVis',</span> <span class="pre">22:</span> <span class="pre">'RAud'}</span></em><a class="headerlink" href="#neurodent.constants.mappings.DEFAULT_ID_TO_NAME" title="Link to this definition">#</a></dt>
+<dd><p>Maps Intan channel IDs to full channel names (e.g., ‘LAud’).</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.mappings.DF_SORT_ORDER">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.mappings.</span></span><span class="sig-name descname"><span class="pre">DF_SORT_ORDER</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'band':</span> <span class="pre">['delta',</span> <span class="pre">'theta',</span> <span class="pre">'alpha',</span> <span class="pre">'beta',</span> <span class="pre">'gamma'],</span> <span class="pre">'channel':</span> <span class="pre">['average',</span> <span class="pre">'all',</span> <span class="pre">'LMot',</span> <span class="pre">'RMot',</span> <span class="pre">'LBar',</span> <span class="pre">'RBar',</span> <span class="pre">'LAud',</span> <span class="pre">'RAud',</span> <span class="pre">'LVis',</span> <span class="pre">'RVis',</span> <span class="pre">'LHip',</span> <span class="pre">'RHip'],</span> <span class="pre">'genotype':</span> <span class="pre">['WT',</span> <span class="pre">'KO'],</span> <span class="pre">'isday':</span> <span class="pre">[True,</span> <span class="pre">False],</span> <span class="pre">'sex':</span> <span class="pre">['Male',</span> <span class="pre">'Female']}</span></em><a class="headerlink" href="#neurodent.constants.mappings.DF_SORT_ORDER" title="Link to this definition">#</a></dt>
+<dd><p>Defines categorical sort orders for DataFrame columns.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.mappings.DATEPARSER_PATTERNS_TO_REMOVE">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.mappings.</span></span><span class="sig-name descname"><span class="pre">DATEPARSER_PATTERNS_TO_REMOVE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">['[A-Z]+\\d+',</span> <span class="pre">'\\([0-9]+\\)',</span> <span class="pre">'(?:\\b\\d\\s){1,}(\\d\\b)?',</span> <span class="pre">'\\s\\d$']</span></em><a class="headerlink" href="#neurodent.constants.mappings.DATEPARSER_PATTERNS_TO_REMOVE" title="Link to this definition">#</a></dt>
+<dd><p>Regex patterns to strip from filenames before date parsing.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.mappings.DEFAULT_DAY">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.mappings.</span></span><span class="sig-name descname"><span class="pre">DEFAULT_DAY</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">datetime.datetime(2000,</span> <span class="pre">1,</span> <span class="pre">1,</span> <span class="pre">0,</span> <span class="pre">0)</span></em><a class="headerlink" href="#neurodent.constants.mappings.DEFAULT_DAY" title="Link to this definition">#</a></dt>
+<dd><p>Fallback date when parsing fails.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="neurodent.constants.mappings.FEATURE_LABELS">
+<span class="sig-prename descclassname"><span class="pre">neurodent.constants.mappings.</span></span><span class="sig-name descname"><span class="pre">FEATURE_LABELS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'alphadelta':</span> <span class="pre">'Alpha/Delta</span> <span class="pre">Ratio',</span> <span class="pre">'ampvar':</span> <span class="pre">'Amplitude</span> <span class="pre">Variance',</span> <span class="pre">'cohere':</span> <span class="pre">'Coherence',</span> <span class="pre">'imcoh':</span> <span class="pre">'Imaginary</span> <span class="pre">Coherence',</span> <span class="pre">'logampvar':</span> <span class="pre">'Log(Amplitude</span> <span class="pre">Variance)',</span> <span class="pre">'lognspike':</span> <span class="pre">'Log(Spike</span> <span class="pre">Count)',</span> <span class="pre">'logpsdband':</span> <span class="pre">'Log</span> <span class="pre">Band</span> <span class="pre">Power',</span> <span class="pre">'logpsdfrac':</span> <span class="pre">'Log</span> <span class="pre">Power</span> <span class="pre">Fraction',</span> <span class="pre">'logpsdtotal':</span> <span class="pre">'Log(Total</span> <span class="pre">PSD)',</span> <span class="pre">'logrms':</span> <span class="pre">'Log(RMS)',</span> <span class="pre">'nspike':</span> <span class="pre">'Spike</span> <span class="pre">Count',</span> <span class="pre">'pcorr':</span> <span class="pre">'Pearson</span> <span class="pre">Correlation',</span> <span class="pre">'psdband':</span> <span class="pre">'Band</span> <span class="pre">Power',</span> <span class="pre">'psdfrac':</span> <span class="pre">'Power</span> <span class="pre">Fraction',</span> <span class="pre">'psdslope':</span> <span class="pre">'PSD</span> <span class="pre">Slope',</span> <span class="pre">'psdtotal':</span> <span class="pre">'Total</span> <span class="pre">PSD',</span> <span class="pre">'rms':</span> <span class="pre">'RMS',</span> <span class="pre">'zcohere':</span> <span class="pre">'Z-Coherence',</span> <span class="pre">'zimcoh':</span> <span class="pre">'Z-Imaginary</span> <span class="pre">Coherence',</span> <span class="pre">'zpcorr':</span> <span class="pre">'Z-Pearson</span> <span class="pre">Correlation'}</span></em><a class="headerlink" href="#neurodent.constants.mappings.FEATURE_LABELS" title="Link to this definition">#</a></dt>
+<dd><p>Canonical display labels for features.</p>
+</dd></dl>
+
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="config.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Configuration Constants</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="plotting.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Plotting Constants</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.mappings.DEFAULT_ID_TO_LR"><code class="docutils literal notranslate"><span class="pre">DEFAULT_ID_TO_LR</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.mappings.GENOTYPE_ALIASES"><code class="docutils literal notranslate"><span class="pre">GENOTYPE_ALIASES</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.mappings.SEX_ALIASES"><code class="docutils literal notranslate"><span class="pre">SEX_ALIASES</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.mappings.CHNAME_ALIASES"><code class="docutils literal notranslate"><span class="pre">CHNAME_ALIASES</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.mappings.LR_ALIASES"><code class="docutils literal notranslate"><span class="pre">LR_ALIASES</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.mappings.DEFAULT_ID_TO_NAME"><code class="docutils literal notranslate"><span class="pre">DEFAULT_ID_TO_NAME</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.mappings.DF_SORT_ORDER"><code class="docutils literal notranslate"><span class="pre">DF_SORT_ORDER</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.mappings.DATEPARSER_PATTERNS_TO_REMOVE"><code class="docutils literal notranslate"><span class="pre">DATEPARSER_PATTERNS_TO_REMOVE</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.mappings.DEFAULT_DAY"><code class="docutils literal notranslate"><span class="pre">DEFAULT_DAY</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.constants.mappings.FEATURE_LABELS"><code class="docutils literal notranslate"><span class="pre">FEATURE_LABELS</span></code></a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/api/constants/mappings.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025, Joseph Dong, Yongtaek Oh, Eric Marsh.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>
