@@ -15,7 +15,7 @@ import seaborn as sns
 from neurodent import constants
 from neurodent.plotting import ExperimentPlotter
 from neurodent.results import WindowAnalysisResult
-from neurodent.plotting.experiment import df_normalize_baseline
+from neurodent.plotting.experiment import _hide_empty_facets, df_normalize_baseline
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -51,6 +51,14 @@ def _close_figures():
 def rng():
     """Deterministic RNG shared across helpers and tests."""
     return np.random.default_rng(42)
+
+
+def _facet_counts(g):
+    """Rows per (row_i, col_j) facet, summed over the hue index."""
+    counts = {}
+    for (i, j, _k), subset in g.facet_data():
+        counts[(i, j)] = counts.get((i, j), 0) + len(subset)
+    return counts
 
 
 def _make_mock_war(
@@ -550,6 +558,107 @@ class TestPlotCatplot:
 # ---------------------------------------------------------------------------
 # plot_heatmap tests
 # ---------------------------------------------------------------------------
+
+
+class TestHideEmptyFacets:
+    """plot_heatmap hides facets whose row/column combination matched no rows.
+
+    JOSS review issue 234. Two animals with disjoint (genotype, sex) leave an
+    anti-diagonal hole, which seaborn renders as two empty framed panels because it
+    sizes the grid from the marginal levels of col and row, not the joint ones.
+    """
+
+    @staticmethod
+    def _sparse_plotter():
+        """Two animals whose (genotype, sex) crossing is anti-diagonal."""
+        war1 = _make_mock_war(animal_id="A1", genotype="WT", sex="Male", features=["pcorr"])
+        war2 = _make_mock_war(animal_id="A2", genotype="KO", sex="Female", features=["pcorr"])
+        return ExperimentPlotter(
+            [war1, war2], features=["pcorr"], plot_order=CUSTOM_PLOT_ORDER
+        )
+
+    def test_fixture_really_is_sparse(self):
+        """Guard the premise: if this stops being sparse every test below is vacuous."""
+        ep = self._sparse_plotter()
+        g = ep.plot_heatmap("pcorr", groupby=["genotype", "sex"], hide_empty=False)
+        counts = _facet_counts(g)
+        assert sorted(counts.values()) == [0, 0, 4, 4]
+
+    def test_empty_facets_hidden(self):
+        ep = self._sparse_plotter()
+        g = ep.plot_heatmap("pcorr", groupby=["genotype", "sex"])
+        counts = _facet_counts(g)
+        for key, n_rows in counts.items():
+            ax = g.facet_axis(*key, modify_state=False)
+            assert ax.get_visible() == bool(n_rows), key
+
+    def test_grid_shape_is_unchanged(self):
+        """Hiding does not reclaim the slot, so the grid keeps its shape."""
+        ep = self._sparse_plotter()
+        assert ep.plot_heatmap("pcorr", groupby=["genotype", "sex"]).axes.shape == (2, 2)
+
+    def test_survivors_keep_tick_and_axis_labels(self):
+        """The empty facets carry the shared labels, so hiding must re-expose them.
+
+        Asserting on tick labels alone passes while the axis label is silently lost.
+        """
+        ep = self._sparse_plotter()
+        g = ep.plot_heatmap("pcorr", groupby=["genotype", "sex"])
+        for key, n_rows in _facet_counts(g).items():
+            if not n_rows:
+                continue
+            ax = g.facet_axis(*key, modify_state=False)
+            assert ax.get_xticklabels(), f"{key} lost its x tick labels"
+            assert ax.get_yticklabels(), f"{key} lost its y tick labels"
+            assert ax.xaxis.label.get_visible()
+            assert ax.yaxis.label.get_visible()
+
+    def test_hide_empty_false_keeps_them(self):
+        ep = self._sparse_plotter()
+        g = ep.plot_heatmap("pcorr", groupby=["genotype", "sex"], hide_empty=False)
+        assert all(ax.get_visible() for ax in g.axes.flat)
+
+    def test_fully_crossed_grid_is_a_noop(self):
+        """Every combination populated, so nothing is hidden."""
+        wars = [
+            _make_mock_war(animal_id=f"A{i}", genotype=gt, sex=sx, features=["pcorr"])
+            for i, (gt, sx) in enumerate(
+                [("WT", "Male"), ("WT", "Female"), ("KO", "Male"), ("KO", "Female")]
+            )
+        ]
+        ep = ExperimentPlotter(wars, features=["pcorr"], plot_order=CUSTOM_PLOT_ORDER)
+        g = ep.plot_heatmap("pcorr", groupby=["genotype", "sex"])
+        assert all(_facet_counts(g).values())
+        assert all(ax.get_visible() for ax in g.axes.flat)
+
+    def test_emptiness_is_judged_from_rows_not_from_artists(self):
+        """The detector keys off facet_data(), not off what is drawn.
+
+        ax.has_data() agrees with facet_data() on the imshow path, so plot_heatmap alone
+        cannot tell the two apart. It disagrees for the seaborn kinds that leave artists
+        on empty axes, so pin the contract directly: an empty facet stays empty even with
+        an artist on it.
+        """
+        ep = self._sparse_plotter()
+        g = ep.plot_heatmap("pcorr", groupby=["genotype", "sex"], hide_empty=False)
+        empty = [key for key, n in _facet_counts(g).items() if not n]
+        assert empty, "fixture is not sparse"
+
+        for key in empty:
+            ax = g.facet_axis(*key, modify_state=False)
+            ax.plot([0, 1], [0, 1])
+            assert ax.has_data(), "artist did not register, test would be vacuous"
+
+        _hide_empty_facets(g)
+        for key in empty:
+            assert not g.facet_axis(*key, modify_state=False).get_visible(), key
+
+    def test_is_idempotent(self):
+        ep = self._sparse_plotter()
+        g = ep.plot_heatmap("pcorr", groupby=["genotype", "sex"])
+        before = [ax.get_visible() for ax in g.axes.flat]
+        _hide_empty_facets(g)
+        assert [ax.get_visible() for ax in g.axes.flat] == before
 
 
 class TestPlotHeatmap:
