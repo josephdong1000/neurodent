@@ -23,10 +23,10 @@ authors:
   orcid: 0000-0003-3264-0902
   affiliation: "1, 2"
 affiliations:
-- name: Children's Hospital of Philadelphia, United States
+- name: Children's Hospital of Philadelphia, United States of America
   index: 1
   ror: 01z7r7q48
-- name: University of Pennsylvania, United States
+- name: University of Pennsylvania, United States of America
   index: 2
   ror: 00b30xv10
 date: 31 March 2026
@@ -48,7 +48,7 @@ Electroencephalography (EEG) and its invasive counterpart, local field potential
 - **Modular Architecture**: A generalized framework for feature calculation allows contributors to easily extend the library of available metrics.
 - **Data organization**: A dedicated scheme designed for rodent study analysis, including genotype and experimental day, rather than individual subject sessions.
 - **High Interoperability**: Integration with `SpikeInterface` and `MNE-Python` ensures support for a wide array of electrophysiology file formats with syntax frequently used in the field.
-- **Scalability**: To address the challenge of analyzing large EEG datasets efficiently, the package integrates dataset caching and uses `Dask` [@DaskDevelopmentTeam:2016] and `Snakemake` [@Molder:2021] to parallelize computations across high-performance computing clusters.
+- **Scalability**: To address the challenge of analyzing large EEG datasets efficiently, the package integrates dataset caching and uses `Dask` [@DaskDevelopmentTeam:2016] and `Snakemake` [@Molder:2025] to parallelize computations across high-performance computing clusters.
 - **Reproducibility**: Development follows Continuous Integration (CI) practices, and intermediate results are saved to prevent redundant computations following pipeline errors.
 
 # State of the Field
@@ -77,7 +77,7 @@ Within the core library, computation is structured around a hierarchy of organiz
 
 Each of these classes naturally encapsulates a specific scope of rodent EEG/LFP analysis. A nested class hierarchy was chosen over a flat library to make the hierarchy of EEG analysis explicit, with lower level objects composing higher level ones. A practical consequence of this design is that analysis can be parallelized by processing each channel and time window independently. `NeuRodent` uses `Dask` to enable configurable parallel processing of channels and windows, either locally or on a distributed cluster. Adjustable in-memory chunk sizes let users trade throughput for RAM, an important consideration given that EEG recordings can span days or weeks.
 
-`NeuRodent` enables contributors to add new features to compute in windowed analyses by discovering feature computation functions at runtime. This greatly reduces the barrier to contribution for domain scientists who may not be familiar with the broader structure of `NeuRodent`. Artifact rejection is done in a similar fashion, where users can write additional filters and apply them with minimal changes. All computed features are outputted as `pandas` DataFrames [@pandas:2020; @mckinney-proc-scipy-2010] saved in Parquet files, which enables downstream workflows in Excel, R, or other analysis tools to interoperate with `NeuRodent` outputs without needing format conversion.
+`NeuRodent` enables contributors to add new features to compute in windowed analyses by discovering feature computation functions at runtime. This greatly reduces the barrier to contribution for domain scientists who may not be familiar with the broader structure of `NeuRodent`. Artifact rejection is done in a similar fashion, where users can write additional filters and apply them with minimal changes. All computed features are outputted as `pandas` DataFrames [@reback2020pandas; @mckinney-proc-scipy-2010] saved in Parquet files, which enables downstream workflows in Excel, R, or other analysis tools to interoperate with `NeuRodent` outputs without needing format conversion.
 
 Data visualization is provided through the Plotter classes. For individual animals, these include channel coherence and correlation matrices, power spectral density histograms, frequency spectrograms, feature time-series, and feature heatmaps. For experiment-wide groups of animals, these include categorical plots, coherence and correlation matrices, Q–Q plots, and 24-hour feature timecourses.
 
