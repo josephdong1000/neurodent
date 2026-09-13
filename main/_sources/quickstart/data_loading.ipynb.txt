@@ -1,0 +1,533 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Data Loading Tutorial\n",
+    "\n",
+    "This tutorial covers how to load EEG data from various formats into NeuRodent's\n",
+    "two main organizer classes:\n",
+    "\n",
+    "- **`LongRecordingOrganizer` (LRO)**: loads and manages a single recording\n",
+    "  (one session, one animal).\n",
+    "- **`AnimalOrganizer` (AO)**: discovers and groups multiple recordings for one\n",
+    "  animal using file-path patterns, then creates LROs internally.\n",
+    "\n",
+    "Most users will interact with `AnimalOrganizer` directly.  Understanding\n",
+    "the LRO helps when you need fine-grained control over how individual\n",
+    "recordings are loaded."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Setup"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from pathlib import Path\n",
+    "import logging\n",
+    "from datetime import datetime\n",
+    "\n",
+    "import numpy as np\n",
+    "\n",
+    "from neurodent import LongRecordingOrganizer, AnimalOrganizer\n",
+    "from neurodent.loading import DiscoveredFile, FileDiscoverer\n",
+    "\n",
+    "import spikeinterface.core as si\n",
+    "\n",
+    "logging.basicConfig(\n",
+    "    format=\"%(asctime)s - %(levelname)s - %(message)s\",\n",
+    "    level=logging.INFO,\n",
+    ")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "\n",
+    "# Part 1: `LongRecordingOrganizer`\n",
+    "\n",
+    "The first argument (`item`) of `LongRecordingOrganizer` accepts several\n",
+    "types, depending on your data layout:\n",
+    "\n",
+    "| `item` type | Use case |\n",
+    "|---|---|\n",
+    "| **`str` / `Path`** (single file) | One recording in a standard format (EDF, Intan, NWB, …) |\n",
+    "| **`list[str]`** (multiple files) | Several files to concatenate into one long recording |\n",
+    "| **`DiscoveredFile`** (single-file) | One file returned by `FileDiscoverer` |\n",
+    "| **`DiscoveredFile`** (multi-file) | Paired files that together form one recording (e.g. `.bin` + `.csv`) |\n",
+    "| **`None`** | When passing a pre-loaded `si.BaseRecording` via the `recording=` parameter |\n",
+    "\n",
+    "The `mode` parameter selects the backend: `\"si\"` (SpikeInterface),\n",
+    "`\"mne\"` (MNE-Python), or `None` (pre-created recording).\n",
+    "\n",
+    "The optional `extract_func` tells LRO *how* to read the file(s).  It can\n",
+    "be a SpikeInterface extractor name (e.g. `\"read_edf\"`), a callable, or\n",
+    "a file-path string (e.g. `\"readers.py:read_custom\"`)."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 1. Loading a Standard Format (EDF)\n",
+    "\n",
+    "The simplest case: point LRO to a single file and specify a built-in\n",
+    "SpikeInterface extractor."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Sample recordings\n",
+    "\n",
+    "`sample_dataset()` returns the recordings bundled with the package: a 60-second\n",
+    "ColMajor `.bin` + Meta `.csv` pair per animal, and a 5-second `.edf`. Reading `.edf`\n",
+    "needs `pip install neurodent[readers]`.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from neurodent.data import sample_dataset\n",
+    "\n",
+    "SAMPLE_DATA = sample_dataset()\n",
+    "\n",
+    "from neurodent import set_channel_map\n",
+    "\n",
+    "# The bundled recordings use Intan Port C/D names; map them to canonical labels\n",
+    "# so channel-based grouping works.\n",
+    "set_channel_map({\n",
+    "    \"LMot\": [\"C-015\", \"D-015\"], \"RMot\": [\"C-016\", \"D-016\"],\n",
+    "    \"LBar\": [\"C-014\", \"D-014\"], \"RBar\": [\"C-017\", \"D-017\"],\n",
+    "    \"LHip\": [\"C-012\", \"D-012\"], \"RHip\": [\"C-019\", \"D-019\"],\n",
+    "    \"LAud\": [\"C-009\", \"D-009\"], \"RAud\": [\"C-022\", \"D-022\"],\n",
+    "    \"LVis\": [\"C-010\", \"D-010\"], \"RVis\": [\"C-021\", \"D-021\"],\n",
+    "})\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Load an EDF file by passing a single path string\n",
+    "lro_edf = LongRecordingOrganizer(\n",
+    "    item=str(SAMPLE_DATA / \"A10\" / \"A10_recording.edf\"),\n",
+    "    mode=\"si\",\n",
+    "    extract_func=\"read_edf\",\n",
+    "    manual_datetimes=datetime(2023, 12, 13),\n",
+    ")\n",
+    "\n",
+    "print(f\"Sampling frequency: {lro_edf.meta.f_s} Hz\")\n",
+    "print(f\"Number of channels: {lro_edf.meta.n_channels}\")\n",
+    "print(f\"Duration: {lro_edf.LongRecording.get_total_duration():.1f} s\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Access the underlying SpikeInterface recording\n",
+    "recording = lro_edf.LongRecording\n",
+    "\n",
+    "print(f\"Recording type: {type(recording).__name__}\")\n",
+    "print(f\"Duration: {recording.get_total_duration():.1f} seconds\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 2. Loading Multi-File Formats with ``DiscoveredFile``\n",
+    "\n",
+    "Some formats pair a data file with a metadata sidecar (e.g. a `.bin`\n",
+    "with a `.csv`).  Wrap the paths in a `DiscoveredFile` so LRO treats\n",
+    "them as a single recording.\n",
+    "\n",
+    "A custom `extract_func` receives the `DiscoveredFile` and returns a\n",
+    "`si.BaseRecording`. NeuRodent ships one for this format, so import it and pass\n",
+    "it directly:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from neurodent.readers import read_bin_csv_pair\n",
+    "\n",
+    "# NeuRodent ships this reader for the custom .bin and metadata .csv format.\n",
+    "# It reads the .bin as column-major (all samples of channel 0, then channel 1, ...)\n",
+    "# and takes the channel count and sampling rate from the csv.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Two files that together form one recording\n",
+    "discovered = DiscoveredFile(\n",
+    "    paths=(\n",
+    "        str(SAMPLE_DATA / \"A10\" / \"Cage 2 A10-0_ColMajor.bin\"),\n",
+    "        str(SAMPLE_DATA / \"A10\" / \"Cage 2 A10-0_Meta.csv\"),\n",
+    "    ),\n",
+    ")\n",
+    "\n",
+    "# Pass the inline function as extract_func\n",
+    "lro_bin = LongRecordingOrganizer(\n",
+    "    item=discovered,\n",
+    "    mode=\"si\",\n",
+    "    extract_func=read_bin_csv_pair,\n",
+    "    manual_datetimes=datetime(2023, 12, 13),\n",
+    ")\n",
+    "\n",
+    "print(f\"Sampling frequency: {lro_bin.meta.f_s} Hz\")\n",
+    "print(f\"Number of channels: {lro_bin.meta.n_channels}\")\n",
+    "print(f\"Channel names: {lro_bin.meta.channel_names}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### File-path string alternative\n",
+    "\n",
+    "Instead of passing the function object, you can name it as a string. NeuRodent\n",
+    "ships this reader, so `\"neurodent.readers:read_bin_csv_pair\"` works from any\n",
+    "installed copy. The `\"path/to/file.py:function_name\"` form loads a reader that\n",
+    "is not installed, for example one kept alongside your analysis scripts:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Same result, but the reader is loaded from a file\n",
+    "lro_bin_from_file = LongRecordingOrganizer(\n",
+    "    item=discovered,\n",
+    "    mode=\"si\",\n",
+    "    extract_func=\"neurodent.readers:read_bin_csv_pair\",\n",
+    "    manual_datetimes=datetime(2023, 12, 13),\n",
+    ")\n",
+    "\n",
+    "print(f\"Sampling frequency: {lro_bin_from_file.meta.f_s} Hz\")\n",
+    "print(f\"Number of channels: {lro_bin_from_file.meta.n_channels}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 3. Other Standard Formats\n",
+    "\n",
+    "Any format supported by SpikeInterface can be loaded via `mode=\"si\"` by\n",
+    "passing the appropriate extractor name:\n",
+    "\n",
+    "```python\n",
+    "# Intan .rhd\n",
+    "lro = LongRecordingOrganizer(\n",
+    "    item=\"/path/to/recording.rhd\",\n",
+    "    mode=\"si\",\n",
+    "    extract_func=\"read_intan\",\n",
+    ")\n",
+    "\n",
+    "# NWB\n",
+    "lro = LongRecordingOrganizer(\n",
+    "    item=\"/path/to/file.nwb\",\n",
+    "    mode=\"si\",\n",
+    "    extract_func=\"read_nwb\",\n",
+    ")\n",
+    "```\n",
+    "\n",
+    "MNE-Python formats are available with `mode=\"mne\"`:\n",
+    "\n",
+    "```python\n",
+    "import mne\n",
+    "\n",
+    "lro = LongRecordingOrganizer(\n",
+    "    item=\"/path/to/recording.fif\",\n",
+    "    mode=\"mne\",\n",
+    "    extract_func=mne.io.read_raw_fif,\n",
+    "    manual_datetimes=datetime(2023, 12, 13),\n",
+    ")\n",
+    "```"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 4. Concatenating Multiple Files\n",
+    "\n",
+    "Pass a **list** of paths to have LRO concatenate them in order:\n",
+    "\n",
+    "```python\n",
+    "lro_multi = LongRecordingOrganizer(\n",
+    "    item=[\"/path/to/session1.edf\", \"/path/to/session2.edf\"],\n",
+    "    mode=\"si\",\n",
+    "    extract_func=\"read_edf\",\n",
+    ")\n",
+    "```"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 5. Pre-Loaded Recording Objects\n",
+    "\n",
+    "If you already have a SpikeInterface `BaseRecording` in memory (from\n",
+    "any source, e.g. `NumpyRecording`, a loaded `.nwb`, custom processing, etc.),\n",
+    "pass it directly to LRO with `mode=None`.\n",
+    "\n",
+    "First, create the recording:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Create a SpikeInterface recording from raw numpy data\n",
+    "num_channels = 8\n",
+    "sampling_frequency = 1000  # Hz\n",
+    "duration = 10  # seconds\n",
+    "num_samples = int(sampling_frequency * duration)\n",
+    "\n",
+    "# Scaled to a realistic microvolt range\n",
+    "data = (50 * np.random.randn(num_samples, num_channels)).astype(np.float32)\n",
+    "\n",
+    "recording_custom = si.NumpyRecording(\n",
+    "    traces_list=[data],\n",
+    "    sampling_frequency=sampling_frequency,\n",
+    ")\n",
+    "\n",
+    "channel_ids = [f\"CH{i:02d}\" for i in range(num_channels)]\n",
+    "recording_custom = recording_custom.rename_channels(new_channel_ids=channel_ids)\n",
+    "\n",
+    "print(f\"Recording type: {type(recording_custom).__name__}\")\n",
+    "print(f\"Duration: {recording_custom.get_total_duration():.1f} s\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Pass any si.BaseRecording directly to LRO\n",
+    "lro_custom = LongRecordingOrganizer(\n",
+    "    item=None,\n",
+    "    mode=None,\n",
+    "    recording=recording_custom,\n",
+    ")\n",
+    "\n",
+    "print(f\"Sampling frequency: {lro_custom.meta.f_s}\")\n",
+    "print(f\"Number of channels: {lro_custom.meta.n_channels}\")\n",
+    "print(f\"Channel names: {lro_custom.meta.channel_names}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 6. Inspecting Loaded Data\n",
+    "\n",
+    "Every LRO exposes a `meta` attribute (`RecordingMetadata`) with key\n",
+    "properties:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "metadata = lro_edf.meta\n",
+    "\n",
+    "print(f\"Recording metadata: {metadata}\")\n",
+    "print(f\"Sampling frequency: {metadata.f_s} Hz\")\n",
+    "print(f\"Number of channels: {metadata.n_channels}\")\n",
+    "print(f\"Channel names: {metadata.channel_names}\")\n",
+    "print(f\"Units: {metadata.V_units}\")\n",
+    "print(f\"Duration: {lro_edf.file_durations} seconds\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "\n",
+    "# Part 2: `AnimalOrganizer`\n",
+    "\n",
+    "In practice you rarely create LROs yourself.  Instead, `AnimalOrganizer`\n",
+    "discovers recordings for an animal automatically using **patterns**, which are\n",
+    "format strings with placeholders that match parts of the file path.\n",
+    "\n",
+    "### Pattern Placeholders\n",
+    "\n",
+    "| Placeholder | Meaning |\n",
+    "|---|---|\n",
+    "| `{animal}` | Animal identifier (e.g. `A10`, `F22`) |\n",
+    "| `{session}` | Session or day folder (e.g. `day1`, `2023-12-13`) |\n",
+    "| `{index}` | File index within a session (when multiple files per session) |\n",
+    "| `*` | Standard glob wildcard matching any character |\n",
+    "\n",
+    "**Example:**  `\"/data/{animal}/{session}/*.edf\"` matches files like\n",
+    "`/data/A10/day1/recording.edf` and extracts `animal=\"A10\"`, `session=\"day1\"`.\n",
+    "\n",
+    "### Key Constructor Parameters\n",
+    "\n",
+    "AO internally uses `FileDiscoverer` to match files, groups them by\n",
+    "session, and creates one LRO per session:\n",
+    "\n",
+    "| Parameter | Description |\n",
+    "|---|---|\n",
+    "| `pattern` | A single pattern string, or a list of patterns for multi-file formats |\n",
+    "| `animal_id` | Filter discoveries to one animal |\n",
+    "| `skip_sessions` | Glob patterns for sessions to exclude |\n",
+    "| `truncate` | Limit the number of sessions loaded |\n",
+    "| `lro_kwargs` | Dict of arguments forwarded to each `LongRecordingOrganizer` |"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 7. Finding Recordings with `FileDiscoverer`\n",
+    "\n",
+    "`FileDiscoverer` scans the filesystem using placeholder patterns and\n",
+    "returns `DiscoveredFile` objects.  For multi-file formats, pass a\n",
+    "list of patterns; files that share the same placeholder values are\n",
+    "grouped automatically."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Discover all bin/csv pairs in the bundled sample dataset\n",
+    "discoverer = FileDiscoverer([\n",
+    "    str(SAMPLE_DATA / \"{animal}\" / \"*_ColMajor.bin\"),\n",
+    "    str(SAMPLE_DATA / \"{animal}\" / \"*_Meta.csv\"),\n",
+    "])\n",
+    "discovered_files = discoverer.discover()\n",
+    "\n",
+    "for f in discovered_files:\n",
+    "    print(f\"Animal {f.metadata['animal']}: {[Path(p).name for p in f.paths]}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 8. Passing Patterns to ``AnimalOrganizer``\n",
+    "\n",
+    "The same pattern syntax goes straight into `AnimalOrganizer`.  The AO\n",
+    "runs `FileDiscoverer` internally, groups the results by session, and\n",
+    "builds LROs.\n",
+    "\n",
+    "For example, the patterns below discover the `Cage 2 A10-0_ColMajor.bin`\n",
+    "and `Cage 2 A10-0_Meta.csv` files in the bundled sample dataset under `A10/` and group\n",
+    "them into a single-session LRO:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Multi-file pattern for paired bin/csv data\n",
+    "ao = AnimalOrganizer(\n",
+    "    pattern=[\n",
+    "        str(SAMPLE_DATA / \"{animal}\" / \"*_ColMajor.bin\"),\n",
+    "        str(SAMPLE_DATA / \"{animal}\" / \"*_Meta.csv\"),\n",
+    "    ],\n",
+    "    animal_id=\"A10\",\n",
+    "    lro_kwargs={\n",
+    "        \"mode\": \"si\",\n",
+    "        \"extract_func\": \"neurodent.readers:read_bin_csv_pair\",\n",
+    "        \"manual_datetimes\": datetime(2023, 12, 13),\n",
+    "    },\n",
+    ")\n",
+    "\n",
+    "print(f\"Animal Organizer created for {ao.animal_id}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "For single-file formats the pattern is just a string:\n",
+    "\n",
+    "```python\n",
+    "ao = AnimalOrganizer(\n",
+    "    pattern=\"/data/{animal}/{session}/*.edf\",\n",
+    "    animal_id=\"A10\",\n",
+    "    lro_kwargs={\"mode\": \"si\", \"extract_func\": \"read_edf\"},\n",
+    ")\n",
+    "```"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Next Steps\n",
+    "\n",
+    "- **[Basic Usage Tutorial](basic_usage.ipynb)**: Complete workflow from loading to visualization\n",
+    "- **[Windowed Analysis Tutorial](../tutorials/windowed_analysis.ipynb)**: Extract features from loaded data\n",
+    "- **[Spike Analysis Tutorial](../tutorials/spike_analysis.ipynb)**: Detect population spikes and fold counts into a WAR"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "neurodent (3.10.8.final.0)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.10.8"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
