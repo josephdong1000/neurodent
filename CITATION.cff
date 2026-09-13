@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use NeuRodent, please cite it using the metadata below."
 title: "NeuRodent"
 type: software
-version: 0.3.0
+version: 0.5.0
 license: MIT
 repository-code: "https://github.com/josephdong1000/neurodent"
 url: "https://github.com/josephdong1000/neurodent"
