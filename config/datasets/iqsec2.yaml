@@ -43,6 +43,17 @@ analysis:
     lro_kwargs:
       mode: "si"
 
+  ep_heatmaps:
+    # A difference heatmap subtracts this group, so naming it wrongly inverts every
+    # result rather than failing. It has to be per-sex here: this is an X-linked
+    # strain, so the control male is x/y and the control female is x/x, and neither
+    # appears in the other's bucket. Without this key the baseline falls back to the
+    # first genotype in sort order, and under a plain alphabetical sort '+' precedes
+    # 'x', which would make the MUTANT the reference in both sexes.
+    baseline_genotype:
+      Male: "x/y"
+      Female: "x/x"
+
 samples_data:
   data_root: /mnt/isilon/marsh_single_unit
 
@@ -61,6 +72,14 @@ samples_data:
     Unknown: [Unknown, unknown, UNKNOWN]
     Male: [Male, male, M, m]
     Female: [Female, female, F, f]
+
+  # Categorical order for plots and sorting. Declared because the package default is
+  # ['WT', 'KO'], which none of these genotypes match; without it the order comes out
+  # in whatever sequence the WARs happen to load. Controls lead so that any code
+  # falling back to 'first in order' lands on a control rather than a mutant.
+  plot_order:
+    genotype: [x/y, x/x, +/y, +/x, +/+, Unknown]
+    sex: [Male, Female]
 
   # Two key spaces, because this dataset has two acquisition systems. The Intan rhd
   # cohorts expose bare ids like 'C-015'. The DataWave bin cohorts expose
