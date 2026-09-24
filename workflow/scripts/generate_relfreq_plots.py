@@ -253,15 +253,40 @@ def create_relfreq_plot(df, feature, feature_label, hue, hue_order, palette, log
     plt.close()
 
 
+def genotype_hue(df, column="genotype"):
+    """Return ``(hue_order, palette)`` sized to the genotypes actually present.
+
+    FacetGrid cycles a palette list that is shorter than ``hue_order`` silently, so the
+    three fixed colours this module used gave two pairs of genotypes the same colour once a
+    dataset had more than three. Sizing the palette to the levels removes the failure mode
+    rather than relying on a warning that this code path does not emit.
+
+    Order follows :data:`~neurodent.constants.DF_SORT_ORDER` where it applies, so these
+    plots agree with the ep_figures ordering instead of applying a separate ASCII sort.
+    """
+    observed = sorted(df[column].dropna().unique().tolist())
+    preferred = [value for value in constants.DF_SORT_ORDER.get(column, []) if value in observed]
+    hue_order = preferred + [value for value in observed if value not in preferred]
+
+    base = ["blue", "blueviolet", "red"]
+    if len(hue_order) <= len(base):
+        palette = base[: len(hue_order)]
+    else:
+        palette = sns.color_palette("husl", len(hue_order)).as_hex()
+    return hue_order, palette
+
+
 def create_relfreq_plots_from_df(df_weighted, feature, feature_label, output_dir, relfreq_config):
     """Create relative frequency plots for a specific feature from pre-extracted DataFrame"""
-    
+
     logger = logging.getLogger(__name__)
-    
+
     # Get format parameters from config
     figure_format = relfreq_config.get("figure_format", "png")
     dpi = relfreq_config.get("dpi", 300)
-    
+
+    hue_order, palette = genotype_hue(df_weighted)
+
     # Create relative frequency distribution plots
     # Check if this is a banded feature using constants
     banded_features = set(constants.BAND_FEATURES) | set(constants.BANDED_MATRIX_FEATURES)
@@ -277,8 +302,8 @@ def create_relfreq_plots_from_df(df_weighted, feature, feature_label, output_dir
                 feature=feature,
                 feature_label=f"{feature_label} ({band})",
                 hue="genotype",
-                hue_order=sorted(df_weighted["genotype"].unique().tolist()),  # Dynamic hue order
-                palette=["blue", "blueviolet", "red"],
+                hue_order=hue_order,
+                palette=palette,
                 log_scale=False,
                 output_path=output_dir / f"{feature}_relfreq_{band}.{figure_format}",
                 dpi=dpi,
@@ -309,8 +334,8 @@ def create_relfreq_plots_from_df(df_weighted, feature, feature_label, output_dir
             feature=feature,
             feature_label=feature_label,
             hue="genotype",
-            hue_order=sorted(df_weighted["genotype"].unique().tolist()),  # Dynamic hue order
-            palette=["blue", "blueviolet", "red"],
+            hue_order=hue_order,
+            palette=palette,
             log_scale=False,
             output_path=output_dir / f"{feature}_relfreq.{figure_format}",
             dpi=dpi,

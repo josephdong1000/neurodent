@@ -31,6 +31,7 @@ from neurodent.workflow import (
     apply_samples_config,
     extend_plot_order_from_attr,
     create_sex_marker_scale,
+    create_genotype_color_scale,
 )
 
 def infer_metadata_columns(df):
@@ -157,11 +158,13 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
                 .add(so.Dash(color="k"), so.Agg(), so.Dodge(empty="drop", gap=0.2))
                 .add(so.Range(color="k"), so.Est(errorbar="sd"), so.Dodge(empty="drop", gap=0.2))
                 .add(so.Dot(), so.Dodge(empty="drop", gap=0.2), so.Jitter(0.75, seed=42))
-                .scale(marker=create_sex_marker_scale(df, plot_lib=so))
+                .scale(
+                    marker=create_sex_marker_scale(df, plot_lib=so),
+                    color=create_genotype_color_scale(df, plot_order.get("genotype"), plot_lib=so),
+                )
                 .theme(
                     axes_style("ticks")
                     | sns.plotting_context("talk")
-                    | {"axes.prop_cycle": plt.cycler(color=["blue", "blueviolet", "red"])}
                     | {"axes.spines.right": False, "axes.spines.top": False}
                 )
                 .layout(size=(6, 6))
@@ -182,11 +185,11 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
                 .scale(
                     x=ExperimentPlotter.band_scale(plot_lib=so),
                     marker=create_sex_marker_scale(df, plot_lib=so),
+                    color=create_genotype_color_scale(df, plot_order.get("genotype"), plot_lib=so),
                 )
                 .theme(
                     axes_style("ticks")
                     | sns.plotting_context("notebook")
-                    | {"axes.prop_cycle": plt.cycler(color=["blue", "blueviolet", "red", "blue", "blueviolet", "red"])}
                     | {"axes.spines.right": False, "axes.spines.top": False}
                 )
                 .label(x="Frequency band", y=feature_label)
@@ -224,10 +227,13 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
                     .theme(
                         axes_style("ticks")
                         | sns.plotting_context("notebook")
-                        | {"axes.prop_cycle": plt.cycler(color=["blue", "blueviolet", "red"])}
                         | {"axes.spines.right": False, "axes.spines.top": False}
                     )
-                    .scale(x=scale, y=scale)
+                    .scale(
+                        x=scale,
+                        y=scale,
+                        color=create_genotype_color_scale(df, plot_order.get("genotype"), plot_lib=so),
+                    )
                     .limit(x=(lambda x: (1, 60) if callable(x) else (1, 100))(scale), y=ylim)
                     .layout(size=(10, 6))
                     .label(x="Frequency (Hz)", y=feature_label)

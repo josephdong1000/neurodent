@@ -109,6 +109,33 @@ def apply_samples_config(samples_config: dict):
     constants.SEX_MAP = copy.deepcopy(samples_config.get("SEX_MAP", constants.DEFAULT_SEX_MAP))
     constants.GENOTYPE_MAP = copy.deepcopy(samples_config.get("GENOTYPE_MAP", constants.DEFAULT_GENOTYPE_MAP))
 
+    # Categorical plot/sort order, opt-in per column. Only the columns a dataset actually
+    # declares are replaced; everything else keeps its module default.
+    #
+    # Deliberately NOT derived from GENOTYPE_MAP, which would look like the parallel to
+    # set_channel_map but is not one. CHANNEL_MAP is documented as a single source of truth
+    # and every shipped dataset declares it, whereas GENOTYPE_MAP's documented default is
+    # an empty passthrough and only two of the seven shipped configs declare one. Deriving
+    # the order from it would set the order to [] for the other five, and for the two that
+    # do declare it would impose their key order: arx_parv lists KO before WT, which would
+    # flip a 33-animal dataset's difference-heatmap baseline from WT to KO, reverse every
+    # map's sign and swap its colours. Opt-in is the only form with no blast radius.
+    #
+    # Mutated in place rather than rebound, matching how set_channel_map updates the
+    # "channel" entry, so modules that already imported the dict object see the change.
+    plot_order = samples_config.get("plot_order")
+    if plot_order:
+        unknown = set(plot_order) - set(constants.DF_SORT_ORDER)
+        if unknown:
+            raise ValueError(
+                f"plot_order declares unknown column(s) {sorted(unknown)}; "
+                f"valid columns are {sorted(constants.DF_SORT_ORDER)}."
+            )
+        for column, order in plot_order.items():
+            if not isinstance(order, (list, tuple)) or not order:
+                raise ValueError(f"plot_order['{column}'] must be a non-empty list.")
+            constants.DF_SORT_ORDER[column] = list(order)
+
     # New: ANIMAL_METADATA for sex/genotype enrichment (required)
     if "ANIMAL_METADATA" in samples_config:
         constants.ANIMAL_METADATA = metadata_module.load_animal_metadata(samples_config)

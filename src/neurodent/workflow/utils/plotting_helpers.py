@@ -126,6 +126,56 @@ def extend_plot_order_from_attr(wars, attr: str, base_order):
     return order
 
 
+GENOTYPE_BASE_COLORS = ["blue", "blueviolet", "red"]
+
+
+def create_genotype_color_scale(df, plot_order=None, plot_lib=None):
+    """Build a seaborn-objects colour scale for the genotype column of *df*.
+
+    Why this exists: the ep_figures plots used to set colours through the matplotlib
+    ``axes.prop_cycle`` rcParam, which fails silently in both directions. seaborn-objects
+    uses the cycle only when the number of levels fits inside it, so a three-colour cycle
+    against five genotypes was discarded outright and replaced with husl, while a
+    six-entry cycle built by repeating three colours was long enough to be used and so
+    handed two different genotypes the same colour. Neither emitted a warning, and because
+    one site had a padded cycle and the others did not, a single run could paint one
+    genotype two different colours across its own figures.
+
+    An explicit scale fixes both: the colour list is sized to the levels actually present,
+    and seaborn warns if a caller ever supplies a short one.
+
+    Args:
+        df: DataFrame with a ``"genotype"`` column.
+        plot_order (list | None): Preferred genotype order. Values present in *df* but
+            absent here are appended, so nothing is dropped.
+        plot_lib: Optional reference to ``seaborn.objects``; imported lazily when ``None``
+            so this module does not require seaborn at import time.
+
+    Returns:
+        A ``seaborn.objects.Nominal`` scale whose ``values`` has one colour per level.
+    """
+    if plot_lib is None:
+        import seaborn.objects as so
+
+        plot_lib = so
+
+    observed = [g for g in df["genotype"].dropna().unique()]
+    order = [g for g in (plot_order or []) if g in observed]
+    order += [g for g in observed if g not in order]
+
+    if len(order) <= len(GENOTYPE_BASE_COLORS):
+        colors = GENOTYPE_BASE_COLORS[: len(order)]
+    else:
+        # More genotypes than the canonical three. husl gives evenly spaced, distinct hues
+        # at any count; the alternative of cycling the base three is what produced the
+        # collisions this helper exists to prevent.
+        import seaborn as sns
+
+        colors = sns.color_palette("husl", len(order)).as_hex()
+
+    return plot_lib.Nominal(list(colors), order=list(order))
+
+
 def create_sex_marker_scale(df, plot_lib=None):
     """Build a seaborn-objects marker scale for the sex column of *df*.
 
