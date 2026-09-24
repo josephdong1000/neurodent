@@ -86,6 +86,77 @@ ALLELE_CORRECTIONS = {
 # Cohort directories that hold rhd files but are not part of the adult study.
 PUP_COHORTS = {"Pup EEG"}
 
+BIN_SUBTREE = "PythonEEG Data Bins/IQSEC2"
+
+# DataWave writes region words rather than amp numbers. Matched case-insensitively because
+# three cohorts carry a lowercase spelling of the same names.
+DATAWAVE_REGION = {
+    "l vis ctx": "LVis", "l hipp": "LHip", "l barrel ctx": "LBar", "l motor ctx": "LMot",
+    "r motor ctx": "RMot", "r barrel ctx": "RBar", "r hipp": "RHip", "r vis ctx": "RVis",
+}
+
+# Adults recorded only by the DataWave rig, so they have no rhd leg at all and are absent
+# from RHD_COHORTS. They are included because they are what breaks the date confound: as
+# rhd-only, every control male sits in a 35 day window in 2020 with just one of eight
+# mutants inside it, and adding these puts controls in early 2019 as well.
+#
+# cage is the sheet's cage number; the port it implies is cross-checked against the port
+# the Meta.csv sidecars actually declare, and a disagreement refuses to generate.
+BIN_ADULTS = {
+    "51": {"dir": "IQSEC2 51_52/51 IQSEC2 Mut Male", "cage": "3", "nested": True},
+    "52": {"dir": "IQSEC2 51_52/52 IQSEC2 Mut Male", "cage": "4"},
+    "42": {"dir": "IQSEC 42 43 44 47/42 IQSEC2 CT Male", "cage": "1"},
+    "43": {"dir": "IQSEC 42 43 44 47/43 IQSEC2 CT Male", "cage": "2"},
+    "44": {"dir": "IQSEC 42 43 44 47/44 IQSEC2 CT Male", "cage": "3"},
+}
+
+# Bin adults deliberately not loaded, with the reason.
+BIN_EXCLUSIONS = {
+    "47": (
+        "Animal 47 (IQSEC 42 43 44 47/47 IQSEC2 Het Female) has only 3 live bins and they "
+        "do not share a montage: two declare 7 channels, missing D-021 (RVis), and one "
+        "declares the full 8. _validate_channel_names compares resolved abbreviations, so "
+        "a 7-channel file and an 8-channel file in one animal raise rather than merge. "
+        "The pattern language cannot express a per-file exclusion (skip_sessions matches "
+        "on {session}, and these share one), so isolating the 8-channel file would leave "
+        "the animal with a single recording. Excluded rather than fudged. It is a het "
+        "female contributing about 3 hours, so it does not bear on the mutant-versus-"
+        "control male contrast these bin animals were added to de-confound."
+    ),
+}
+
+# Animals whose implant was also recorded by the DataWave rig, producing a second block of
+# data in the bin tree that THIS config does not reach. Counted at generation time so the
+# note cannot go stale. Not loaded here because the bin half is a different reader and a
+# different channel key space; recorded per animal so nobody reads these entries as the
+# animal's complete record.
+DUAL_TREE_BINS = {
+    "80": "011320 IQSEC2_80_81_82_83", "81": "011320 IQSEC2_80_81_82_83",
+    "82": "011320 IQSEC2_80_81_82_83", "83": "011320 IQSEC2_80_81_82_83",
+    "76": "013120_IQSEC2_78_76_Recordings", "78": "013120_IQSEC2_78_76_Recordings",
+    "77": "012720_IQSEC2_77",
+}
+
+# Per-animal notes that no automated check can derive.
+ANIMAL_NOTES = {
+    "81": (
+        "Records conflict on this animal, resolved in favour of the reference sheet. The "
+        "sheet's genotype column gives IQSEC2(+/y), a mutant male, and that is what is "
+        "emitted. Against it: the workbook's four per-genotype analysis sheets are "
+        "complete and non-overlapping, and they place 81 in Mutant Female (+/+) while "
+        "Mutant Male explicitly omits it, so the (+/+) total of 3 only reconciles that "
+        "way. Demographic Info lists 81 under BOTH columns. The tiebreaker is that its "
+        "(+/y) entry carries age 36, exactly its age at implant given a 2019-12-02 birth "
+        "and a 2020-01-07 implant, while the (+/+) entry carries age 46, matching no "
+        "implant date. Genetics agrees: the litter holds five (+/x) hets, implying a "
+        "wild-type sire, who cannot produce (+/+) daughters."
+    ),
+    "82": (
+        "Same records conflict as animal 81 and resolved the same way, in favour of the "
+        "reference sheet's IQSEC2(+/y). See the note on 81 for the full evidence."
+    ),
+}
+
 # Every port the hardware exposes but no animal claims, with the reason it is empty. Keyed
 # by (cohort, port) rather than by cohort, so "checked and found empty" is distinguishable
 # from "never considered". The port guard refuses to generate on any unassigned port that
@@ -274,6 +345,95 @@ def read_reference_sheet():
             "died": str(row[6]).strip() if row[6] is not None else None,
         }
     return out
+
+
+PROBEINFO_POSITIONAL = re.compile(r"^([ABCD])-(\d{3})$")
+
+
+def _probeinfo_region(raw):
+    """Resolve one ProbeInfo string to a canonical abbreviation, or None.
+
+    ProbeInfo is port-qualified, e.g. 'Intan Input (1)/PortC L Vis Ctx'. The tail is either
+    a region word, in any of the case variants the lab's exports use, or a positional amp
+    id like 'C-010' for files whose export dropped the region names.
+    """
+    _, _, tail = raw.partition("/")
+    tail = tail.strip()
+    if not tail.startswith("Port") or len(tail) < 6:
+        return None
+    tail = tail[5:].strip()
+    positional = PROBEINFO_POSITIONAL.match(tail)
+    if positional:
+        return AMP_TO_REGION.get(positional.group(2))
+    return DATAWAVE_REGION.get(tail.lower())
+
+
+def _bin_channel_sets(animal_dir):
+    """Return {abbrev tuple: [raw ProbeInfo tuples]} over an animal's LIVE bins.
+
+    Zero-byte bins are skipped: the reader raises on them and the loader substitutes a
+    0-sample placeholder that later stages drop, so they never reach the merge and their
+    sidecars say nothing about the montage.
+    """
+    import csv
+
+    out = defaultdict(list)
+    for binary in sorted((Path(DATA_ROOT) / BIN_SUBTREE / animal_dir).rglob("*_ColMajor.bin")):
+        if binary.stat().st_size == 0:
+            continue
+        sidecar = binary.with_name(binary.name.replace("_ColMajor.bin", "_Meta.csv"))
+        if not sidecar.exists():
+            continue
+        rows = list(csv.DictReader(sidecar.open(errors="replace")))
+        raw = tuple(row["ProbeInfo"].strip() for row in rows)
+        abbrevs = tuple(_probeinfo_region(name) for name in raw)
+        out[abbrevs].append(raw)
+    return out
+
+
+def _sidecars_without_lastedit(animal_dir):
+    """Live sidecars whose trailing column has no header name, so LastEdit is unreadable.
+
+    These are stale MATLAB writetable output. DDFBinaryMetadata checks for the column by
+    name and falls back to dt_end=None with a warning, which is survivable for metadata but
+    leaves that file with no end time to place it on the timeline.
+    """
+    out = []
+    for binary in sorted((Path(DATA_ROOT) / BIN_SUBTREE / animal_dir).rglob("*_ColMajor.bin")):
+        if binary.stat().st_size == 0:
+            continue
+        sidecar = binary.with_name(binary.name.replace("_ColMajor.bin", "_Meta.csv"))
+        if sidecar.exists() and "LastEdit" not in sidecar.open(errors="replace").readline():
+            out.append(sidecar.name)
+    return out
+
+
+def bin_probeinfo_by_region():
+    """Return {abbrev: sorted raw ProbeInfo strings} across every included bin adult.
+
+    Built from the sidecars rather than hand-written. The lab's exports carry three
+    spellings of the same montage (title case, lowercase, and positional amp ids) and
+    resolve_channel matches exactly with no fallback, so every spelling present in the data
+    has to appear in the map or that file fails to resolve.
+
+    Deliberately reads EVERY sidecar, including those whose bin is zero-byte and therefore
+    never loads today. Sixty of the 73 bins in the 42/43/44/47 cohort are empty because an
+    export was abandoned, their sources still exist as .ddf, and the lab has been asked to
+    re-run it. If that happens those files become live, and several of them carry the
+    lowercase spelling that no live file currently uses. Listing an alias that nothing
+    resolves costs nothing; omitting one that something resolves is a load failure.
+    """
+    import csv
+
+    out = defaultdict(set)
+    for spec in BIN_ADULTS.values():
+        for sidecar in sorted((Path(DATA_ROOT) / BIN_SUBTREE / spec["dir"]).rglob("*_Meta.csv")):
+            for row in csv.DictReader(sidecar.open(errors="replace")):
+                raw = (row.get("ProbeInfo") or "").strip()
+                abbrev = _probeinfo_region(raw) if raw else None
+                if abbrev:
+                    out[abbrev].add(raw)
+    return {k: sorted(v) for k, v in out.items()}
 
 
 def _cohort_files(cohort):
@@ -626,6 +786,40 @@ def main(argv=None):
                     f"is empty."
                 )
 
+    # The bin adults. Every ProbeInfo string must resolve, the montage must be consistent
+    # across an animal's live files (a 7-channel and an 8-channel file in one animal raise
+    # at merge rather than combining), and the port the sidecars declare must match the one
+    # the sheet's cage implies.
+    for animal_id, spec in BIN_ADULTS.items():
+        sets = _bin_channel_sets(spec["dir"])
+        if not sets:
+            problems.append(f"bin/{animal_id}: no live bins under {spec['dir']}")
+            continue
+        for abbrevs, raws in sets.items():
+            if None in abbrevs:
+                unresolved = {r for names in raws for r, a in zip(names, abbrevs) if a is None}
+                problems.append(f"bin/{animal_id}: unresolvable ProbeInfo {sorted(unresolved)}")
+        distinct = {tuple(sorted(a for a in abbrevs if a)) for abbrevs in sets}
+        if len(distinct) > 1:
+            problems.append(
+                f"bin/{animal_id}: live files declare {len(distinct)} different montages "
+                f"{sorted(distinct)}; they would raise at merge rather than combine"
+            )
+        expected = CAGE_TO_PORT[spec["cage"]]
+        declared = {
+            name.split("/")[1][4:5]
+            for names in (r for raws in sets.values() for r in raws)
+            for name in names
+            if "/" in name
+        }
+        if declared != {expected}:
+            problems.append(
+                f"bin/{animal_id}: sheet cage {spec['cage']} implies port {expected}, "
+                f"sidecars declare {sorted(declared)}"
+            )
+        if animal_id not in ref:
+            problems.append(f"bin/{animal_id}: no reference-sheet row")
+
     # Every cohort on disk must be accounted for. Without this a renamed or newly added
     # cohort directory is silently dropped from the study.
     on_disk = {
@@ -714,15 +908,22 @@ def main(argv=None):
     w("    Male: [Male, male, M, m]")
     w("    Female: [Female, female, F, f]")
     w("")
-    w("  # rhd exposes bare Intan ids, so the map is keyed on those. The bin half uses")
-    w("  # port-prefixed ProbeInfo strings and is a different key space; it is not present")
-    w("  # here because this config covers the rhd cohorts only.")
+    w("  # Two key spaces, because this dataset has two acquisition systems. The Intan rhd")
+    w("  # cohorts expose bare ids like 'C-015'. The DataWave bin cohorts expose")
+    w("  # port-prefixed ProbeInfo strings like 'Intan Input (1)/PortC L Motor Ctx', and")
+    w("  # the lab's exports spell those three ways: title case, lowercase, and positional")
+    w("  # amp ids where the export dropped the region words. resolve_channel matches")
+    w("  # exactly with no fallback, so every spelling present in the data must be listed.")
+    w("  # The bin entries are generated from the sidecars, not hand-written.")
     w("  channels:")
+    bin_names = bin_probeinfo_by_region()
     for region in REGION_ORDER:
         amp = next(a for a, r in AMP_TO_REGION.items() if r == region)
         w(f"    {region}:")
         for port in "ABCD":
             w(f"    - {port}-{amp}")
+        for raw in bin_names.get(region, ()):
+            w(f"    - {q(raw)}")
     w("")
     w("  # One anchor per port keeps each animal to a single line instead of eight.")
     w("  _ports:")
@@ -803,6 +1004,29 @@ def main(argv=None):
                     84,
                 ):
                     w(f"  #   {line}")
+            if animal_id in ANIMAL_NOTES:
+                for line in _wrap(ANIMAL_NOTES[animal_id], 84):
+                    w(f"  #   {line}")
+            bin_cohort = DUAL_TREE_BINS.get(animal_id)
+            if bin_cohort:
+                share = sum(1 for a in DUAL_TREE_BINS.values() if a == bin_cohort)
+                live = [
+                    p for p in (Path(DATA_ROOT) / BIN_SUBTREE / bin_cohort).rglob("*_ColMajor.bin")
+                    if p.stat().st_size > 0
+                ]
+                # 8 channels, float32, 2000 Hz, per the Meta.csv sidecars.
+                hours = sum(p.stat().st_size for p in live) / (8 * 4 * 2000) / 3600 / share
+                for line in _wrap(
+                    f"INCOMPLETE RECORD: this animal's implant was also recorded by the "
+                    f"DataWave rig, leaving roughly {len(live) // share} more bin files "
+                    f"and about {hours:.0f} more hours under "
+                    f"'{BIN_SUBTREE}/{bin_cohort}' that no pattern in this config reaches. "
+                    f"The two legs abut rather than overlap. What is loaded here is real "
+                    f"and correctly attributed, but it is not the whole recording, and "
+                    f"coverage is uneven across animals for that reason.",
+                    84,
+                ):
+                    w(f"  #   {line}")
             opens, ohms_by_region, measured = _open_electrodes(cohort, port)
             if not measured:
                 for line in _wrap(
@@ -875,6 +1099,79 @@ def main(argv=None):
                 w("    manual_datetime:")
                 for key, start in sessions.items():
                     w(f"      {q(key)}: {q(start)}")
+    # --- DataWave bin adults ---
+    w("  # === DataWave bin cohorts (no rhd leg at all) ===")
+    for line in _wrap(
+        "These six animals were recorded only by the DataWave rig. They are here because "
+        "they are what makes the male genotype contrast interpretable: with the rhd "
+        "cohorts alone every control male falls in a 35 day window in 2020 and only one "
+        "of eight mutants falls inside it, so genotype and recording date are very nearly "
+        "the same variable and any difference between the groups could equally be a "
+        "difference between two eras of the rig. These animals put controls in early 2019 "
+        "as well, so the two groups interleave. That improves the design; it does not make "
+        "it a designed experiment, and recording date is still worth carrying as a "
+        "covariate.",
+        84,
+    ):
+        w(f"  #   {line}")
+    for animal_id, reason in BIN_EXCLUSIONS.items():
+        for line in _wrap(f"Animal {animal_id} not loaded. {reason}", 84):
+            w(f"  #   {line}")
+
+    for animal_id, spec in BIN_ADULTS.items():
+        row = ref.get(animal_id, {})
+        port = CAGE_TO_PORT[spec["cage"]]
+        sets = _bin_channel_sets(spec["dir"])
+        n_live = sum(len(v) for v in sets.values())
+        hours = sum(
+            p.stat().st_size for p in (Path(DATA_ROOT) / BIN_SUBTREE / spec["dir"]).rglob("*_ColMajor.bin")
+            if p.stat().st_size > 0
+        ) / (8 * 4 * 2000) / 3600
+        spellings = len({raw for raws in sets.values() for names in raws for raw in names})
+        for line in _wrap(
+            f"Animal {animal_id}: {n_live} live bins, about {hours:.0f} h, Port{port} from "
+            f"sheet cage {spec['cage']} and confirmed by the sidecars. {spellings} distinct "
+            f"ProbeInfo spellings of the same 8 electrodes, all mapped above. No "
+            f"channel_subset: unlike the rhd cohorts, where one file holds four animals' "
+            f"ports, each bin file holds only this animal.",
+            84,
+        ):
+            w(f"  #   {line}")
+        stale = _sidecars_without_lastedit(spec["dir"])
+        if stale:
+            for line in _wrap(
+                f"WATCH: {len(stale)} live sidecar(s) here are stale MATLAB writetable "
+                f"output whose final column has no name, so LastEdit cannot be read: "
+                f"{', '.join(stale)}. These bins carry no timestamps of their own and no "
+                f"manual_datetime covers them, so DDFBinaryMetadata sets dt_end to None "
+                f"and only warns. Whether the timeline survives a None among its files has "
+                f"not been tested, because these are multi-GB files and testing it needs a "
+                f"real load on the cluster. If war_generation fails for this animal, look "
+                f"here first.",
+                84,
+            ):
+                w(f"  #   {line}")
+        w(f"  - id: IQSEC2_{animal_id}")
+        w(f"    genotype: {q(row.get('allele') or 'Unknown')}")
+        w(f"    sex: {q(row.get('sex') or 'Unknown')}")
+        base = f"{{data_root}}/{BIN_SUBTREE}/{spec['dir']}"
+        # 51's files sit under Part 1 and Part 2, which serve as the session key. The rest
+        # are flat, so their own directory is the session.
+        if spec.get("nested"):
+            stem = f"{base}/{{session}}/Cage {spec['cage']}-{{index}}"
+        else:
+            parent, _, leaf = spec["dir"].rpartition("/")
+            stem = f"{{data_root}}/{BIN_SUBTREE}/{parent}/{{session}}/Cage {spec['cage']}-{{index}}"
+        w("    pattern:")
+        w(f"    - \"{stem}_ColMajor.bin\"")
+        w(f"    - \"{stem}_Meta.csv\"")
+        w("    lro_kwargs:")
+        w("      mode: \"si\"")
+        w("      extract_func: \"neurodent.readers:read_bin_csv_pair\"")
+        w("      multiprocess_mode: \"serial\"")
+        # LastEdit in the sidecar is the recording END, verified against the .ddf mtimes.
+        w("      datetimes_are_start: false")
+
     _write_atomic(args.out, "\n".join(out) + "\n")
     print(f"wrote {args.out} ({len(out)} lines)")
 
