@@ -6,12 +6,34 @@
 #
 # Ports come from the sheet's Cage column (1->A 2->B 3->C 4->D; the trailing letter
 # in '3B' is the rack, not the port). Folder-name genotypes contradict the sheet and
-# are NOT used. Positional assignment (folder-name order maps to A,B,C,D) is wrong in
-# five cohorts because several start at cage 3, and is never used here.
+# are not used. Positional assignment (folder-name order maps to A,B,C,D) is wrong in
+# six of the ten cohorts because several start at cage 3, and is never used here:
+# 20180917, IQSEC 65_66, 013120, 012720, 20200602 and IQSEC animal 3.
 #
-# Pups live in a separate config: 32 ProbeInfo strings occur in both pup and adult
-# cohorts and would need different abbreviations in each, which set_channel_map
-# refuses. See config/datasets/iqsec2_pup.yaml.
+# lro_kwargs carries ignore_integrity_checks. 49 of the 9867 rhd files hold short
+# timestamp discontinuities that read_intan otherwise refuses to open, which aborts
+# 10 of the 23 animals. Measured across all 49: 70 sample drops of 1 to 3 samples,
+# 0.5 to 1.5 ms each at 2000 Hz, 0.0395 s total for the whole dataset. The flag
+# splices them shut. Two residuals are worth knowing. The splice is not amplitude
+# free: the step at the join is a median 199 uV and a worst case 6921 uV, each
+# contaminating exactly one 5 s window, so at worst 0.055 percent of one animal's
+# windows. And the dataset's real timeline error is elsewhere and much larger:
+# 20200609_..._200609 contains a cross-file timestamp restart of 75.2 s that
+# accumulates to about 109 s of drift, which no per-file check can see because neo
+# validates continuity within a file only.
+#
+# This config covers the adult half only. The pup cohorts need their own config and
+# it does not exist yet: 32 ProbeInfo strings occur in both pup and adult cohorts and
+# would need different abbreviations in each, which set_channel_map refuses. That
+# constraint belongs to the DataWave ProbeInfo key space; every raw name in THIS
+# file is a bare Intan id, so it does not bind here.
+#
+# Caveat on the female arm, recorded because a figure will not show it: IQSEC2_3 is
+# the only x/x animal, so it is the baseline every female difference heatmap is
+# normalized against. It has no reference-sheet row, its genotype and sex are both
+# assumed, its cohort has no impedance record at all, and 25 of its 142 files are
+# spliced. The female arm is 7 het, 1 mutant and that 1 assumed control. The male
+# contrast, 8 mutant against 6 control, is the result that stands on its own.
 
 analysis:
   war_generation:
@@ -34,7 +56,6 @@ samples_data:
     x/y: [x/y]
     +/x: [+/x]
     +/+: [+/+]
-    -/y: [-/y]
     x/x: [x/x]
   SEX_MAP:
     Unknown: [Unknown, unknown, UNKNOWN]
@@ -95,15 +116,24 @@ samples_data:
 
   animals:
   # --- 20180917_IQSEC2_6_23: 4328 files, 4 sessions, 64 amp channels on C,D
+  #   Animal 6: 1 declared electrode(s) read at or above 5e+06 ohm in this cohort's own
+  #   impedance export and are unconnected amplifier inputs, not electrodes: LMot (C-015)
+  #   1.43e+07 ohm. Declared bad below. Nothing else in the pipeline would remove them:
+  #   the manual channel filter is the only gate on the ep_analysis path, and LOF scores a
+  #   dead channel around 1.1 against a threshold of 2.5 because its distance metric
+  #   scales with amplitude.
   - id: IQSEC2_6
     genotype: +/y
     sex: Male
     channel_subset: *port_c
+    bad_channels:
+    - LMot
     pattern: "{data_root}/PythonEEG Data/IQSEC2/20180917_IQSEC2_6_23/{session}_{index}.rhd"
     lro_kwargs:
       extract_func: "read_intan"
       stream_id: "0"
       datetimes_are_start: true
+      ignore_integrity_checks: true
     manual_datetime:
       20180917_IQSEC2_6_23_180917: '2018-09-17 09:11:56'
       20180917_IQSEC2_6_23_180918: '2018-09-18 00:00:57'
@@ -118,6 +148,7 @@ samples_data:
       extract_func: "read_intan"
       stream_id: "0"
       datetimes_are_start: true
+      ignore_integrity_checks: true
     manual_datetime:
       20180917_IQSEC2_6_23_180917: '2018-09-17 09:11:56'
       20180917_IQSEC2_6_23_180918: '2018-09-18 00:00:57'
@@ -133,6 +164,7 @@ samples_data:
       extract_func: "read_intan"
       stream_id: "0"
       datetimes_are_start: true
+      ignore_integrity_checks: true
     manual_datetime:
       20190924_IQSEC_56_57_60_61_190924: '2019-09-24 08:53:10'
       20190924_IQSEC_56_57_60_61_190925: '2019-09-25 00:23:12'
@@ -147,20 +179,31 @@ samples_data:
       extract_func: "read_intan"
       stream_id: "0"
       datetimes_are_start: true
+      ignore_integrity_checks: true
     manual_datetime:
       20190924_IQSEC_56_57_60_61_190924: '2019-09-24 08:53:10'
       20190924_IQSEC_56_57_60_61_190925: '2019-09-25 00:23:12'
       20190924_IQSEC_56_57_60_61_190926: '2019-09-26 00:23:14'
       20190924_IQSEC_56_57_60_61_190927: '2019-09-27 00:23:15'
+  #   Animal 60: 2 declared electrode(s) read at or above 5e+06 ohm in this cohort's own
+  #   impedance export and are unconnected amplifier inputs, not electrodes: LHip (C-012)
+  #   1.68e+07 ohm, RHip (C-019) 1.02e+07 ohm. Declared bad below. Nothing else in the
+  #   pipeline would remove them: the manual channel filter is the only gate on the
+  #   ep_analysis path, and LOF scores a dead channel around 1.1 against a threshold of
+  #   2.5 because its distance metric scales with amplitude.
   - id: IQSEC2_60
     genotype: +/y
     sex: Male
     channel_subset: *port_c
+    bad_channels:
+    - LHip
+    - RHip
     pattern: "{data_root}/PythonEEG Data/IQSEC2/IQSEC 56 57 60 61/{session}_{index}.rhd"
     lro_kwargs:
       extract_func: "read_intan"
       stream_id: "0"
       datetimes_are_start: true
+      ignore_integrity_checks: true
     manual_datetime:
       20190924_IQSEC_56_57_60_61_190924: '2019-09-24 08:53:10'
       20190924_IQSEC_56_57_60_61_190925: '2019-09-25 00:23:12'
@@ -175,15 +218,17 @@ samples_data:
       extract_func: "read_intan"
       stream_id: "0"
       datetimes_are_start: true
+      ignore_integrity_checks: true
     manual_datetime:
       20190924_IQSEC_56_57_60_61_190924: '2019-09-24 08:53:10'
       20190924_IQSEC_56_57_60_61_190925: '2019-09-25 00:23:12'
       20190924_IQSEC_56_57_60_61_190926: '2019-09-26 00:23:14'
       20190924_IQSEC_56_57_60_61_190927: '2019-09-27 00:23:15'
   # --- IQSEC 65_66: 147 files, 4 sessions, 128 amp channels on A,B,C,D
-  #   PortB carries 7 connected channels in a non-canonical set (14,15,16,18,19,20,22
-  #   rather than 10,12,14,15,16,17,19,21) with no reference-sheet row and no name
-  #   anywhere. Unidentified, so not loaded.
+  #   PortA not loaded. Empty headstage: 1 of 8 canonical amps live.
+  #   PortB not loaded. 4 of 8 canonical amps live, in a non-canonical set, with no
+  #   reference-sheet row and no name anywhere in the workbook. An unidentified animal
+  #   cannot be given a genotype, so it is not loaded.
   - id: IQSEC2_65
     genotype: +/y
     sex: Male
@@ -193,6 +238,7 @@ samples_data:
       extract_func: "read_intan"
       stream_id: "0"
       datetimes_are_start: true
+      ignore_integrity_checks: true
     manual_datetime:
       20191105_IQSEC2_65_66_191105: '2019-11-05 08:50:04'
       20191105_IQSEC2_65_66_191106: '2019-11-06 00:20:07'
@@ -207,12 +253,15 @@ samples_data:
       extract_func: "read_intan"
       stream_id: "0"
       datetimes_are_start: true
+      ignore_integrity_checks: true
     manual_datetime:
       20191105_IQSEC2_65_66_191105: '2019-11-05 08:50:04'
       20191105_IQSEC2_65_66_191106: '2019-11-06 00:20:07'
       20191105_IQSEC2_65_66_191107: '2019-11-07 00:20:09'
       20191105_IQSEC2_65_66_191108: '2019-11-08 00:20:10'
   # --- 013120_IQSEC2_78_76_Recordings: 143 files, 4 sessions, 128 amp channels on A,B,C,D
+  #   PortB not loaded. Empty headstage: 0 of 8 canonical amps live.
+  #   PortC not loaded. Empty headstage: 0 of 8 canonical amps live.
   - id: IQSEC2_76
     genotype: +/x
     sex: Female
@@ -222,6 +271,7 @@ samples_data:
       extract_func: "read_intan"
       stream_id: "0"
       datetimes_are_start: true
+      ignore_integrity_checks: true
     manual_datetime:
       013120_IQSEC2_78_4B_76_1B_IntanRecording_200131: '2020-01-31 11:23:18'
       013120_IQSEC2_78_4B_76_1B_IntanRecording_200201: '2020-02-01 00:23:19'
@@ -236,14 +286,17 @@ samples_data:
       extract_func: "read_intan"
       stream_id: "0"
       datetimes_are_start: true
+      ignore_integrity_checks: true
     manual_datetime:
       013120_IQSEC2_78_4B_76_1B_IntanRecording_200131: '2020-01-31 11:23:18'
       013120_IQSEC2_78_4B_76_1B_IntanRecording_200201: '2020-02-01 00:23:19'
       013120_IQSEC2_78_4B_76_1B_IntanRecording_200202: '2020-02-02 00:23:20'
       013120_IQSEC2_78_4B_76_1B_IntanRecording_200203: '2020-02-03 00:23:22'
   # --- 012720_IQSEC2_77: 140 files, 4 sessions, 96 amp channels on A,C,D
-  #   PortD is a CDKL5 animal: these 140 rhd are a joint recording filed identically under
-  #   PythonEEG Data/CDKL5. PortA is an empty headstage. Only PortC is IQSEC2.
+  #   PortA not loaded. Empty headstage: 0 of 8 canonical amps live.
+  #   PortD not loaded. A CDKL5 animal, not IQSEC2: these 140 rhd are a joint recording
+  #   filed identically under PythonEEG Data/CDKL5. All 8 canonical amps are live, so this
+  #   is a real implant belonging to another study.
   - id: IQSEC2_77
     genotype: +/x
     sex: Female
@@ -253,6 +306,7 @@ samples_data:
       extract_func: "read_intan"
       stream_id: "0"
       datetimes_are_start: true
+      ignore_integrity_checks: true
     manual_datetime:
       012720_IQSEC2_77_cage3B_CDKL5_wt_cage4B_IntanRecording_200127: '2020-01-27 16:05:07'
       012720_IQSEC2_77_cage3B_CDKL5_wt_cage4B_IntanRecording_200128: '2020-01-28 00:05:07'
@@ -268,6 +322,7 @@ samples_data:
       extract_func: "read_intan"
       stream_id: "0"
       datetimes_are_start: true
+      ignore_integrity_checks: true
     manual_datetime:
       011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200113: '2020-01-13 11:34:46'
       011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200114: '2020-01-14 00:08:18'
@@ -279,6 +334,14 @@ samples_data:
   #   date are excluded: the rig kept recording other animals, so this port is an empty
   #   headstage there. Dropped:
   #   011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200117
+  #   KEPT BUT UNVERIFIED: session
+  #   011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200116 starts on or before
+  #   animal 81's recorded death date (2020-01-16) and runs about 22 minutes past the end
+  #   of it, across 48 files. The sheet records a date with no time of day, so the
+  #   post-mortem fraction of this session is unknown: it is somewhere between none of it
+  #   and all of it. It is retained rather than dropped because dropping it would discard
+  #   real data on a guess, but any result leaning on this animal should be checked
+  #   against it.
   - id: IQSEC2_81
     genotype: +/y
     sex: Male
@@ -290,6 +353,7 @@ samples_data:
       extract_func: "read_intan"
       stream_id: "0"
       datetimes_are_start: true
+      ignore_integrity_checks: true
     manual_datetime:
       011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200113: '2020-01-13 11:34:46'
       011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200114: '2020-01-14 00:08:18'
@@ -305,6 +369,7 @@ samples_data:
       extract_func: "read_intan"
       stream_id: "0"
       datetimes_are_start: true
+      ignore_integrity_checks: true
     manual_datetime:
       011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200113: '2020-01-13 11:34:46'
       011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200114: '2020-01-14 00:08:18'
@@ -321,6 +386,7 @@ samples_data:
       extract_func: "read_intan"
       stream_id: "0"
       datetimes_are_start: true
+      ignore_integrity_checks: true
     manual_datetime:
       011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200113: '2020-01-13 11:34:46'
       011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200114: '2020-01-14 00:08:18'
@@ -329,6 +395,7 @@ samples_data:
       011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200116: '2020-01-16 00:22:13'
       011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200117: '2020-01-17 00:22:15'
   # --- 20200505_IQSEC2_97_98_99: 163 files, 4 sessions, 128 amp channels on A,B,C,D
+  #   PortD not loaded. Empty headstage: 0 of 8 canonical amps live.
   - id: IQSEC2_97
     genotype: x/y
     sex: Male
@@ -340,6 +407,7 @@ samples_data:
         extract_func: "read_intan"
         stream_id: "0"
         datetimes_are_start: true
+        ignore_integrity_checks: true
       manual_datetime:
         2020505_IQSEC2_979899_200505: '2020-05-05 08:23:53'
         2020505_IQSEC2_979899_200506: '2020-05-06 00:23:55'
@@ -351,6 +419,7 @@ samples_data:
         extract_func: "read_intan"
         stream_id: "0"
         datetimes_are_start: true
+        ignore_integrity_checks: true
       manual_datetime:
         2020505_IQSEC2_979899_200508: '2020-05-08 08:23:58'
   - id: IQSEC2_98
@@ -364,6 +433,7 @@ samples_data:
         extract_func: "read_intan"
         stream_id: "0"
         datetimes_are_start: true
+        ignore_integrity_checks: true
       manual_datetime:
         2020505_IQSEC2_979899_200505: '2020-05-05 08:23:53'
         2020505_IQSEC2_979899_200506: '2020-05-06 00:23:55'
@@ -375,6 +445,7 @@ samples_data:
         extract_func: "read_intan"
         stream_id: "0"
         datetimes_are_start: true
+        ignore_integrity_checks: true
       manual_datetime:
         2020505_IQSEC2_979899_200508: '2020-05-08 08:23:58'
   - id: IQSEC2_99
@@ -388,6 +459,7 @@ samples_data:
         extract_func: "read_intan"
         stream_id: "0"
         datetimes_are_start: true
+        ignore_integrity_checks: true
       manual_datetime:
         2020505_IQSEC2_979899_200505: '2020-05-05 08:23:53'
         2020505_IQSEC2_979899_200506: '2020-05-06 00:23:55'
@@ -399,9 +471,12 @@ samples_data:
         extract_func: "read_intan"
         stream_id: "0"
         datetimes_are_start: true
+        ignore_integrity_checks: true
       manual_datetime:
         2020505_IQSEC2_979899_200508: '2020-05-08 08:23:58'
   # --- 20200602_IQSEC2_106_107: 145 files, 4 sessions, 128 amp channels on A,B,C,D
+  #   PortA not loaded. Empty headstage: 0 of 8 canonical amps live.
+  #   PortB not loaded. Empty headstage: 0 of 8 canonical amps live.
   - id: IQSEC2_106
     genotype: x/y
     sex: Male
@@ -411,6 +486,7 @@ samples_data:
       extract_func: "read_intan"
       stream_id: "0"
       datetimes_are_start: true
+      ignore_integrity_checks: true
     manual_datetime:
       20200602_IQSEC2_106_107_200602: '2020-06-02 08:24:35'
       20200602_IQSEC2_106_107_200603: '2020-06-03 00:24:38'
@@ -425,26 +501,47 @@ samples_data:
       extract_func: "read_intan"
       stream_id: "0"
       datetimes_are_start: true
+      ignore_integrity_checks: true
     manual_datetime:
       20200602_IQSEC2_106_107_200602: '2020-06-02 08:24:35'
       20200602_IQSEC2_106_107_200603: '2020-06-03 00:24:38'
       20200602_IQSEC2_106_107_200604: '2020-06-04 00:24:40'
       20200602_IQSEC2_106_107_200605: '2020-06-05 00:24:42'
   # --- 20200609_IQSEC2_114_117_118: 4332 files, 4 sessions, 128 amp channels on A,B,C,D
-  #   117 and 115 were implanted but never recorded: the reference sheet gives both
-  #   Recording Start, Recording End, Cage and Amp channel as N/A, with 115 marked Died
-  #   and 117 perfused 2020-06-09. The 59.5 GB file named 117 is a cage video. PortB is
-  #   92.4 percent line noise at the median across 109 timepoints. PortD carries no
-  #   animal.
+  #   PortB not loaded. Animal 117, not loaded. The reference sheet is the authority here
+  #   and it gives 117 no Cage, no Amp channel, no Recording Start and no Recording End,
+  #   so no port assignment is derivable for it under the cage-to-port rule this config
+  #   uses everywhere else; 115, its littermate, is marked Died with the same blank cells.
+  #   Recorded honestly: the hardware disagrees. This port carries 7 of 8 live canonical
+  #   amps, indistinguishable in quality from PortA which IS loaded, and the cohort's
+  #   DataWave sidecars name their four cages Cage 1 (114), Cage 2 (117), Cage 3 (118) and
+  #   Cage 4 (Empty), so the acquisition software recorded a Cage 2 animal named 117 for
+  #   the full three days. That is a gap in the lab record rather than evidence the port
+  #   is empty, and resolving it needs the lab, not more analysis. Two earlier
+  #   justifications for this exclusion were withdrawn as false: that the 59.5 GB file
+  #   named 117 is a cage video (all four cohort .ddf are the same kind of file, including
+  #   those of two loaded animals), and that PortB is 92.4 percent line noise (that figure
+  #   has no script, output or log behind it).
+  #   PortD not loaded. Empty headstage: 0 of 8 canonical amps live, and the cohort's
+  #   DataWave sidecar names this cage 'Empty'.
+  #   Animal 114: 1 declared electrode(s) read at or above 5e+06 ohm in this cohort's own
+  #   impedance export and are unconnected amplifier inputs, not electrodes: LHip (A-012)
+  #   1.75e+07 ohm. Declared bad below. Nothing else in the pipeline would remove them:
+  #   the manual channel filter is the only gate on the ep_analysis path, and LOF scores a
+  #   dead channel around 1.1 against a threshold of 2.5 because its distance metric
+  #   scales with amplitude.
   - id: IQSEC2_114
     genotype: x/y
     sex: Male
     channel_subset: *port_a
+    bad_channels:
+    - LHip
     pattern: "{data_root}/PythonEEG Data/IQSEC2/20200609_IQSEC2_114_117_118/{session}_{index}.rhd"
     lro_kwargs:
       extract_func: "read_intan"
       stream_id: "0"
       datetimes_are_start: true
+      ignore_integrity_checks: true
     manual_datetime:
       20200609_IQSEC2_114_117_118_200609: '2020-06-09 08:26:31'
       20200609_IQSEC2_114_117_118_200610: '2020-06-10 00:00:34'
@@ -459,6 +556,7 @@ samples_data:
       extract_func: "read_intan"
       stream_id: "0"
       datetimes_are_start: true
+      ignore_integrity_checks: true
     manual_datetime:
       20200609_IQSEC2_114_117_118_200609: '2020-06-09 08:26:31'
       20200609_IQSEC2_114_117_118_200610: '2020-06-10 00:00:34'
@@ -471,6 +569,11 @@ samples_data:
   #   by the pipeline; the rhd header carries only bare ids, so the standard montage
   #   applies. If the implant really was mirrored, every lateralized result for this
   #   animal is inverted and nothing would catch it.
+  #   Animal 3 has NO impedance record: its cohort carries no impedance export, and the
+  #   rhd headers report an impedance test frequency of 0 with a magnitude of 0 on every
+  #   channel, so the test was never run. The montage below is therefore unverified
+  #   hardware, not verified-good hardware. Do not read the absence of bad_channels here
+  #   as evidence that these electrodes were sound.
   - id: IQSEC2_3
     genotype: x/x
     sex: Female
@@ -480,6 +583,7 @@ samples_data:
       extract_func: "read_intan"
       stream_id: "0"
       datetimes_are_start: true
+      ignore_integrity_checks: true
     manual_datetime:
       IQSEC2_3_20180522_180522: '2018-05-22 08:51:02'
       IQSEC2_3_20180522_180523: '2018-05-23 00:21:03'
