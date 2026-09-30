@@ -59,21 +59,20 @@ class TestWARIntegration:
 
         keys = ["CHANNEL_MAP", "CHANNEL_ABBREVS", "CHANNEL_ABBREV_BY_RAW", "DF_SORT_ORDER"]
         orig = {k: copy.deepcopy(getattr(constants, k)) for k in keys}
-        # read_bin_csv_pair keys identity on the port-qualified ProbeInfo column, so the
-        # fixture presents "Intan Input (1)/PortC C-015" rather than a bare "C-015". The
-        # bare forms are kept as aliases because the same fixture ships an EDF twin whose
-        # header labels really are bare.
+        # Exact channel names as the readers present them. The bin fixture and its EDF
+        # twin both use bare ids; see tests/test_readers.py for the port-qualified form
+        # that real DataWave exports carry.
         constants.set_channel_map({
-            "LMot": ["C-015", "D-015", "Intan Input (1)/PortC C-015", "Intan Input (1)/PortD D-015"],
-            "RMot": ["C-016", "D-016", "Intan Input (1)/PortC C-016", "Intan Input (1)/PortD D-016"],
-            "LBar": ["C-014", "D-014", "Intan Input (1)/PortC C-014", "Intan Input (1)/PortD D-014"],
-            "RBar": ["C-017", "D-017", "Intan Input (1)/PortC C-017", "Intan Input (1)/PortD D-017"],
-            "LHip": ["C-012", "D-012", "Intan Input (1)/PortC C-012", "Intan Input (1)/PortD D-012"],
-            "RHip": ["C-019", "D-019", "Intan Input (1)/PortC C-019", "Intan Input (1)/PortD D-019"],
-            "LAud": ["C-009", "D-009", "Intan Input (1)/PortC C-009", "Intan Input (1)/PortD D-009"],
-            "RAud": ["C-022", "D-022", "Intan Input (1)/PortC C-022", "Intan Input (1)/PortD D-022"],
-            "LVis": ["C-010", "D-010", "Intan Input (1)/PortC C-010", "Intan Input (1)/PortD D-010"],
-            "RVis": ["C-021", "D-021", "Intan Input (1)/PortC C-021", "Intan Input (1)/PortD D-021"],
+            "LMot": ["C-015", "D-015"],
+            "RMot": ["C-016", "D-016"],
+            "LBar": ["C-014", "D-014"],
+            "RBar": ["C-017", "D-017"],
+            "LHip": ["C-012", "D-012"],
+            "RHip": ["C-019", "D-019"],
+            "LAud": ["C-009", "D-009"],
+            "RAud": ["C-022", "D-022"],
+            "LVis": ["C-010", "D-010"],
+            "RVis": ["C-021", "D-021"],
         })
         yield
         for k, v in orig.items():
