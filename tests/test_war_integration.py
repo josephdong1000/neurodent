@@ -59,12 +59,20 @@ class TestWARIntegration:
 
         keys = ["CHANNEL_MAP", "CHANNEL_ABBREVS", "CHANNEL_ABBREV_BY_RAW", "DF_SORT_ORDER"]
         orig = {k: copy.deepcopy(getattr(constants, k)) for k in keys}
+        # Exact channel names as the readers present them. The bin fixture and its EDF
+        # twin both use bare ids; see tests/test_readers.py for the port-qualified form
+        # that real DataWave exports carry.
         constants.set_channel_map({
-            "LMot": ["C-015", "D-015"], "RMot": ["C-016", "D-016"],
-            "LBar": ["C-014", "D-014"], "RBar": ["C-017", "D-017"],
-            "LHip": ["C-012", "D-012"], "RHip": ["C-019", "D-019"],
-            "LAud": ["C-009", "D-009"], "RAud": ["C-022", "D-022"],
-            "LVis": ["C-010", "D-010"], "RVis": ["C-021", "D-021"],
+            "LMot": ["C-015", "D-015"],
+            "RMot": ["C-016", "D-016"],
+            "LBar": ["C-014", "D-014"],
+            "RBar": ["C-017", "D-017"],
+            "LHip": ["C-012", "D-012"],
+            "RHip": ["C-019", "D-019"],
+            "LAud": ["C-009", "D-009"],
+            "RAud": ["C-022", "D-022"],
+            "LVis": ["C-010", "D-010"],
+            "RVis": ["C-021", "D-021"],
         })
         yield
         for k, v in orig.items():

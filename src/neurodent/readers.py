@@ -55,7 +55,21 @@ def read_bin_csv_pair(discovered_file, **kwargs):
 
     n_channels = len(rows)
     sampling_rate = float(rows[0]["SampleRate"])
-    channel_names = [row["Label"] for row in rows]
+
+    # Channel identity comes from ProbeInfo, not Label. ProbeInfo is port-qualified
+    # ("Intan Input (1)/PortC L Vis Ctx") while Label carries only the region name, so
+    # Label is ambiguous whenever one export spans several ports: an IQSEC2 joint
+    # recording of four pups repeats each of its eight region names once per port, and
+    # under Label every animal's channel_subset silently resolves to the same port.
+    # ProbeInfo is unique within every sidecar measured (1878 IQSEC2, 9700 sox5) and
+    # never blank where Label is populated, and it is what the package's own metadata
+    # reader keys on (recording_metadata.py).
+    channel_names = [row["ProbeInfo"] for row in rows]
+    if any(not name.strip() for name in channel_names):
+        raise ValueError(
+            f"ProbeInfo is blank for at least one channel in {csv_path}. "
+            f"ProbeInfo is the channel identity, so a blank entry cannot be resolved."
+        )
 
     file_size = os.path.getsize(bin_path)
     if file_size == 0:

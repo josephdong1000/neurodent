@@ -21,6 +21,11 @@ cluster:
 samples_data:
   data_root: .tests/integration/data
   channels:
+    # Exact channel names as the readers present them. read_bin_csv_pair keys identity
+    # on the ProbeInfo column, which this fixture keeps short and port-qualified by the
+    # channel id itself (the 'C' in C-015 IS the port). Real DataWave exports prefix
+    # these with 'Intan Input (1)/PortC ', which adds length but no information; see
+    # sox5_bin.yaml for a map against unmodified export names.
     LMot:
     - C-015
     - D-015

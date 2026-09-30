@@ -105,6 +105,8 @@ def test_shipped_map_covers_every_raw_name_on_disk(name):
     known = {raw for raws in channels.values() for raw in raws}
     unresolved = {}
     scanned = 0
+    # ProbeInfo is the identity read_bin_csv_pair keys on; Label is checked too because
+    # the shipped maps carry both spellings and a reader elsewhere may still use Label.
     for meta in data_root.rglob("*_Meta.csv"):
         try:
             rows = list(csv.DictReader(meta.open()))
@@ -114,10 +116,12 @@ def test_shipped_map_covers_every_raw_name_on_disk(name):
             continue  # header-only sidecars carry no channel names
         scanned += 1
         for row in rows:
-            label = (row.get("Label") or "").strip()
-            if label and label not in known:
-                unresolved.setdefault(label, 0)
-                unresolved[label] += 1
+            for column in ("ProbeInfo", "Label"):
+                raw = (row.get(column) or "").strip()
+                if raw and raw not in known:
+                    key = f"{raw} [{column}]"
+                    unresolved.setdefault(key, 0)
+                    unresolved[key] += 1
 
     if scanned == 0:
         pytest.skip(f"{name}: no non-empty Meta.csv found under {data_root}")
