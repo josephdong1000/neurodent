@@ -3,6 +3,7 @@
 Mixin for :class:`~neurodent.loading.long_recording_organizer.LongRecordingOrganizer`.
 """
 
+import errno
 import json
 import logging
 from pathlib import Path
@@ -292,6 +293,52 @@ class LroLoadingMixin:
         else:
             raise ValueError(f"Invalid mode: {mode}")
 
+    # OSError errnos that describe the storage, not the recording. A corrupt payload is a
+    # data problem worth skipping; a stale NFS handle or a vanished directory is an
+    # environment problem, and swallowing it would turn a broken mount into a quietly empty
+    # dataset. ESTALE is the one that matters most here: this data lives on NFS, it is not
+    # a FileNotFoundError, and it is exactly what a flaky mount raises mid-run.
+    _ENVIRONMENT_ERRNOS = frozenset(
+        getattr(errno, name)
+        for name in ("ENOENT", "EACCES", "EPERM", "EISDIR", "ESTALE", "EIO", "ENODEV", "ENOTCONN")
+        if hasattr(errno, name)
+    )
+
+    @classmethod
+    def _reraise_if_environment_error(cls, exc: Exception, paths) -> None:
+        """Re-raise *exc* when it describes the storage rather than the recording.
+
+        The catch around the readers has to be broad, because a reader signals a corrupt
+        payload with whichever of ``ValueError``, ``IndexError``, ``KeyError`` or
+        ``OSError`` suits it. ``OSError`` however also covers missing paths, permission
+        failures and stale network handles, none of which mean "this recording is corrupt".
+
+        Discriminated on ``errno`` rather than by probing the filesystem. Probing was the
+        first attempt and it was wrong twice over: it made the outcome depend on storage
+        state at a moment unrelated to the exception, and it reclassified a genuinely
+        corrupt payload as an environment error whenever the path happened to be
+        unreachable at that instant.
+        """
+        if isinstance(exc, (FileNotFoundError, PermissionError, IsADirectoryError)):
+            raise exc
+        if isinstance(exc, OSError) and exc.errno in cls._ENVIRONMENT_ERRNOS:
+            raise exc
+
+    def _placeholder_for_unreadable(self, exc: Exception, paths) -> "si.BaseRecording":
+        """Record an unreadable file on the manifest and return a 0-sample placeholder."""
+        if not hasattr(self, "skipped_files") or self.skipped_files is None:
+            self.skipped_files = []
+        for path in paths:
+            self.skipped_files.append({"path": str(path), "error": f"{type(exc).__name__}: {exc}"})
+        logging.warning(
+            f"extract_func failed for {self.display_name} "
+            f"({', '.join(str(p) for p in paths)}): {type(exc).__name__}: {exc}. "
+            f"Creating 0-sample placeholder; this recording will be skipped. Note that "
+            f"later files in this group shift earlier if their datetimes are chained from "
+            f"a single anchor."
+        )
+        return self._create_empty_si_recording()
+
     @staticmethod
     def _create_empty_si_recording() -> "si.BaseRecording":
         """Return a 0-sample SpikeInterface recording as a placeholder.
@@ -314,10 +361,29 @@ class LroLoadingMixin:
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         **kwargs,
     ):
+        """Load this item through a SpikeInterface-style reader.
+
+        ``skip_unreadable_files`` (an ``lro_kwargs`` entry, default ``False``) controls what
+        happens when the reader raises on a single file. Left off, the exception propagates
+        and the animal fails loudly, which is the long-standing behaviour. Turned on, the
+        file becomes a 0-sample placeholder that later stages drop, and every skipped path
+        is recorded on ``self.skipped_files`` so the loss is auditable rather than a line
+        lost in a log.
+
+        Turning it on is not free, and the cost is not where it looks. A dropped file is
+        removed from the timeline, and when per-file datetimes are chained from a single
+        session anchor the clock then advances only over the files that survived, so every
+        later file in that session is stamped early by the dropped duration. That is why
+        this is opt-in rather than the default: converting a loud crash into a silently
+        shifted timeline would be a worse failure than the crash.
+        """
         from .discovery import DiscoveredFile
 
         if si is None:
             raise ImportError("SpikeInterface is required")
+
+        # Popped, not forwarded: readers take **kwargs and would otherwise receive it.
+        skip_unreadable = bool(kwargs.pop("skip_unreadable_files", False))
 
         # Determine number of files being processed
         if isinstance(self.item, list):
@@ -332,21 +398,25 @@ class LroLoadingMixin:
             # DiscoveredFile: handle both single and multi-file cases
             if self.item.is_multi_file:
                 # Multi-file group: pass as-is to extract_func (user's custom reader).
-                # Wrap in try/except so a corrupt/empty file group produces a 0-sample
-                # placeholder that downstream code skips, rather than crashing the
-                # entire animal's pipeline run.
+                # Guarded unconditionally rather than behind skip_unreadable_files: the
+                # bin/csv pair readers raise on a zero-byte payload as a matter of course
+                # (sox5 ships over a thousand such files, IQSEC2 several hundred), and the
+                # per-file datetime those datasets use means a dropped file shifts nothing.
                 try:
                     rec: "si.BaseRecording" = extract_func(self.item, **kwargs)
                 except (ValueError, IndexError, OSError, KeyError) as e:
-                    logging.warning(
-                        f"extract_func failed for {self.display_name} "
-                        f"({self.item.paths}): {e}. "
-                        f"Creating 0-sample placeholder; this recording will be skipped."
-                    )
-                    rec = self._create_empty_si_recording()
+                    self._reraise_if_environment_error(e, self.item.paths)
+                    rec = self._placeholder_for_unreadable(e, self.item.paths)
             else:
-                # Single file
-                rec: "si.BaseRecording" = extract_func(self.item.path, **kwargs)
+                # Single file. Unguarded unless the caller opts in; see the docstring for
+                # why a silent skip here is more dangerous than the exception.
+                try:
+                    rec: "si.BaseRecording" = extract_func(self.item.path, **kwargs)
+                except (ValueError, IndexError, OSError, KeyError) as e:
+                    if not skip_unreadable:
+                        raise
+                    self._reraise_if_environment_error(e, (self.item.path,))
+                    rec = self._placeholder_for_unreadable(e, (self.item.path,))
         elif isinstance(self.item, list):
             # List of files: concatenate individually using multiprocess_mode
             if multiprocess_mode == "dask":

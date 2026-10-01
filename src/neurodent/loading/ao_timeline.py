@@ -281,6 +281,24 @@ class AoTimelineMixin:
             for item in zero_items:
                 item_durations.pop(item, None)
 
+            # Dropping an item does not leave a hole. When datetimes are chained from a
+            # single anchor the clock advances only over the items that remain, so every
+            # later file in this group is stamped EARLIER by the dropped files' real
+            # durations, which are unknown precisely because the files did not load. State
+            # the likely magnitude from the surviving files rather than leaving the reader
+            # to discover a shifted timeline from the figures.
+            survivors = [d for d in item_durations.values() if d > 0]
+            if survivors and len(ordered_items) > 0:
+                typical = sorted(survivors)[len(survivors) // 2]
+                logging.warning(
+                    f"Timeline shifted: {len(zero_items)} item(s) dropped from a chained "
+                    f"timeline of {len(ordered_items) + len(zero_items)}. Files after each "
+                    f"drop are stamped early, by roughly {typical:.0f}s per drop at the "
+                    f"median surviving duration, up to about "
+                    f"{typical * len(zero_items) / 3600:.2f}h by the end of this group. "
+                    f"Per-file or per-session anchors reset this; a single anchor does not."
+                )
+
         datetimes_are_start = base_lro_kwargs.get("datetimes_are_start", True)
         result = {}
 
