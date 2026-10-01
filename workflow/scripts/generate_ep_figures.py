@@ -17,7 +17,6 @@ import matplotlib
 
 matplotlib.use("Agg")  # Non-interactive backend
 
-import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 import seaborn.objects as so
@@ -102,8 +101,13 @@ def process_feature_dataframe(df, feature):
 
     return df, df_pivot
 
-def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config):
-    """Create plots for a specific feature using seaborn objects"""
+def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config, plot_order):
+    """Create plots for a specific feature using seaborn objects.
+
+    ``plot_order`` is passed in rather than read from ``constants.DF_SORT_ORDER`` because
+    the caller has already extended it with the genotypes observed on the loaded WARs; a
+    dataset whose genotypes fall outside the module default depends on that extension.
+    """
 
     logger = logging.getLogger(__name__)
     logger.info(f"Processing feature: {feature}")
@@ -310,7 +314,7 @@ def main():
         else:
             feature_label = feature
 
-        create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
+        create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config, plot_order)
     logger.info(f"Successfully generated EP statistical figures for {len(features)} features")
 
 if __name__ == "__main__":

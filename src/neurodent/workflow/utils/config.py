@@ -115,7 +115,7 @@ def apply_samples_config(samples_config: dict):
     # Deliberately NOT derived from GENOTYPE_MAP, which would look like the parallel to
     # set_channel_map but is not one. CHANNEL_MAP is documented as a single source of truth
     # and every shipped dataset declares it, whereas GENOTYPE_MAP's documented default is
-    # an empty passthrough and only two of the seven shipped configs declare one. Deriving
+    # an empty passthrough and only one of the six shipped configs declares one. Deriving
     # the order from it would set the order to [] for the other five, and for the two that
     # do declare it would impose their key order: arx_parv lists KO before WT, which would
     # flip a 33-animal dataset's difference-heatmap baseline from WT to KO, reverse every
