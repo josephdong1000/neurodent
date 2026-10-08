@@ -97,8 +97,25 @@ def load_animal_recordings(
     sex = meta.get("sex", "Unknown")
     logger.info(f"Resolved genotype '{genotype}' and sex '{sex}' for {animal_id} from ANIMAL_METADATA")
 
-    # Load data from all source folders
-    for folder_info in animal_folders:
+    # Per-animal overrides are constant across the loop, so resolve them once.
+    animal_overrides = samples_config.get("_animal_overrides", {}).get(animal_id, {})
+
+    # An animal may declare several SOURCES, each with its own pattern, reader and
+    # datetime convention. IQSEC2's dual-tree cohorts need this: the same animal was
+    # recorded sequentially by two acquisition systems, so one entry draws from an Intan
+    # tree whose filenames carry start times and a DataWave tree whose sidecars carry end
+    # times. Each source produces its own LRO(s) and they are consolidated into a single
+    # AnimalOrganizer below, so the animal stays one animal for statistics rather than
+    # being split into two entries.
+    source_specs = animal_overrides.get("sources")
+    if source_specs:
+        base_info = animal_folders[0]
+        work_items = [(base_info, spec) for spec in source_specs]
+        logger.info(f"{animal_id}: loading from {len(source_specs)} configured source(s)")
+    else:
+        work_items = [(info, None) for info in animal_folders]
+
+    for folder_info, source_spec in work_items:
         # Unpack tuple from Snakefile
         folder_path, source_animal_id, session_key = folder_info
 
@@ -126,22 +143,30 @@ def load_animal_recordings(
         if "datetimes_are_start" in session_analysis_config:
             session_lro_kwargs.setdefault("datetimes_are_start", session_analysis_config["datetimes_are_start"])
 
-        # Apply per-animal overrides from unified animals config
-        animal_overrides = samples_config.get("_animal_overrides", {}).get(animal_id, {})
+        # Apply per-animal overrides from unified animals config, then the per-source
+        # spec on top so a source's own reader and datetimes_are_start win.
         if animal_overrides:
             logger.info(f"  -> Applying per-animal overrides: {list(animal_overrides.keys())}")
             if "lro_kwargs" in animal_overrides:
                 session_lro_kwargs.update(animal_overrides["lro_kwargs"])
+        if source_spec and "lro_kwargs" in source_spec:
+            logger.info(f"  -> Applying per-source lro_kwargs: {list(source_spec['lro_kwargs'])}")
+            session_lro_kwargs.update(source_spec["lro_kwargs"])
 
         # Sessions to skip: dataset-level plus any per-animal override (e.g. a setup/test stub that
         # a single animal has but isn't a real recording day). Both are fnmatch patterns on {session}.
         skip_sessions = list(session_analysis_config.get("skip_sessions", session_analysis_config.get("skip_days", [])))
         skip_sessions += list(animal_overrides.get("skip_sessions", []))
+        if source_spec:
+            skip_sessions += list(source_spec.get("skip_sessions", []))
 
         # Resolve manual_datetimes for this session. The per-animal value may be a
         # scalar (one start time), a dict (keyed per session/file), or a list (per-recording
         # order, possibly nested); AnimalOrganizer distributes it across discovered sessions.
-        if "manual_datetimes" in samples_config:
+        if source_spec and "manual_datetime" in source_spec:
+            session_lro_kwargs["manual_datetimes"] = source_spec["manual_datetime"]
+            logger.info(f"  -> Using per-source manual datetimes for {animal_id}")
+        elif "manual_datetimes" in samples_config:
             all_manual_dts = samples_config["manual_datetimes"]
             if animal_id in all_manual_dts:
                 session_lro_kwargs["manual_datetimes"] = all_manual_dts[animal_id]
@@ -149,7 +174,11 @@ def load_animal_recordings(
 
         # Build absolute discovery pattern from the config's relative pattern
         # Per-animal pattern override takes precedence over session/default config
-        effective_pattern = animal_overrides.get("pattern", session_analysis_config.get("pattern"))
+        effective_pattern = session_analysis_config.get("pattern")
+        if "pattern" in animal_overrides:
+            effective_pattern = animal_overrides["pattern"]
+        if source_spec and "pattern" in source_spec:
+            effective_pattern = source_spec["pattern"]
         if effective_pattern is None:
             raise KeyError(
                 f"Missing 'pattern' key in war_generation config for session '{session_key}'. "
@@ -193,11 +222,14 @@ def load_animal_recordings(
             val_files += sum(len(v) for v in groups.values())
             continue
 
-        if is_joint and channel_subset is not None:
-            logger.info(f"  -> Joint session detected. Filtering to channels: {channel_subset}")
+        effective_channel_subset = channel_subset
+        if source_spec and "channel_subset" in source_spec:
+            effective_channel_subset = source_spec["channel_subset"]
+        if is_joint and effective_channel_subset is not None:
+            logger.info(f"  -> Joint session detected. Filtering to channels: {effective_channel_subset}")
             # Split to only the channels assigned to this animal
             # source_animal_id is the key in the splits dict
-            splits = session_ao.split(groups={source_animal_id: channel_subset})
+            splits = session_ao.split(groups={source_animal_id: effective_channel_subset})
             session_ao = splits[source_animal_id]
 
         # Collect LROs

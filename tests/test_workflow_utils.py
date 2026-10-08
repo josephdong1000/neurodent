@@ -715,6 +715,77 @@ class TestExpandAnimalsConfig:
         assert "channels" not in meta
         assert "group" not in meta
 
+    def test_duplicate_animal_id_raises(self):
+        """Two entries sharing an id corrupt silently, so expansion must refuse them."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "genotype": "WT", "sex": "M", "pattern": "{data_root}/rhd/{index}.rhd"},
+                {"id": "A10", "genotype": "WT", "sex": "M", "pattern": "{data_root}/bin/{index}.bin"},
+            ],
+        }
+        with pytest.raises(ValueError, match="Duplicate animal id 'A10'"):
+            expand_animals_config(cfg)
+
+    def test_duplicate_id_message_names_both_positions(self):
+        """The error must locate both entries, since ids repeat far apart in real configs."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "genotype": "WT", "sex": "M"},
+                {"id": "F22", "genotype": "KO", "sex": "F"},
+                {"id": "A10", "genotype": "WT", "sex": "M"},
+            ],
+        }
+        with pytest.raises(ValueError, match=r"positions 0 and 2"):
+            expand_animals_config(cfg)
+
+    def test_excluded_duplicate_is_allowed(self):
+        """Excluded entries are documentation only, so they may repeat an active id."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "genotype": "WT", "sex": "M"},
+                {"id": "A10", "genotype": "WT", "sex": "M", "exclude": True},
+            ],
+        }
+        out = expand_animals_config(cfg)
+        assert len(out["animals"]) == 1
+
+    def test_slug_collision_raises(self):
+        """Ids differing only by punctuation share an output path and would overwrite."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "IQ-118", "genotype": "WT", "sex": "M"},
+                {"id": "IQ 118", "genotype": "WT", "sex": "M"},
+            ],
+        }
+        with pytest.raises(ValueError, match="both slugify to"):
+            expand_animals_config(cfg)
+
+    def test_id_repeated_in_animal_metadata_is_not_a_duplicate(self):
+        """Only the animals list is checked; ANIMAL_METADATA legitimately repeats ids."""
+        cfg = {
+            "data_root": "/data",
+            "ANIMAL_METADATA": [{"id": "A10", "genotype": "WT", "sex": "M"}],
+            "animals": [{"id": "A10", "genotype": "WT", "sex": "M"}],
+        }
+        out = expand_animals_config(cfg)
+        assert len(out["animals"]) == 1
+
+    def test_unique_ids_unaffected(self):
+        """The guard must not disturb a well-formed config."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "genotype": "WT", "sex": "M"},
+                {"id": "F22", "genotype": "KO", "sex": "F"},
+            ],
+        }
+        out = expand_animals_config(cfg)
+        assert [a["id"] for a in out["animals"]] == ["A10", "F22"]
+
     def test_validates_no_overlapping_channels_in_group(self):
         """Animals in the same group cannot share channels."""
         cfg = {

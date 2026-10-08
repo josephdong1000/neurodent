@@ -197,17 +197,20 @@ class TestOverlappingAnimaldaysBug:
 
                     mock_lro_class.side_effect = mock_lro_side_effect
 
-                    # Add mock merge method to track merging
+                    # Track merging. merge_many takes the whole list at once, so three
+                    # folders are one call carrying two LROs, not two pairwise calls.
                     merge_call_count = 0
+                    merged_lro_count = 0
 
-                    def mock_merge(other_lro):
-                        nonlocal merge_call_count
+                    def mock_merge(other_lros):
+                        nonlocal merge_call_count, merged_lro_count
                         merge_call_count += 1
+                        merged_lro_count += len(other_lros)
 
                     # Add merge method to all mock LROs
-                    mock_lro_a.merge = mock_merge
-                    mock_lro_b.merge = mock_merge
-                    mock_lro_c.merge = mock_merge
+                    mock_lro_a.merge_many = mock_merge
+                    mock_lro_b.merge_many = mock_merge
+                    mock_lro_c.merge_many = mock_merge
 
                     # Create AnimalOrganizer which should trigger temporal sorting and merging
                     ao = results.AnimalOrganizer(
@@ -219,8 +222,10 @@ class TestOverlappingAnimaldaysBug:
                     # Verify that we have one merged LRO (overlapping folders)
                     assert len(ao.long_recordings) == 1
 
-                    # Verify that merging occurred - should be 2 merges for 3 folders
-                    assert merge_call_count == 2, f"Expected 2 merge calls for 3 folders, got {merge_call_count}"
+                    # One flat merge_many call folding in the other two LROs, which keeps
+                    # the concatenation one level deep instead of N-1.
+                    assert merge_call_count == 1, f"Expected 1 merge_many call, got {merge_call_count}"
+                    assert merged_lro_count == 2, f"Expected 2 LROs merged for 3 folders, got {merged_lro_count}"
 
                     # Verify that all folders were grouped into one animalday
                     assert len(ao.animaldays) == 1, f"Expected 1 animalday, got {len(ao.animaldays)}"

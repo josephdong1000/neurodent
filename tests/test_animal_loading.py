@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from neurodent.loading import AnimalOrganizer
 from neurodent.workflow import apply_samples_config
 from neurodent.workflow.utils import (
     expand_animals_config,
@@ -43,6 +44,26 @@ def _prepare(dataset):
 
     config = load_dataset_config(dataset)
     samples_config = expand_animals_config(resolve_samples_config(config))
+    set_temp_directory(config["temp_directory"])
+    apply_samples_config(samples_config)
+    return config, samples_config
+
+
+def _prepare_with_sources(dataset, animal_id, sources):
+    """Prepare a dataset config with `sources` declared on one animal.
+
+    Injected before expand_animals_config, which is how a real config declares it and
+    also the only way _animal_overrides gets created for a dataset that otherwise has
+    no per-animal overrides.
+    """
+    from neurodent.core.utils import set_temp_directory
+
+    config = load_dataset_config(dataset)
+    raw = resolve_samples_config(config)
+    for animal in raw["animals"]:
+        if animal["id"] == animal_id:
+            animal["sources"] = sources
+    samples_config = expand_animals_config(raw)
     set_temp_directory(config["temp_directory"])
     apply_samples_config(samples_config)
     return config, samples_config
@@ -127,3 +148,87 @@ def test_animalday_single_source_mini_real(_at_repo_root):
         assert set(ao.animaldays) == set(war.result["animalday"].unique()), (
             "the WAR animalday column must equal ao.animaldays so every AO to WAR join lines up"
         )
+
+
+@pytest.mark.integration
+@pytest.mark.slow
+@pytest.mark.mutates_constants
+def test_per_animal_sources_load_independently(_at_repo_root):
+    """An animal may draw from several sources, each with its own pattern and reader.
+
+    IQSEC2's dual-tree cohorts need this: the same animal was recorded sequentially by
+    two acquisition systems, so one entry must carry an Intan source whose filenames give
+    start times and a DataWave source whose sidecars give end times. Without it the animal
+    has to be split into two entries, which counts one mouse twice in cross-animal
+    statistics.
+
+    Two identical sources are used here so the expected file count is exactly double the
+    single-source baseline, which distinguishes "both sources ran" from "one ran twice".
+    """
+    pytest.importorskip("spikeinterface")
+
+    config, samples_config = _prepare("mini_real")
+    baseline = load_animal_recordings(
+        samples_config, config, [("", "A10", "")], "A10", validate_only=True
+    )
+
+    pattern = config["analysis"]["war_generation"]["pattern"]
+    config, samples_config = _prepare_with_sources("mini_real", "A10", [
+        {"pattern": pattern, "lro_kwargs": {"datetimes_are_start": True}},
+        {"pattern": pattern, "lro_kwargs": {"datetimes_are_start": True}},
+    ])
+    doubled = load_animal_recordings(
+        samples_config, config, [("", "A10", "")], "A10", validate_only=True
+    )
+
+    assert doubled["n_files"] == baseline["n_files"] * 2, (
+        "each source must be discovered independently"
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.slow
+@pytest.mark.mutates_constants
+def test_source_lro_kwargs_win_over_animal_level(_at_repo_root):
+    """A source's own lro_kwargs must beat the animal-level ones, not the reverse.
+
+    The per-animal update used to run last and silently clobber the per-source value,
+    which matters because the two trees need opposite datetimes_are_start: rhd filename
+    stamps are starts, DataWave LastEdit is an end.
+    """
+    pytest.importorskip("spikeinterface")
+
+    config = load_dataset_config("mini_real")
+    pattern = config["analysis"]["war_generation"]["pattern"]
+    raw = resolve_samples_config(config)
+    for animal in raw["animals"]:
+        if animal["id"] == "A10":
+            animal["lro_kwargs"] = {"datetimes_are_start": False}
+            animal["sources"] = [
+                {"pattern": pattern, "lro_kwargs": {"datetimes_are_start": True}},
+            ]
+    samples_config = expand_animals_config(raw)
+    apply_samples_config(samples_config)
+
+    captured = {}
+    real_ao = AnimalOrganizer
+
+    class _Spy(real_ao):
+        def __init__(self, *args, **kwargs):
+            captured.update(kwargs.get("lro_kwargs", {}))
+            super().__init__(*args, **kwargs)
+
+    import neurodent.workflow.utils.animal_loading as al
+
+    monkey = al.AnimalOrganizer
+    al.AnimalOrganizer = _Spy
+    try:
+        load_animal_recordings(
+            samples_config, config, [("", "A10", "")], "A10", validate_only=True
+        )
+    finally:
+        al.AnimalOrganizer = monkey
+
+    assert captured.get("datetimes_are_start") is True, (
+        "the per-source value must survive the per-animal update"
+    )
