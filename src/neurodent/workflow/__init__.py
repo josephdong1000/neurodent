@@ -17,6 +17,7 @@ from .utils import (
     apply_samples_config,
     expand_animals_config,
     extend_plot_order_from_attr,
+    create_genotype_color_scale,
     create_sex_marker_scale,
 )
 
@@ -26,5 +27,6 @@ __all__ = [
     "apply_samples_config",
     "expand_animals_config",
     "extend_plot_order_from_attr",
+    "create_genotype_color_scale",
     "create_sex_marker_scale",
 ]

@@ -24,6 +24,7 @@ from .logging import (
 from .plotting_helpers import (
     load_wars,
     extend_plot_order_from_attr,
+    create_genotype_color_scale,
     create_sex_marker_scale,
 )
 
@@ -45,5 +46,6 @@ __all__ = [
     "increment_memory",
     "load_wars",
     "extend_plot_order_from_attr",
+    "create_genotype_color_scale",
     "create_sex_marker_scale",
 ]

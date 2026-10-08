@@ -105,16 +105,58 @@ def filter_wars_by_sex(wars, sex):
     return [war for war in wars if war.sex == sex]
 
 
-def determine_baseline_key(found_genotypes, sex):
-    """Determine the baseline genotype key for difference maps.
+def determine_baseline_key(found_genotypes, sex, config=None):
+    """Determine the baseline genotype that difference maps are computed against.
 
-    Prefer the first genotype in ``DF_SORT_ORDER["genotype"]`` that is actually
-    present (typically "WT"); fall back to the first observed genotype.
+    A difference heatmap subtracts the baseline group, so picking the wrong one silently
+    inverts every result rather than failing. Resolution order:
+
+    1. ``analysis.ep_heatmaps.baseline_genotype`` from the config, when present. It may be
+       a single genotype, or a mapping of sex to genotype for the ``sex_specific`` baseline
+       mode, where the control genotype differs between the sexes. An X-linked strain is
+       the motivating case: the control male and the control female carry different
+       alleles, and neither appears in the other's bucket, so no single value can serve.
+    2. Otherwise the first entry of ``DF_SORT_ORDER["genotype"]`` that is present, which
+       under the default ``["WT", "KO"]`` picks WT.
+
+    A configured baseline that is absent from this bucket raises. It used to fall through
+    to "the first genotype observed", which for a dataset whose genotypes sort with the
+    mutant first quietly made the mutant the reference. Being told the baseline is missing
+    is always better than being handed an inverted map.
+
+    Args:
+        found_genotypes (list[str]): Genotypes present in this bucket.
+        sex (str): The sex bucket being processed, used to resolve a per-sex mapping.
+        config (dict | None): Merged pipeline config. When ``None``, only step 2 applies.
+
+    Returns:
+        str | None: The baseline genotype, or ``None`` when *found_genotypes* is empty.
+
+    Raises:
+        ValueError: If a baseline is configured for this bucket but is not present in it.
     """
-    for g in constants.DF_SORT_ORDER.get("genotype", []):
-        if g in found_genotypes:
-            return g
-    return found_genotypes[0] if found_genotypes else None
+    if not found_genotypes:
+        return None
+
+    configured = (
+        (config or {}).get("analysis", {}).get("ep_heatmaps", {}).get("baseline_genotype")
+    )
+    if isinstance(configured, dict):
+        configured = configured.get(sex)
+    if configured:
+        if configured not in found_genotypes:
+            raise ValueError(
+                f"Configured baseline genotype {configured!r} for sex {sex!r} is not among "
+                f"the genotypes present ({sorted(found_genotypes)}). Fix "
+                f"analysis.ep_heatmaps.baseline_genotype; proceeding would silently "
+                f"compute differences against the wrong group."
+            )
+        return configured
+
+    for genotype in constants.DF_SORT_ORDER.get("genotype", []):
+        if genotype in found_genotypes:
+            return genotype
+    return found_genotypes[0]
 
 
 def generate_difference_heatmaps(wars, features, output_dir, config):
@@ -154,9 +196,8 @@ def generate_difference_heatmaps(wars, features, output_dir, config):
 
             # Determine baseline key from the genotypes actually present in this sex bucket
             found_genotypes = sorted({war.genotype for war in sex_wars})
-            baseline_key = determine_baseline_key(found_genotypes, sex)
-            if baseline_key not in found_genotypes:
-                 logger.warning(f"Could not find exact baseline genotype for {sex}. Using {baseline_key} (might fail). Found: {found_genotypes}")
+            baseline_key = determine_baseline_key(found_genotypes, sex, config)
+            logger.info(f"Baseline genotype for {sex}: {baseline_key} (present: {found_genotypes})")
 
             for feature in features:
                 logger.info(f"Generating difference heatmap for {feature} ({sex} vs {baseline_key})")
