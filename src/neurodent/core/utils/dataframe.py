@@ -150,7 +150,12 @@ def nanaverage_series_of_np(x: pd.Series, weights: pd.Series) -> np.ndarray:
     numerator = np.nansum(np.where(np.isnan(stacked), 0.0, stacked) * per_position, axis=0)
     with np.errstate(invalid="ignore", divide="ignore"):
         out = np.where(totals > 0, numerator / np.where(totals > 0, totals, 1.0), np.nan)
-    return out
+
+    # np.where yields a 0-d array when the rows are scalars rather than arrays, where
+    # nanmean_series_of_np yields a numpy scalar. Returning the 0-d array makes the averaged
+    # column object dtype, which the plotting layer cannot use, so match the unweighted
+    # function's container exactly.
+    return out[()] if out.ndim == 0 else out
 
 
 def sort_dataframe_by_plot_order(df: pd.DataFrame, df_sort_order: Optional[dict] = None) -> pd.DataFrame:

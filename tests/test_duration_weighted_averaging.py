@@ -9,12 +9,16 @@ mean gives 44 percent of that animal's data 17 percent of the weight.
 import warnings
 from unittest.mock import MagicMock
 
+import matplotlib
+
 import numpy as np
 import pandas as pd
 import pytest
 
+matplotlib.use("Agg")
+
 from neurodent import constants
-from neurodent.core.utils import nanaverage_series_of_np
+from neurodent.core.utils import nanaverage_series_of_np, nanmean_series_of_np
 from neurodent.plotting import ExperimentPlotter
 from neurodent.results import WindowAnalysisResult
 
@@ -22,8 +26,9 @@ CHANNELS = ["LMot", "RMot"]
 ABBREVS = ["LM", "RM"]
 
 PLOT_ORDER = {
-    # "average" is the channel name collapse_channels=True produces.
-    "channel": ABBREVS + CHANNELS + ["average"],
+    # "average" is what collapse_channels=True names the channel; "all" is what an
+    # uncollapsed matrix feature names it.
+    "channel": ABBREVS + CHANNELS + ["average", "all"],
     "genotype": ["WT", "KO"],
     "sex": ["Male", "Female"],
     "isday": [True, False],
@@ -187,6 +192,172 @@ class TestEpFiguresSecondAggregation:
         assert expected == pytest.approx(70.0 / 106.0 * 10.0)
         for value in np.ravel(pivoted.to_numpy()):
             assert value == pytest.approx(expected)
+
+
+class TestReturnContainerMatchesUnweighted:
+    """The weighted and unweighted averages must return the same kind of object.
+
+    They did not: ``np.where`` yields a 0-d array for scalar rows where ``np.nanmean`` yields
+    a numpy scalar, which made the averaged column object dtype and took the EP figure rule
+    down with a PlotSpecError. The numbers were right the whole time, so only a dtype
+    assertion catches it. Asserting on ``float(np.ravel(v)[0])`` does not.
+    """
+
+    @pytest.mark.parametrize(
+        "values",
+        [
+            pytest.param([1.0, 3.0], id="scalars"),
+            pytest.param([np.array([1.0, 2.0]), np.array([3.0, 4.0])], id="vectors"),
+            pytest.param([np.zeros((2, 2)), np.full((2, 2), 4.0)], id="matrices"),
+        ],
+    )
+    def test_container_type_matches(self, values):
+        series = pd.Series(values)
+        weights = pd.Series([3.0, 1.0])
+
+        unweighted = nanmean_series_of_np(series)
+        weighted = nanaverage_series_of_np(series, weights)
+
+        assert type(weighted) is type(unweighted)
+        assert np.ndim(weighted) == np.ndim(unweighted)
+
+    def test_zero_weight_fallback_matches_too(self):
+        """The fallback and the weighted path are two branches of one function."""
+        series = pd.Series([1.0, 3.0])
+
+        fallback = nanaverage_series_of_np(series, pd.Series([0.0, 0.0]))
+        weighted = nanaverage_series_of_np(series, pd.Series([3.0, 1.0]))
+
+        assert type(fallback) is type(weighted)
+
+    def test_averaged_column_is_not_object_dtype(self):
+        """The defect only shows as a dtype on the assembled frame."""
+        df = _pull(_one_long_five_short())
+
+        assert df["rms"].dtype != object, (
+            "an object column reaches seaborn as unhashable arrays and the EP rule aborts"
+        )
+        assert df["rms"].dtype == np.dtype("float64")
+
+    def test_unweighted_pull_has_the_same_dtype(self):
+        weighted = _pull(_one_long_five_short())
+        unweighted = _pull(_one_long_five_short(), weight_by_duration=False)
+
+        assert weighted["rms"].dtype == unweighted["rms"].dtype
+
+
+class TestDurationNamedInGroupby:
+    """Grouping BY duration makes it a key, so the weighting must stand down, not crash."""
+
+    def test_does_not_raise(self):
+        war = _one_long_five_short()
+        plotter = ExperimentPlotter([war], features=["rms"], plot_order=PLOT_ORDER)
+
+        df = plotter.pull_timeseries_dataframe(
+            "rms",
+            groupby=["animal", "genotype", "sex", "duration"],
+            average_groupby=True,
+        )
+
+        assert "duration" in df.columns
+        assert df["rms"].dtype != object
+
+    def test_groups_are_unweighted_within_themselves(self):
+        """Every row in such a group shares one duration, so the means coincide."""
+        war = _one_long_five_short()
+        plotter = ExperimentPlotter([war], features=["rms"], plot_order=PLOT_ORDER)
+        groupby = ["animal", "genotype", "sex", "duration"]
+
+        weighted = plotter.pull_timeseries_dataframe(
+            "rms", groupby=groupby, average_groupby=True
+        )
+        unweighted = plotter.pull_timeseries_dataframe(
+            "rms", groupby=groupby, average_groupby=True, weight_by_duration=False
+        )
+
+        np.testing.assert_allclose(
+            weighted.sort_values(groupby + ["channel"])["rms"].to_numpy(dtype=float),
+            unweighted.sort_values(groupby + ["channel"])["rms"].to_numpy(dtype=float),
+        )
+
+
+class TestRenderPathsAgreeWithExportedNumbers:
+    """The figures and the exported data must use the same weighting.
+
+    ``generate_ep_heatmaps`` exports from a pull with ``average_groupby=True`` and then plots
+    via ``plot_heatmap``, which pulls again with ``average_groupby=False`` and averages at
+    render time in ``_plot_matrix``. Weighting only the first of those would publish a figure
+    and a CSV that disagree for the same grouping.
+    """
+
+    @staticmethod
+    def _matrix_war():
+        """One long animalday reading 1.0 and two short ones reading 0.0, as 2x2 matrices."""
+        war = MagicMock(spec=WindowAnalysisResult)
+        war.animal_id = "A1"
+        war.genotype = "WT"
+        war.sex = "Male"
+        war.channel_names = CHANNELS
+        war.channel_abbrevs = ABBREVS
+        readings = [1.0, 0.0, 0.0]
+        durations = [LONG_DAY_SECONDS, SHORT_DAY_SECONDS, SHORT_DAY_SECONDS]
+        war.get_result.return_value = pd.DataFrame(
+            {
+                "animal": ["A1"] * 3,
+                "genotype": ["WT"] * 3,
+                "sex": ["Male"] * 3,
+                "duration": durations,
+                "pcorr": [np.full((2, 2), r).tolist() for r in readings],
+            }
+        )
+        return war
+
+    def test_render_time_matrix_average_is_weighted(self):
+        plotter = ExperimentPlotter(
+            [self._matrix_war()], features=["pcorr"], plot_order=PLOT_ORDER
+        )
+        expected = LONG_DAY_SECONDS / (LONG_DAY_SECONDS + 2 * SHORT_DAY_SECONDS)
+        assert expected == pytest.approx(70.0 / 106.0)
+
+        # What the heatmap path renders: no averaging in the pull, averaged in _plot_matrix.
+        unaveraged = plotter.pull_timeseries_dataframe(
+            "pcorr", groupby=["animal"], average_groupby=False
+        )
+        assert "duration" in unaveraged.columns, (
+            "_plot_matrix cannot weight what the pull did not carry"
+        )
+        rendered = nanaverage_series_of_np(
+            unaveraged["pcorr"], unaveraged["duration"]
+        )
+
+        np.testing.assert_allclose(np.ravel(rendered), expected)
+
+    def test_averaging_pull_drops_duration_but_render_pull_keeps_it(self):
+        plotter = ExperimentPlotter(
+            [self._matrix_war()], features=["pcorr"], plot_order=PLOT_ORDER
+        )
+
+        averaged = plotter.pull_timeseries_dataframe(
+            "pcorr", groupby=["animal"], average_groupby=True
+        )
+        unaveraged = plotter.pull_timeseries_dataframe(
+            "pcorr", groupby=["animal"], average_groupby=False
+        )
+
+        assert "duration" not in averaged.columns
+        assert "duration" in unaveraged.columns
+
+    def test_plot_catplot_renders_with_weighting_on(self):
+        """The call shape docs/tutorials/visualization.ipynb makes, which must not raise."""
+        plotter = ExperimentPlotter(
+            [_one_long_five_short()], features=["rms"], plot_order=PLOT_ORDER
+        )
+
+        grid = plotter.plot_catplot(
+            "rms", groupby=["animal", "genotype", "sex"], average_groupby=True
+        )
+
+        assert grid is not None
 
 
 class TestNanaverageSeriesOfNp:

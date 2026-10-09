@@ -251,8 +251,9 @@ class ExperimentPlotter:
 
         Returns:
             pd.DataFrame: A DataFrame with the feature data. ``duration`` is consumed by the
-                averaging and is not a column of the result unless it was named in
-                ``groupby``.
+                averaging and is not a column of the result. Naming ``duration`` in ``groupby``
+                keeps it as a grouping key and disables the weighting, which changes nothing:
+                every row in such a group shares one duration.
 
         Note:
             Rows arriving here are animaldays once the WARs have been flattened, and
@@ -324,12 +325,19 @@ class ExperimentPlotter:
         # below can weight by it. Only possible when every result has the column, since a
         # partial set of weights would silently weight some animals and not others.
         weight_col = "duration"
-        weighting = (
-            average_groupby
-            and weight_by_duration
-            and all(weight_col in df_war.columns for df_war in self.df_wars)
+        # A caller that groups BY duration has made it a grouping key, so every row in a group
+        # shares one value and the weighted mean equals the unweighted one. Leave it alone
+        # rather than reach for a column that is no longer in the group frame.
+        have_weights = (
+            all(weight_col in df_war.columns for df_war in self.df_wars)
+            and weight_col not in groupby
         )
-        if average_groupby and weight_by_duration and not weighting:
+        # Carry the weights whenever the results have them, not only when averaging here. The
+        # matrix heatmaps average at render time instead (_plot_matrix), and the baseline
+        # normalisation averages a subset, and both need the weights to agree with the numbers
+        # this method exports.
+        weighting = average_groupby and weight_by_duration and have_weights
+        if average_groupby and weight_by_duration and not weighting and weight_col not in groupby:
             warnings.warn(
                 f"No '{weight_col}' column in the results, so groupby averaging counts every "
                 "row equally regardless of how much recording it represents. Pass "
@@ -337,7 +345,7 @@ class ExperimentPlotter:
                 UserWarning,
                 stacklevel=2,
             )
-        carry = groupby + ([weight_col] if weighting and weight_col not in groupby else [])
+        carry = groupby + ([weight_col] if have_weights else [])
 
         # first iterate through animals, since that determines channel idx
         # then pull out feature into matrix, assign channels, and add to dataframe
@@ -392,7 +400,7 @@ class ExperimentPlotter:
         else:
             melt_groupby = groupby
         # The weight column is an id_var, not a value: melting it would make it a channel.
-        if weighting and weight_col not in melt_groupby:
+        if have_weights and weight_col not in melt_groupby:
             melt_groupby = melt_groupby + [weight_col]
         feature_cols = [col for col in df.columns if col not in melt_groupby]
         df = df.melt(
@@ -470,9 +478,10 @@ class ExperimentPlotter:
         # look into this
         if average_groupby:
             groupby_cols = df.columns.drop(feature).tolist()
-            if weighting and weight_col not in groupby:
-                # Weights are a weight, not a grouping key. Leaving the column in would make
-                # every distinct duration its own group and the averaging a no-op.
+            if have_weights:
+                # A weight is never a grouping key. Leaving the column in would make every
+                # distinct duration its own group and the averaging a no-op, whether or not
+                # the weights are actually being applied.
                 groupby_cols.remove(weight_col)
             logging.debug(f"groupby_cols: {groupby_cols}")
             grouped = df.groupby(groupby_cols, sort=False, dropna=False)
@@ -816,8 +825,17 @@ class ExperimentPlotter:
         return grids
 
     def _plot_matrix(self, data, feature, color_palette="RdBu_r", norm=None, **kwargs):
-        matrices = np.array(data[feature].tolist())
-        avg_matrix = np.nanmean(matrices, axis=0)
+        """Render one averaged matrix.
+
+        The heatmap paths pull with ``average_groupby=False``, so the rows arriving here are
+        animaldays and are not the same length. Weight them by ``duration`` when the pull
+        carried it, so the figure matches the numbers ``pull_timeseries_dataframe`` exports
+        for the same grouping.
+        """
+        if "duration" in data.columns:
+            avg_matrix = core_utils.nanaverage_series_of_np(data[feature], data["duration"])
+        else:
+            avg_matrix = np.nanmean(np.array(data[feature].tolist()), axis=0)
 
         if norm is None:
             norm = colors.CenteredNorm(vcenter=0, halfrange=1)
@@ -1173,17 +1191,25 @@ def df_normalize_baseline(
             "Check your baseline_key and baseline_groupby parameters."
         )
 
+    # The baseline rows are animaldays when the caller pulled without averaging, and they are
+    # not the same length, so weight them by duration when the frame carries it. An unweighted
+    # baseline against weighted data would offset every value by a number nothing produced.
+    def _mean_of(group):
+        if "duration" in group.columns:
+            return core_utils.nanaverage_series_of_np(group[feature], group["duration"])
+        return core_utils.nanmean_series_of_np(group[feature])
+
     if remaining_groupby:
-        baseline_means = df_base.groupby(remaining_groupby)[feature].apply(
-            core_utils.nanmean_series_of_np
-        )
+        baseline_means = df_base.groupby(remaining_groupby)[
+            [feature] + (["duration"] if "duration" in df_base.columns else [])
+        ].apply(_mean_of).rename(feature)
         df_merge = df.merge(
             baseline_means, how="left", on=remaining_groupby, suffixes=("", "_baseline")
         )
     else:
-        baseline_means = df_base.groupby(baseline_groupby)[feature].apply(
-            core_utils.nanmean_series_of_np
-        )  # Global baseline
+        baseline_means = df_base.groupby(baseline_groupby)[
+            [feature] + (["duration"] if "duration" in df_base.columns else [])
+        ].apply(_mean_of).rename(feature)  # Global baseline
         assert len(baseline_means) == 1
         df_merge = df.assign(
             **{f"{feature}_baseline": [baseline_means.iloc[0] for _ in range(len(df))]}
