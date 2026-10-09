@@ -18,7 +18,7 @@ from pathlib import Path
 from neurodent import constants
 from neurodent.loading import AnimalOrganizer
 
-from .config import apply_path_overrides
+from .config import apply_path_overrides, resolve_source_subset
 from .discovery import get_discovery_animal_filter, resolve_animal_pattern
 
 
@@ -37,9 +37,16 @@ def load_animal_recordings(
     folder/session it resolves the discovery pattern, applies session- and
     per-animal config overrides (``datetimes_are_start``, ``manual_datetimes``,
     ``lro_kwargs``, ``pattern``), builds an :class:`~neurodent.loading.AnimalOrganizer`,
-    optionally splits a joint session down to this animal's channels, and finally
-    consolidates every discovered ``LongRecordingOrganizer`` into one
+    splits it down to this animal's channels when that source's files hold several
+    animals, and finally consolidates every discovered ``LongRecordingOrganizer`` into one
     ``AnimalOrganizer`` via :meth:`AnimalOrganizer.from_lros`.
+
+    Whether a source is split is decided per source by
+    :func:`~neurodent.workflow.utils.config.resolve_source_subset`: the source's own
+    ``channel_subset`` if it declares one (null means it is not split), otherwise the
+    animal's. The reader and file format play no part. Only a source that is split looks
+    for its files under the animal's ``group`` name, because only it reads files shared with
+    other animals.
 
     Genotype and sex are resolved from
     :data:`neurodent.constants.ANIMAL_METADATA` (populated by
@@ -57,8 +64,10 @@ def load_animal_recordings(
             standalone caller passes ``[("", animal_id, "")]``).
         animal_id (str): Canonical animal id; must be present in
             ``constants.ANIMAL_METADATA``.
-        channel_subset (list[str] | None, optional): Channels assigned to this
-            animal for a joint session; ``None`` for a non-joint animal.
+        channel_subset (list[str] | None, optional): A cross-check only. The dataset
+            config decides which channels belong to an animal, and they are read from it
+            here, so ``None`` is always correct. A caller that passes a list must pass
+            exactly the configured one.
         logger (logging.Logger | None, optional): Logger for progress messages; a
             module logger is used when ``None``.
 
@@ -73,7 +82,8 @@ def load_animal_recordings(
     Raises:
         KeyError: If ``animal_id`` is not in ``constants.ANIMAL_METADATA`` or a
             session has no ``pattern`` configured.
-        ValueError: If no recordings are discovered for the animal.
+        ValueError: If no recordings are discovered for the animal, or if a
+            ``channel_subset`` is passed that differs from the configured one.
     """
     if logger is None:
         logger = logging.getLogger(__name__)
@@ -100,6 +110,19 @@ def load_animal_recordings(
     # Per-animal overrides are constant across the loop, so resolve them once.
     animal_overrides = samples_config.get("_animal_overrides", {}).get(animal_id, {})
 
+    # Which channels belong to the animal is configuration. A caller that left it out used
+    # to get every channel of a multi-animal file without a word, so it is read here and a
+    # caller's value is only compared against it.
+    animal_subset = samples_config.get("_animal_channel_subsets", {}).get(animal_id)
+    if channel_subset is not None and (
+        animal_subset is None or list(channel_subset) != list(animal_subset)
+    ):
+        raise ValueError(
+            f"{animal_id}: channel_subset {list(channel_subset)} was passed, but the dataset "
+            f"config assigns {animal_subset}. The dataset config decides which channels "
+            "belong to an animal; pass None, or exactly the configured list."
+        )
+
     # An animal may declare several SOURCES, each with its own pattern, reader and
     # datetime convention. IQSEC2's dual-tree cohorts need this: the same animal was
     # recorded sequentially by two acquisition systems, so one entry draws from an Intan
@@ -121,8 +144,10 @@ def load_animal_recordings(
 
         logger.info(f"Loading session: {folder_path} (ID in metadata: {source_animal_id})")
 
-        # Check if this animal has channels defined (indicates joint session)
-        is_joint = source_animal_id in samples_config.get("_animal_channel_subsets", {})
+        # Decided per source: a file holding several animals needs splitting whatever
+        # format it is in, and one holding this animal alone does not.
+        subset = resolve_source_subset(animal_subset, source_spec)
+        splits_source = subset is not None
 
         # Apply session-specific overrides from dataset config
         session_analysis_config = analysis_config.copy()
@@ -197,12 +222,14 @@ def load_animal_recordings(
         # Determine the animal filter value for discovery
         animal_groups = samples_config.get("_animal_groups", {})
         discovery_animal_filter = get_discovery_animal_filter(
-            source_animal_id, is_joint, animal_groups
+            source_animal_id, splits_source, animal_groups
         )
-        if is_joint and source_animal_id in animal_groups:
-            logger.info(f"  -> Using group '{discovery_animal_filter}' for {{animal}} placeholder in discovery")
-        elif is_joint:
-            logger.info(f"  -> Using animal ID '{discovery_animal_filter}' for discovery (joint session without group)")
+        if splits_source:
+            logger.info(f"  -> Split to this animal's channels: {subset}")
+            if source_animal_id in animal_groups:
+                logger.info(f"  -> Using group '{discovery_animal_filter}' for {{animal}} placeholder in discovery")
+        else:
+            logger.info("  -> Not split: every channel in these files belongs to this animal")
 
         # Create AO for this session using pattern-based discovery
         session_ao = AnimalOrganizer(
@@ -222,15 +249,9 @@ def load_animal_recordings(
             val_files += sum(len(v) for v in groups.values())
             continue
 
-        effective_channel_subset = channel_subset
-        if source_spec and "channel_subset" in source_spec:
-            effective_channel_subset = source_spec["channel_subset"]
-        if is_joint and effective_channel_subset is not None:
-            logger.info(f"  -> Joint session detected. Filtering to channels: {effective_channel_subset}")
-            # Split to only the channels assigned to this animal
+        if splits_source:
             # source_animal_id is the key in the splits dict
-            splits = session_ao.split(groups={source_animal_id: effective_channel_subset})
-            session_ao = splits[source_animal_id]
+            session_ao = session_ao.split(groups={source_animal_id: subset})[source_animal_id]
 
         # Collect LROs
         all_lros.extend(session_ao.long_recordings)
