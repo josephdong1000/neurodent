@@ -228,6 +228,7 @@ class ExperimentPlotter:
         collapse_channels: bool = False,
         average_groupby: bool = False,
         strict_groupby: bool = False,
+        weight_by_duration: bool = True,
     ) -> pd.DataFrame:
         """
         Process feature data for plotting.
@@ -241,9 +242,26 @@ class ExperimentPlotter:
             average_groupby (bool, optional): Whether to average the groupby variable(s).
             strict_groupby (bool, optional): If True, raise an exception when groupby columns
                 contain NaN values. If False (default), only issue a warning.
+            weight_by_duration (bool, optional): When averaging, weight each row by its
+                ``duration`` column so that every recorded second counts equally. Defaults
+                to True. Set False for the unweighted mean, which counts every row equally
+                however long it is. Ignored when ``average_groupby`` is False, or when the
+                results carry no ``duration`` column, in which case the mean is unweighted
+                and a warning is issued.
 
         Returns:
-            pd.DataFrame: A DataFrame with the feature data.
+            pd.DataFrame: A DataFrame with the feature data. ``duration`` is consumed by the
+                averaging and is not a column of the result unless it was named in
+                ``groupby``.
+
+        Note:
+            Rows arriving here are animaldays once the WARs have been flattened, and
+            animaldays are not the same length: an animal recorded on two rigs in sequence
+            can hold one 70 hour animalday beside five 18 hour ones. Averaging those
+            unweighted gives 44 percent of that animal's data 17 percent of the weight, so
+            the weighted mean is the default. This weights per second rather than per
+            animal, which is also what the unweighted mean did, since a row is an animalday
+            and animals contribute different numbers of them.
         """
         if "band" in groupby or groupby == "band":
             raise ValueError(
@@ -302,6 +320,25 @@ class ExperimentPlotter:
                 "Check your data and groupby parameters."
             )
 
+        # Carry each row's recording duration alongside the groupby columns so the averaging
+        # below can weight by it. Only possible when every result has the column, since a
+        # partial set of weights would silently weight some animals and not others.
+        weight_col = "duration"
+        weighting = (
+            average_groupby
+            and weight_by_duration
+            and all(weight_col in df_war.columns for df_war in self.df_wars)
+        )
+        if average_groupby and weight_by_duration and not weighting:
+            warnings.warn(
+                f"No '{weight_col}' column in the results, so groupby averaging counts every "
+                "row equally regardless of how much recording it represents. Pass "
+                "weight_by_duration=False to ask for this explicitly.",
+                UserWarning,
+                stacklevel=2,
+            )
+        carry = groupby + ([weight_col] if weighting and weight_col not in groupby else [])
+
         # first iterate through animals, since that determines channel idx
         # then pull out feature into matrix, assign channels, and add to dataframe
         # meanwhile carrying over the groupby feature
@@ -333,7 +370,7 @@ class ExperimentPlotter:
                     ch_to_idx=ch_to_idx, channels=channels, ch_names=ch_names,
                 )
                 channel_dict = channel_dict | {"freq": freq_vals.tolist()}
-                vals = df_war[groupby].to_dict("list") | channel_dict
+                vals = df_war[carry].to_dict("list") | channel_dict
 
             else:
                 # All non-HIST feature types: extract + format channels
@@ -343,7 +380,7 @@ class ExperimentPlotter:
                     extracted, ftype, collapse_channels,
                     ch_to_idx=ch_to_idx, channels=channels, ch_names=ch_names,
                 )
-                vals = df_war[groupby].to_dict("list") | channel_dict
+                vals = df_war[carry].to_dict("list") | channel_dict
 
             df_feature = pd.DataFrame.from_dict(vals, orient="columns")
             dataframes.append(df_feature)
@@ -354,6 +391,9 @@ class ExperimentPlotter:
             melt_groupby = groupby + ["freq"]
         else:
             melt_groupby = groupby
+        # The weight column is an id_var, not a value: melting it would make it a channel.
+        if weighting and weight_col not in melt_groupby:
+            melt_groupby = melt_groupby + [weight_col]
         feature_cols = [col for col in df.columns if col not in melt_groupby]
         df = df.melt(
             id_vars=melt_groupby,
@@ -430,9 +470,19 @@ class ExperimentPlotter:
         # look into this
         if average_groupby:
             groupby_cols = df.columns.drop(feature).tolist()
+            if weighting and weight_col not in groupby:
+                # Weights are a weight, not a grouping key. Leaving the column in would make
+                # every distinct duration its own group and the averaging a no-op.
+                groupby_cols.remove(weight_col)
             logging.debug(f"groupby_cols: {groupby_cols}")
             grouped = df.groupby(groupby_cols, sort=False, dropna=False)
-            df = grouped[feature].apply(core_utils.nanmean_series_of_np).reset_index()
+            if weighting:
+                df = grouped.apply(
+                    lambda g: core_utils.nanaverage_series_of_np(g[feature], g[weight_col]),
+                    include_groups=False,
+                ).reset_index(name=feature)
+            else:
+                df = grouped[feature].apply(core_utils.nanmean_series_of_np).reset_index()
 
         # baseline_means = (df_base
         #                   .groupby(remaining_groupby)[feature]
