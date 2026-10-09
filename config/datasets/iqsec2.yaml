@@ -385,7 +385,6 @@ samples_data:
       lro_kwargs:
         mode: "si"
         extract_func: "neurodent.readers:read_bin_csv_pair"
-        multiprocess_mode: "serial"
         datetimes_are_start: true
       manual_datetime:
         Datawave_76:
@@ -467,7 +466,6 @@ samples_data:
       lro_kwargs:
         mode: "si"
         extract_func: "neurodent.readers:read_bin_csv_pair"
-        multiprocess_mode: "serial"
         datetimes_are_start: true
       manual_datetime:
         Datawave_78:
@@ -553,7 +551,6 @@ samples_data:
       lro_kwargs:
         mode: "si"
         extract_func: "neurodent.readers:read_bin_csv_pair"
-        multiprocess_mode: "serial"
         datetimes_are_start: true
       manual_datetime:
         Datawave_77:
@@ -636,7 +633,6 @@ samples_data:
       lro_kwargs:
         mode: "si"
         extract_func: "neurodent.readers:read_bin_csv_pair"
-        multiprocess_mode: "serial"
         datetimes_are_start: true
       manual_datetime:
         Datawave_80:
@@ -841,7 +837,6 @@ samples_data:
       lro_kwargs:
         mode: "si"
         extract_func: "neurodent.readers:read_bin_csv_pair"
-        multiprocess_mode: "serial"
         datetimes_are_start: true
       manual_datetime:
         Datawave_81:
@@ -1025,7 +1020,6 @@ samples_data:
       lro_kwargs:
         mode: "si"
         extract_func: "neurodent.readers:read_bin_csv_pair"
-        multiprocess_mode: "serial"
         datetimes_are_start: true
       manual_datetime:
         Datawave_82:
@@ -1207,7 +1201,6 @@ samples_data:
       lro_kwargs:
         mode: "si"
         extract_func: "neurodent.readers:read_bin_csv_pair"
-        multiprocess_mode: "serial"
         datetimes_are_start: true
       manual_datetime:
         Datawave_83:
@@ -1580,7 +1573,6 @@ samples_data:
     lro_kwargs:
       mode: "si"
       extract_func: "neurodent.readers:read_bin_csv_pair"
-      multiprocess_mode: "serial"
       datetimes_are_start: true
     manual_datetime:
       Part 1:
@@ -1743,7 +1735,6 @@ samples_data:
     lro_kwargs:
       mode: "si"
       extract_func: "neurodent.readers:read_bin_csv_pair"
-      multiprocess_mode: "serial"
       datetimes_are_start: true
     manual_datetime:
       52 IQSEC2 Mut Male:
@@ -1839,7 +1830,6 @@ samples_data:
     lro_kwargs:
       mode: "si"
       extract_func: "neurodent.readers:read_bin_csv_pair"
-      multiprocess_mode: "serial"
       datetimes_are_start: true
     manual_datetime:
       42 IQSEC2 CT Male:
@@ -1882,7 +1872,6 @@ samples_data:
     lro_kwargs:
       mode: "si"
       extract_func: "neurodent.readers:read_bin_csv_pair"
-      multiprocess_mode: "serial"
       datetimes_are_start: true
     manual_datetime:
       43 IQSEC2 CT Male:
@@ -1917,7 +1906,6 @@ samples_data:
     lro_kwargs:
       mode: "si"
       extract_func: "neurodent.readers:read_bin_csv_pair"
-      multiprocess_mode: "serial"
       datetimes_are_start: true
     manual_datetime:
       44 IQSEC2 CT Male:

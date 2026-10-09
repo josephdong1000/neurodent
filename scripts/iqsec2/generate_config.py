@@ -761,8 +761,10 @@ def _bin_lro_kwargs_lines(indent):
     that guarantee for itself but only ever covered the two rhd sites; the DataWave block
     was written out by hand in a third place, which is what this fixes.
 
-    multiprocess_mode is serial because read_bin_csv_pair reads a whole payload into memory
-    as one array, and these payloads run to several GB.
+    There is no multiprocess_mode. The loader builds one recording per bin/csv pair and
+    merges them afterwards, and only a recording built from a plain list of files reads
+    that setting, so it would do nothing here. read_bin_csv_pair memory-maps the payload,
+    so a large file is not read into memory when it is opened either.
 
     datetimes_are_start is true because the per-file manual_datetime lists this generator
     writes hold start times, computed from the sidecar's LastEdit minus the payload
@@ -773,7 +775,6 @@ def _bin_lro_kwargs_lines(indent):
         f"{pad}lro_kwargs:",
         f"{pad}  mode: \"si\"",
         f"{pad}  extract_func: \"neurodent.readers:read_bin_csv_pair\"",
-        f"{pad}  multiprocess_mode: \"serial\"",
         f"{pad}  datetimes_are_start: true",
     ]
 
