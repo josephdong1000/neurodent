@@ -391,6 +391,103 @@ def _bin_channel_sets(animal_dir):
     return out
 
 
+def bin_file_starts(patterns):
+    """Return ``{session: [iso start time, ...]}``, one entry per discovered file.
+
+    Each value is that file's own start, taken as its sidecar LastEdit (the recording END)
+    minus its duration, which comes from the payload size rather than from reading it.
+
+    This is used in preference to a single per-session end anchor, for every bin source,
+    because an anchor silently assumes the session's files are contiguous and in filename
+    order, and in this dataset neither holds:
+
+    * Animals 42, 43 and 44 keep only 4 of 19, 4 of 18 and 2 of 18 files; the rest are
+      zero-byte. The survivors are therefore separated by real holes, and cumulating
+      backwards from one anchor absorbs them, misplacing the earliest files by 94 minutes.
+      Measured.
+    * Animal 78's DataWave counter wrapped mid-session, so its filenames run 19 to 46 then
+      1 to 18 while discovery sorts them 1 to 46. An anchor would misplace all 46 files by
+      up to 14 hours, and because ``is_day`` is a clock-hour test that flips day from night
+      for nearly every window, with nothing warning.
+
+    Nothing downstream checks these values against each other. ``_validate_file_contiguity``
+    looks like it would, but ``ao_build`` gives each discovered item its own LRO carrying a
+    single timestamp, and that function returns early for a one-file LRO, so no gap or
+    overlap in an emitted list is ever reported. The values have to be right when written.
+
+    One entry is required for EVERY discovered item, including the zero-byte ones, because
+    ``_assign_session_list`` raises on a length mismatch. A dead file has no duration, so
+    its start equals its end; where the sidecar cannot supply one either, the value is
+    derived from the neighbouring file's far edge.
+
+    Values carry microseconds, and exact duplicates are nudged apart, because
+    ``_validate_timestamp_ordering`` rejects any two items sharing a timestamp. That is not
+    hypothetical: animal 44's zero-byte ``Cage 3-12`` has a LastEdit of 12:09:41, and the
+    live ``Cage 3-13`` that follows it starts at 12:09:41.7, so a dead file's end coincides
+    with the next file's start. Formatting to whole seconds collided the two and the animal
+    failed to load.
+    """
+    import csv
+    from collections import defaultdict as _dd
+    from datetime import timedelta
+
+    from neurodent.loading.discovery import FileDiscoverer, _natural_sort_key
+
+    by_session = _dd(list)
+    for item in FileDiscoverer(patterns).discover():
+        paths = item.get_path_list()
+        binary = next((p for p in paths if p.endswith("_ColMajor.bin")), paths[0])
+        sidecar = next((p for p in paths if p.endswith("_Meta.csv")), None)
+        start = None
+        seconds = 0.0
+        if sidecar is not None and Path(sidecar).exists():
+            rows = list(csv.DictReader(Path(sidecar).open(errors="replace")))
+            stamp = (rows[0].get("LastEdit") or "").strip() if rows else ""
+            size = Path(binary).stat().st_size
+            if rows and size:
+                seconds = size / (len(rows) * 4 * float(rows[0]["SampleRate"]))
+            if stamp:
+                start = datetime.fromisoformat(stamp) - timedelta(seconds=seconds)
+        by_session[(item.metadata or {}).get("session") or ""].append(
+            (paths[0], start, seconds)
+        )
+
+    out = {}
+    for session, files in by_session.items():
+        files.sort(key=lambda triple: _natural_sort_key(triple[0]))
+        starts = [start for _, start, _d in files]
+        durations = [seconds for _, _s, seconds in files]
+        known = [i for i, s in enumerate(starts) if s is not None]
+        if not known:
+            raise SystemExit(
+                f"session {session!r}: no sidecar carries a readable LastEdit, so no file in "
+                f"it can be placed on a timeline."
+            )
+        # Fill the unreadable ones so the list length matches the discovered count. Place each
+        # one against its neighbour's far EDGE, not its start: animal 43's Cage 2-18 is a live
+        # 14.96 hour file whose sidecar carries no LastEdit, and offsetting from the previous
+        # file's start put it 30 minutes before that file had finished, overlapping two real
+        # recordings and misfiling an hour of windows across the day/night boundary.
+        for i, value in enumerate(starts):
+            if value is None and i and starts[i - 1] is not None:
+                starts[i] = starts[i - 1] + timedelta(seconds=durations[i - 1])
+        # Anything still unset precedes every known value, so walk backward from the first one
+        # that is set, subtracting each file's own duration.
+        for i in range(len(starts) - 2, -1, -1):
+            if starts[i] is None and starts[i + 1] is not None:
+                starts[i] = starts[i + 1] - timedelta(seconds=durations[i])
+
+        # Make every value distinct. Files with a real LastEdit claim their true start first,
+        # so a nudge only ever lands on a value that was synthesised or already duplicated.
+        taken = set()
+        for i in sorted(range(len(starts)), key=lambda j: j not in known):
+            while starts[i] in taken:
+                starts[i] += timedelta(microseconds=1)
+            taken.add(starts[i])
+        out[session] = [s.strftime("%Y-%m-%d %H:%M:%S.%f") for s in starts]
+    return out
+
+
 def _sidecars_without_lastedit(animal_dir):
     """Live sidecars whose trailing column has no header name, so LastEdit is unreadable.
 
@@ -1163,12 +1260,12 @@ def main(argv=None):
             for line in _wrap(
                 f"WATCH: {len(stale)} live sidecar(s) here are stale MATLAB writetable "
                 f"output whose final column has no name, so LastEdit cannot be read: "
-                f"{', '.join(stale)}. These bins carry no timestamps of their own and no "
-                f"manual_datetime covers them, so DDFBinaryMetadata sets dt_end to None "
-                f"and only warns. Whether the timeline survives a None among its files has "
-                f"not been tested, because these are multi-GB files and testing it needs a "
-                f"real load on the cluster. If war_generation fails for this animal, look "
-                f"here first.",
+                f"{', '.join(stale)}. Their manual_datetime entries below are therefore "
+                f"DERIVED, placed at the preceding file's end rather than measured, so the "
+                f"gap before them is an assumption of contiguity. Every other entry comes "
+                f"from a real LastEdit. Nothing downstream cross-checks them: each file "
+                f"becomes its own single-item LRO, and the contiguity check returns early "
+                f"for those. If this animal's day/night split looks wrong, look here first.",
                 84,
             ):
                 w(f"  #   {line}")
@@ -1186,12 +1283,33 @@ def main(argv=None):
         w("    pattern:")
         w(f"    - \"{stem}_ColMajor.bin\"")
         w(f"    - \"{stem}_Meta.csv\"")
+
+        resolved = [
+            s.replace("{data_root}", DATA_ROOT) + suffix
+            for s, suffix in ((stem, "_ColMajor.bin"), (stem, "_Meta.csv"))
+        ]
+        starts = bin_file_starts(resolved)
+        if not starts:
+            raise SystemExit(f"bin/{animal_id}: no discoverable files under {spec['dir']}")
+
+        # Timestamps have to come in through the config. read_bin_csv_pair returns a bare
+        # recording and convert_file_with_si_to_recording then hardcodes dt_end = None, so
+        # nothing on the si path ever reads the sidecar's LastEdit; without this block the
+        # animal dies in merge_many with 'has durations but missing file_end_datetimes'.
+        #
+        # Per-file starts rather than one end anchor per session. An anchor assumes the
+        # session is contiguous and in filename order, and see bin_file_starts for the two
+        # measured cases here where it is not.
         w("    lro_kwargs:")
         w("      mode: \"si\"")
         w("      extract_func: \"neurodent.readers:read_bin_csv_pair\"")
         w("      multiprocess_mode: \"serial\"")
-        # LastEdit in the sidecar is the recording END, verified against the .ddf mtimes.
-        w("      datetimes_are_start: false")
+        w("      datetimes_are_start: true")
+        w("    manual_datetime:")
+        for session, values in sorted(starts.items()):
+            w(f"      {q(session)}:")
+            for value in values:
+                w(f"      - {q(value)}")
 
     _write_atomic(args.out, "\n".join(out) + "\n")
     print(f"wrote {args.out} ({len(out)} lines)")
