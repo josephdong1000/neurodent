@@ -125,11 +125,16 @@ BIN_EXCLUSIONS = {
     ),
 }
 
-# Animals whose implant was also recorded by the DataWave rig, producing a second block of
-# data in the bin tree that THIS config does not reach. Counted at generation time so the
-# note cannot go stale. Not loaded here because the bin half is a different reader and a
-# different channel key space; recorded per animal so nobody reads these entries as the
-# animal's complete record.
+# Animals recorded on both rigs, one after the other. Each gets two sources: the rhd leg
+# and the DataWave leg below it. The DataWave leg is 349 hours in total, 23 to 47 percent of
+# these animals' recordings, and went unloaded for a while on the grounds that it used a
+# different reader and a different channel naming scheme. Neither is a reason: the per-file
+# start times come from the same bin_file_starts the DataWave-only adults use, and both
+# naming schemes already resolve through the channels: map.
+#
+# The directory names are shared with RHD_COHORTS, so the port an animal's rhd leg uses is
+# cross-checked against the port its DataWave sidecars declare. Inside each cohort the files
+# sit one subdirectory per animal, 'Datawave_80' and so on, which is the session key.
 DUAL_TREE_BINS = {
     "80": "011320 IQSEC2_80_81_82_83", "81": "011320 IQSEC2_80_81_82_83",
     "82": "011320 IQSEC2_80_81_82_83", "83": "011320 IQSEC2_80_81_82_83",
@@ -505,8 +510,20 @@ def _sidecars_without_lastedit(animal_dir):
     return out
 
 
+def _datawave_dirs():
+    """Every DataWave directory this config loads from, relative to DATA_ROOT/BIN_SUBTREE.
+
+    Both groups of animals, so the channel map and the refusal checks cover the same set of
+    files the config actually reads. The dual-tree cohort directories hold one subdirectory
+    per animal, and naming the cohort reaches all of them.
+    """
+    return sorted(
+        {spec["dir"] for spec in BIN_ADULTS.values()} | set(DUAL_TREE_BINS.values())
+    )
+
+
 def bin_probeinfo_by_region():
-    """Return {abbrev: sorted raw ProbeInfo strings} across every included bin adult.
+    """Return {abbrev: sorted raw ProbeInfo strings} across every DataWave file loaded.
 
     Built from the sidecars rather than hand-written. The lab's exports carry three
     spellings of the same montage (title case, lowercase, and positional amp ids) and
@@ -519,12 +536,18 @@ def bin_probeinfo_by_region():
     re-run it. If that happens those files become live, and several of them carry the
     lowercase spelling that no live file currently uses. Listing an alias that nothing
     resolves costs nothing; omitting one that something resolves is a load failure.
+
+    Covers the dual-tree cohorts as well as the DataWave-only adults. Those seven animals
+    add no new spelling, since the adults already span all four ports in title case, so this
+    is not about map entries. It is so that the refusal check below sees their files: an
+    unresolvable name is dropped here without comment, and only that check turns it into a
+    reason not to generate.
     """
     import csv
 
     out = defaultdict(set)
-    for spec in BIN_ADULTS.values():
-        for sidecar in sorted((Path(DATA_ROOT) / BIN_SUBTREE / spec["dir"]).rglob("*_Meta.csv")):
+    for animal_dir in _datawave_dirs():
+        for sidecar in sorted((Path(DATA_ROOT) / BIN_SUBTREE / animal_dir).rglob("*_Meta.csv")):
             for row in csv.DictReader(sidecar.open(errors="replace")):
                 raw = (row.get("ProbeInfo") or "").strip()
                 abbrev = _probeinfo_region(raw) if raw else None
@@ -730,11 +753,83 @@ def _sessions_before_death(sessions, died, extents):
     return keep, sorted(dropped), sorted(straddling)
 
 
-def _lro_kwargs_lines(indent):
-    """Emit the per-animal lro_kwargs block at the given indent.
+def _bin_lro_kwargs_lines(indent):
+    """Emit the DataWave reader's lro_kwargs block at the given indent.
 
-    One helper serves both emission sites (the flat animal and the per-source list item)
-    so a reader option cannot be added to one and silently missed by the other.
+    The sibling of _lro_kwargs_lines, for the other reader. Each reader gets one helper so
+    an option cannot be added in one place and missed in another. _lro_kwargs_lines claimed
+    that guarantee for itself but only ever covered the two rhd sites; the DataWave block
+    was written out by hand in a third place, which is what this fixes.
+
+    multiprocess_mode is serial because read_bin_csv_pair reads a whole payload into memory
+    as one array, and these payloads run to several GB.
+
+    datetimes_are_start is true because the per-file manual_datetime lists this generator
+    writes hold start times, computed from the sidecar's LastEdit minus the payload
+    duration. It has to sit inside lro_kwargs: beside the pattern it is read by nothing.
+    """
+    pad = " " * indent
+    return [
+        f"{pad}lro_kwargs:",
+        f"{pad}  mode: \"si\"",
+        f"{pad}  extract_func: \"neurodent.readers:read_bin_csv_pair\"",
+        f"{pad}  multiprocess_mode: \"serial\"",
+        f"{pad}  datetimes_are_start: true",
+    ]
+
+
+def _datawave_stem(cohort, animal_id):
+    """Return an animal's DataWave filename stem, with {index} where the number varies.
+
+    Read off the files rather than transcribed, because a transcribed copy of 707
+    filenames is exactly the kind of second source of truth the module docstring argues
+    against. Animal 80 yields '011020_IQSEC2_80_cage1B_Recording-{index}'.
+
+    Two index spellings exist and both are kept verbatim: a hyphen for cohorts 011320 and
+    012720, and a space with brackets for 013120 ('..._Recording ({index})'). Brackets
+    survive into the pattern because _pattern_to_regex_and_glob escapes every segment that
+    is not a placeholder.
+
+    Only files with '_Recording' in the name are considered, which is also what keeps the
+    two zero-byte '...Spreadsheet...' artifacts in Datawave_80 and Datawave_76 out of the
+    config without needing a skip rule for them.
+    """
+    import re as _re
+
+    folder = Path(DATA_ROOT) / BIN_SUBTREE / cohort / f"Datawave_{animal_id}"
+    if not folder.is_dir():
+        raise SystemExit(f"dual-tree/{animal_id}: no such directory {folder}")
+
+    stems = set()
+    for payload in sorted(folder.glob("*_ColMajor.bin")):
+        if "_Recording" not in payload.name:
+            continue
+        matched = _re.match(
+            r"^(?P<prefix>.*_Recording)(?P<sep>-|\s\()\d+\)?_ColMajor\.bin$", payload.name
+        )
+        if not matched:
+            raise SystemExit(
+                f"dual-tree/{animal_id}: cannot parse an index out of {payload.name!r}. "
+                f"The pattern language needs one varying number per file."
+            )
+        separator = matched.group("sep")
+        index = "{index}" if separator == "-" else "({index})"
+        stems.add(f"{matched.group('prefix')}{separator[0]}{index}")
+
+    if len(stems) != 1:
+        raise SystemExit(
+            f"dual-tree/{animal_id}: expected one filename stem under {folder.name}, found "
+            f"{len(stems)}: {sorted(stems)}. One pattern cannot span them."
+        )
+    return stems.pop()
+
+
+def _lro_kwargs_lines(indent):
+    """Emit the rhd reader's lro_kwargs block at the given indent.
+
+    One helper serves both rhd emission sites (the flat animal and the per-source list
+    item) so a reader option cannot be added to one and silently missed by the other. The
+    DataWave reader has its own, _bin_lro_kwargs_lines.
 
     ignore_integrity_checks is on because 49 of the 9867 rhd files carry short timestamp
     discontinuities that read_intan otherwise refuses to open, which aborts 10 of the 23
@@ -916,6 +1011,41 @@ def main(argv=None):
             )
         if animal_id not in ref:
             problems.append(f"bin/{animal_id}: no reference-sheet row")
+
+    # The same three checks for the dual-tree animals' DataWave leg. Their port is
+    # cross-checked against the port their rhd leg uses rather than against the sheet's
+    # cage, which is the stronger statement: both legs have to agree the electrodes belong
+    # to this animal, or the two legs are not the same implant.
+    for animal_id, bin_cohort in DUAL_TREE_BINS.items():
+        animal_dir = f"{bin_cohort}/Datawave_{animal_id}"
+        sets = _bin_channel_sets(animal_dir)
+        if not sets:
+            problems.append(f"dual-tree/{animal_id}: no live bins under {animal_dir}")
+            continue
+        for abbrevs, raws in sets.items():
+            if None in abbrevs:
+                unresolved = {r for names in raws for r, a in zip(names, abbrevs) if a is None}
+                problems.append(
+                    f"dual-tree/{animal_id}: unresolvable ProbeInfo {sorted(unresolved)}"
+                )
+        distinct = {tuple(sorted(a for a in abbrevs if a)) for abbrevs in sets}
+        if len(distinct) > 1:
+            problems.append(
+                f"dual-tree/{animal_id}: live files declare {len(distinct)} different "
+                f"montages {sorted(distinct)}; they would raise at merge rather than combine"
+            )
+        expected = RHD_COHORTS[bin_cohort][animal_id]
+        declared = {
+            name.split("/")[1][4:5]
+            for names in (r for raws in sets.values() for r in raws)
+            for name in names
+            if "/" in name
+        }
+        if declared != {expected}:
+            problems.append(
+                f"dual-tree/{animal_id}: its rhd leg uses port {expected}, but the DataWave "
+                f"sidecars declare {sorted(declared)}"
+            )
 
     # Every cohort on disk must be accounted for. Without this a renamed or newly added
     # cohort directory is silently dropped from the study.
@@ -1126,22 +1256,53 @@ def main(argv=None):
                 for line in _wrap(ANIMAL_NOTES[animal_id], 84):
                     w(f"  #   {line}")
             bin_cohort = DUAL_TREE_BINS.get(animal_id)
+            bin_stem = bin_starts = None
             if bin_cohort:
-                share = sum(1 for a in DUAL_TREE_BINS.values() if a == bin_cohort)
-                live = [
-                    p for p in (Path(DATA_ROOT) / BIN_SUBTREE / bin_cohort).rglob("*_ColMajor.bin")
-                    if p.stat().st_size > 0
+                bin_stem = _datawave_stem(bin_cohort, animal_id)
+                # {session} stays a placeholder so discovery captures it, which is what
+                # makes the returned dict key the session the loader will see.
+                bin_starts = bin_file_starts([
+                    f"{DATA_ROOT}/{BIN_SUBTREE}/{bin_cohort}/{{session}}/{bin_stem}{suffix}"
+                    for suffix in ("_ColMajor.bin", "_Meta.csv")
+                ])
+                if not bin_starts:
+                    raise SystemExit(
+                        f"dual-tree/{animal_id}: no discoverable files under {bin_cohort}"
+                    )
+                folder = Path(DATA_ROOT) / BIN_SUBTREE / bin_cohort / f"Datawave_{animal_id}"
+                # 8 channels, float32, 2000 Hz, per this animal's own Meta.csv sidecars.
+                payloads = [
+                    p for p in folder.glob("*_ColMajor.bin")
+                    if "_Recording" in p.name and p.stat().st_size
                 ]
-                # 8 channels, float32, 2000 Hz, per the Meta.csv sidecars.
-                hours = sum(p.stat().st_size for p in live) / (8 * 4 * 2000) / 3600 / share
+                hours = sum(p.stat().st_size for p in payloads) / (8 * 4 * 2000) / 3600
+                values = sorted(v for vals in bin_starts.values() for v in vals)
+                rhd_first = min(sessions.values()) if sessions else None
+                order = (
+                    "DataWave leg first, then rhd"
+                    if rhd_first and values and values[0] < rhd_first
+                    else "rhd leg first, then DataWave"
+                )
+                first_date = datetime.fromisoformat(values[0]).strftime("%b-%d-%Y")
+                shares_date = any(
+                    datetime.fromisoformat(s).strftime("%b-%d-%Y") == first_date
+                    for s in sessions.values()
+                )
                 for line in _wrap(
-                    f"INCOMPLETE RECORD: this animal's implant was also recorded by the "
-                    f"DataWave rig, leaving roughly {len(live) // share} more bin files "
-                    f"and about {hours:.0f} more hours under "
-                    f"'{BIN_SUBTREE}/{bin_cohort}' that no pattern in this config reaches. "
-                    f"The two legs abut rather than overlap. What is loaded here is real "
-                    f"and correctly attributed, but it is not the whole recording, and "
-                    f"coverage is uneven across animals for that reason.",
+                    f"SECOND RIG: this animal was recorded on the DataWave rig as well, "
+                    f"{len(payloads)} files and about {hours:.1f} hours under "
+                    f"'{BIN_SUBTREE}/{bin_cohort}/Datawave_{animal_id}'. Both legs are "
+                    f"loaded, as two sources. Order: {order}. The DataWave leg's first file "
+                    f"starts {values[0]}, and because an animalday is named after its first "
+                    f"file's date it lands on {first_date}, which "
+                    + (
+                        f"an rhd session already occupies, so the two merge into one "
+                        f"animalday."
+                        if shares_date
+                        else f"no rhd session occupies, so it becomes an animalday of its "
+                        f"own spanning several calendar dates. The statistics weight "
+                        f"animaldays by duration, so its length is accounted for."
+                    ),
                     84,
                 ):
                     w(f"  #   {line}")
@@ -1190,33 +1351,88 @@ def main(argv=None):
                 w("    bad_channels:")
                 for region in opens:
                     w(f"    - {region}")
-            if dropped:
-                # Removing the datetime is not enough: discovery still finds the files and
-                # then requires a datetime for every session it found. Skip at discovery.
-                w("    skip_sessions:")
-                for key in dropped:
-                    w(f"    - {q(key)}")
+            # Collect the animal's sources before choosing a shape for them. Two unrelated
+            # things can add one: a cohort whose rhd files sit at two depths, and an animal
+            # that was also recorded on the DataWave rig. bin_cohort, bin_stem and
+            # bin_starts were resolved with the comment block above.
+
+            def _rhd_leg(subpath, subset, skips):
+                def emit(indent):
+                    pad = " " * indent
+                    lines = [
+                        f"{pad}pattern: \"{{data_root}}/{RHD_SUBTREE}/{cohort}{subpath}"
+                        f"/{{session}}_{{index}}.rhd\""
+                    ]
+                    if skips:
+                        # Removing the datetime is not enough: discovery still finds the
+                        # files and then requires a datetime for every session it found.
+                        # Skip at discovery.
+                        lines.append(f"{pad}skip_sessions:")
+                        lines += [f"{pad}- {q(key)}" for key in skips]
+                    lines += _lro_kwargs_lines(indent)
+                    lines.append(f"{pad}manual_datetime:")
+                    lines += [f"{pad}  {q(k)}: {q(v)}" for k, v in subset.items()]
+                    return lines
+
+                return emit
+
+            def _bin_leg(stem, starts):
+                def emit(indent):
+                    pad = " " * indent
+                    base = f"{{data_root}}/{BIN_SUBTREE}/{bin_cohort}/{{session}}/{stem}"
+                    lines = [f"{pad}pattern:"]
+                    lines += [f"{pad}- \"{base}{suffix}\"" for suffix in
+                              ("_ColMajor.bin", "_Meta.csv")]
+                    # Not a property of the file type. Whether channels get picked out of a
+                    # file ought to follow what the file holds, but the loader decides it
+                    # from a key on the ANIMAL, so this leg inherits the rhd leg's answer
+                    # and has to opt out by hand. Without it the split looks for 'A-010' in
+                    # files that name the same electrode 'Intan Input (1)/PortA L Vis Ctx'
+                    # and raises. These 707 files were each measured to hold this animal
+                    # alone; elsewhere in this tree 12 DataWave files hold four animals and
+                    # would want the split.
+                    lines.append(f"{pad}channel_subset: null")
+                    lines += _bin_lro_kwargs_lines(indent)
+                    lines.append(f"{pad}manual_datetime:")
+                    for session_key, values in sorted(starts.items()):
+                        lines.append(f"{pad}  {q(session_key)}:")
+                        lines += [f"{pad}  - {q(value)}" for value in values]
+                    return lines
+
+                return emit
+
+            # skip_sessions stays an animal-level key while there is one source, so the 21
+            # single-source animals keep their exact shape. With a second source it has to
+            # move onto the rhd leg: at animal level it is concatenated into every source's
+            # skip list, and it names an rhd session.
+            legs = []
+            if bin_cohort:
+                legs.append(("rhd leg", _rhd_leg("", sessions, dropped)))
+            else:
+                if dropped:
+                    w("    skip_sessions:")
+                    for key in dropped:
+                        w(f"    - {q(key)}")
+                legs.append(("flat", _rhd_leg("", sessions, None)))
             if extra:
                 # This cohort's files sit at two depths, which no single glob can span:
                 # ** cannot cross a separator here, and a pattern list is an AND-pair
                 # rather than a union. Two sources reach both.
-                w("    sources:")
-                for label, subpath in (("flat", ""), ("nested", f"/{extra}")):
-                    w(f"    # {label}")
-                    w(f"    - pattern: \"{{data_root}}/{RHD_SUBTREE}/{cohort}{subpath}/{{session}}_{{index}}.rhd\"")
-                    for line in _lro_kwargs_lines(6):
-                        w(line)
-                    w("      manual_datetime:")
-                    subset = nested_sessions if subpath else sessions
-                    for key, start in subset.items():
-                        w(f"        {q(key)}: {q(start)}")
-            else:
-                w(f"    pattern: \"{{data_root}}/{RHD_SUBTREE}/{cohort}/{{session}}_{{index}}.rhd\"")
-                for line in _lro_kwargs_lines(4):
+                legs.append(("nested", _rhd_leg(f"/{extra}", nested_sessions, None)))
+            if bin_cohort:
+                legs.append(("DataWave leg", _bin_leg(bin_stem, bin_starts)))
+
+            if len(legs) == 1:
+                for line in legs[0][1](4):
                     w(line)
-                w("    manual_datetime:")
-                for key, start in sessions.items():
-                    w(f"      {q(key)}: {q(start)}")
+            else:
+                w("    sources:")
+                for label, emit in legs:
+                    w(f"    # {label}")
+                    lines = emit(6)
+                    w("    - " + lines[0].lstrip())
+                    for line in lines[1:]:
+                        w(line)
     # --- DataWave bin adults ---
     w("  # === DataWave bin cohorts (no rhd leg at all) ===")
     for line in _wrap(
@@ -1300,11 +1516,8 @@ def main(argv=None):
         # Per-file starts rather than one end anchor per session. An anchor assumes the
         # session is contiguous and in filename order, and see bin_file_starts for the two
         # measured cases here where it is not.
-        w("    lro_kwargs:")
-        w("      mode: \"si\"")
-        w("      extract_func: \"neurodent.readers:read_bin_csv_pair\"")
-        w("      multiprocess_mode: \"serial\"")
-        w("      datetimes_are_start: true")
+        for line in _bin_lro_kwargs_lines(4):
+            w(line)
         w("    manual_datetime:")
         for session, values in sorted(starts.items()):
             w(f"      {q(session)}:")
