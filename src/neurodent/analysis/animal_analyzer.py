@@ -398,7 +398,11 @@ class AnimalAnalyzer:
                     detection_params=detection_params or {},
                     animal_id=self.ao.animal_id,
                     genotype=self.ao.genotype,
-                    animal_day=self.ao.animaldays[i],
+                    # The name the WAR gives this recording's rows (see
+                    # _process_fragment_metadata), so read_sars_spikes can match spikes to rows
+                    # by name. ao.animaldays agrees with it on the pipeline's from_lros path
+                    # but not on every construction path.
+                    animal_day=getattr(lrec, "animalday", None) or self.ao.animaldays[i],
                     bin_folder_name=None,
                     metadata=self.ao.long_recordings[i].meta,
                 )

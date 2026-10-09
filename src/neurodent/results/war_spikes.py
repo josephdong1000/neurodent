@@ -76,14 +76,35 @@ class WARSpikeMixin:
                         )
                         spikes_channel.append(spike_times)
                     spikes_all.append(spikes_channel)
-                return self._read_from_spikes_all(spikes_all, inplace=inplace)
+                return self._read_from_spikes_all(
+                    spikes_all, inplace=inplace, animaldays=self._spike_animaldays(sars)
+                )
             case "mne":
                 raws = [sar.result_mne for sar in sars]
-                return self.read_mnes_spikes(raws, inplace=inplace)
+                return self.read_mnes_spikes(
+                    raws, inplace=inplace, animaldays=self._spike_animaldays(sars)
+                )
             case _:
                 raise ValueError(f"Invalid read_mode: {read_mode}")
 
-    def read_mnes_spikes(self, raws: list[mne.io.RawArray], inplace=True):
+    def _spike_animaldays(self, sars):
+        """The animalday names to match spike results by, or None to pair them in sorted order.
+
+        Names are used when every one is an animalday of this WAR. Spike results computed by
+        AnimalAnalyzer carry exactly the WAR's names. Ones saved by an earlier version may not,
+        and those fall back to the old pairing, in sorted animalday order, with a warning.
+        """
+        names = [getattr(sar, "animal_day", None) for sar in sars]
+        in_war = set(self.result["animalday"])
+        if all(name in in_war for name in names):
+            return names
+        logging.warning(
+            f"Spike results are named {names}, which are not all animaldays of this WAR "
+            f"({sorted(in_war)}). Pairing them with the animaldays in sorted order instead."
+        )
+        return None
+
+    def read_mnes_spikes(self, raws: list[mne.io.RawArray], inplace=True, animaldays=None):
         """
         Extract spike features from MNE RawArray objects with spike annotations.
 
@@ -96,6 +117,8 @@ class WARSpikeMixin:
                   as event labels (e.g., 'LMot', 'RMot', etc.).
             inplace: If True, modifies self.result and returns self.
                     If False, returns a new WindowAnalysisResult.
+            animaldays: The animalday each raw belongs to, in the same order. Strongly
+                    recommended; see _read_from_spikes_all for what happens without it.
 
         Returns:
             WindowAnalysisResult: WAR object with added spike features (nspike, lognspike).
@@ -127,9 +150,11 @@ class WARSpikeMixin:
                 spike_times = spike_times / raw.info["sfreq"]
                 spikes_channel.append(spike_times)
             spikes_all.append(spikes_channel)
-        return self._read_from_spikes_all(spikes_all, inplace=inplace)
+        return self._read_from_spikes_all(spikes_all, inplace=inplace, animaldays=animaldays)
 
-    def _read_from_spikes_all(self, spikes_all: list[list[list[float]]], inplace=True):
+    def _read_from_spikes_all(
+        self, spikes_all: list[list[list[float]]], inplace=True, animaldays=None
+    ):
         """
         Internal method to bin spike times into WAR time windows and add as features.
 
@@ -146,35 +171,59 @@ class WARSpikeMixin:
                          = 2 sessions, 2 channels each
             inplace: If True, modifies self.result and returns self.
                     If False, returns a new WindowAnalysisResult with enhanced data.
+            animaldays: The animalday each entry of spikes_all belongs to, in the same order.
+                    When omitted, spikes_all is taken to follow the animaldays in sorted name
+                    order, which is the order AnimalOrganizer builds them in. Passing the names
+                    removes that assumption, and read_sars_spikes always does.
 
         Returns:
             WindowAnalysisResult: WAR object with spike features added to result DataFrame.
 
+        Raises:
+            ValueError: If the number of names and spike sets differ, or an animalday in the
+                result has no spike set.
+
         Notes:
-            - Groups self.result by 'animalday' and matches to spikes_all by index
+            - Each animalday's counts are written to that animalday's own rows. They used to
+              be concatenated in sorted name order and assigned to the rows by position, but
+              rows are sorted by timestamp, and names sort differently from dates across some
+              month boundaries ('Feb-01-2020' before 'Jan-31-2020'). For an animal recorded
+              across such a boundary every row got another window's count, shifted by the
+              length of its earliest animalday: about 13 h for IQSEC2 76 and 78.
             - Uses _bin_spike_df() helper to count spikes within each time window
             - Adds two new columns:
                 - 'nspike': array of spike counts per channel for each window
                 - 'lognspike': log-transformed spike counts via log_transform()
-            - Warns if spike count size doesn't match result DataFrame size
         """
-        # Each groupby animalday is a recording session
-        grouped = self.result.groupby("animalday")
-        animaldays = grouped.groups.keys()
-        logging.debug(f"Animal days: {animaldays}")
-        spike_counts = dict(zip(animaldays, spikes_all))
-        spike_counts = grouped.apply(
-            lambda x: _bin_spike_df(x, spikes_channel=spike_counts[x.name])
-        )
-        spike_counts: pd.Series = spike_counts.explode()
-
-        if spike_counts.size != self.result.shape[0]:
-            logging.warning(
-                f"Spike counts size {spike_counts.size} does not match result size {self.result.shape[0]}"
+        # Each animalday is one recording session, and its spike times are seconds from the
+        # start of that session, so they are binned against that animalday's own rows.
+        row_days = self.result["animalday"].to_numpy()
+        days_in_rows = list(dict.fromkeys(row_days))
+        if animaldays is None:
+            animaldays = sorted(days_in_rows)
+        animaldays = list(animaldays)
+        if len(animaldays) != len(spikes_all):
+            raise ValueError(
+                f"{len(spikes_all)} spike sets were given for {len(animaldays)} animaldays"
             )
+        spikes_by_day = dict(zip(animaldays, spikes_all))
+        missing = [day for day in days_in_rows if day not in spikes_by_day]
+        if missing:
+            raise ValueError(f"No spike results for animalday(s) {missing}")
+        unused = [day for day in spikes_by_day if day not in set(days_in_rows)]
+        if unused:
+            logging.warning(f"Spike results for animaldays with no windows were ignored: {unused}")
+        logging.debug(f"Animal days: {days_in_rows}")
+
+        nspike = np.empty(len(row_days), dtype=object)
+        for day in days_in_rows:
+            positions = np.flatnonzero(row_days == day)
+            counts = _bin_spike_df(self.result.iloc[positions], spikes_channel=spikes_by_day[day])
+            for position, row_counts in zip(positions, counts):
+                nspike[position] = row_counts
 
         result = self.result.copy()
-        result["nspike"] = spike_counts.tolist()
+        result["nspike"] = list(nspike)
         result["lognspike"] = list(
             log_transform(np.stack(result["nspike"].tolist(), axis=0))
         )
