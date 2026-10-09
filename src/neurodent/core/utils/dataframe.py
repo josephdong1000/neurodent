@@ -98,6 +98,66 @@ def nanmean_series_of_np(x: pd.Series, axis: int = 0) -> np.ndarray:
     return xmean
 
 
+def nanaverage_series_of_np(x: pd.Series, weights: pd.Series) -> np.ndarray:
+    """
+    Compute a weighted NaN-aware mean across a Series whose elements are numpy arrays.
+
+    The weighted counterpart of :func:`nanmean_series_of_np`, for averaging rows that do not
+    represent equal amounts of recording. Each element of ``x`` is weighted by the matching
+    element of ``weights``, and NaNs are masked per position rather than per row, so a
+    channel that is NaN in one row still gets the full weight of the rows where it is
+    present.
+
+    Args:
+        x (pd.Series): Series containing numpy arrays (or scalars) as elements.
+        weights (pd.Series): Weight for each element of ``x``, in the same order and of the
+            same length.
+
+    Returns:
+        np.ndarray: The weighted average across the Series elements. Positions that are NaN
+            in every element come back as NaN. Falls back to the unweighted mean when the
+            weights sum to zero or are all NaN, since a zero total carries no information
+            about how to combine the rows.
+
+    Raises:
+        ValueError: If ``x`` and ``weights`` have different lengths.
+
+    Examples:
+        >>> import pandas as pd
+        >>> import numpy as np
+        >>> values = pd.Series([np.array([1.0, 2.0]), np.array([3.0, 4.0])])
+        >>> nanaverage_series_of_np(values, pd.Series([3.0, 1.0]))
+        array([1.5, 2.5])
+    """
+    if len(x) != len(weights):
+        raise ValueError(
+            f"x and weights must be the same length, got {len(x)} and {len(weights)}"
+        )
+
+    stacked = np.array(list(x), dtype=float)
+    w = np.asarray(weights, dtype=float)
+    w = np.where(np.isfinite(w), w, 0.0)
+
+    if w.sum() <= 0:
+        return np.nanmean(stacked, axis=0)
+
+    # Broadcast the weights along the value axes, then zero the weight wherever the value is
+    # NaN so that a missing channel does not drag its row's weight into the denominator.
+    shaped = w.reshape((len(w),) + (1,) * (stacked.ndim - 1))
+    per_position = np.where(np.isnan(stacked), 0.0, np.broadcast_to(shaped, stacked.shape))
+
+    totals = per_position.sum(axis=0)
+    numerator = np.nansum(np.where(np.isnan(stacked), 0.0, stacked) * per_position, axis=0)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        out = np.where(totals > 0, numerator / np.where(totals > 0, totals, 1.0), np.nan)
+
+    # np.where yields a 0-d array when the rows are scalars rather than arrays, where
+    # nanmean_series_of_np yields a numpy scalar. Returning the 0-d array makes the averaged
+    # column object dtype, which the plotting layer cannot use, so match the unweighted
+    # function's container exactly.
+    return out[()] if out.ndim == 0 else out
+
+
 def sort_dataframe_by_plot_order(df: pd.DataFrame, df_sort_order: Optional[dict] = None) -> pd.DataFrame:
     """
     Sort DataFrame columns according to predefined orders.

@@ -40,6 +40,7 @@ from .caching import (
 )
 from .dataframe import (
     nanaverage,
+    nanaverage_series_of_np,
     nanmean_series_of_np,
     sort_dataframe_by_plot_order,
     _get_groupby_keys,
@@ -84,6 +85,7 @@ __all__ = [
     "get_cache_status_message",
     "should_use_cache_unified",
     "nanaverage",
+    "nanaverage_series_of_np",
     "nanmean_series_of_np",
     "sort_dataframe_by_plot_order",
     "Natural_Neighbor",
