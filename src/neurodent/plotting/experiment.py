@@ -257,12 +257,8 @@ class ExperimentPlotter:
 
         Note:
             Rows arriving here are animaldays once the WARs have been flattened, and
-            animaldays are not the same length: an animal recorded on two rigs in sequence
-            can hold one 70 hour animalday beside five 18 hour ones. Averaging those
-            unweighted gives 44 percent of that animal's data 17 percent of the weight, so
-            the weighted mean is the default. This weights per second rather than per
-            animal, which is also what the unweighted mean did, since a row is an animalday
-            and animals contribute different numbers of them.
+            animaldays are not the same length. `weight_by_duration=True` weights per second rather than per
+            animal.
         """
         if "band" in groupby or groupby == "band":
             raise ValueError(
