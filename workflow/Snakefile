@@ -140,27 +140,6 @@ def get_animal_id(wildcards):
     return ANIMAL_TO_FULL_ID_MAP[wildcards.animal]
 
 
-def get_all_fragment_filtered_parquet(wildcards):
-    out = []
-    for anim in ANIMALS:
-        # Only process animals that have quality-filtered output
-        qual_filter_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        qual_filenames = glob_wildcards(os.path.join(qual_filter_output, "{filename}.parquet")).filename
-        if qual_filenames:  # Only if quality filtering produced files
-            out.append(f"results/wars_fragment_filtered/{Path(qual_filter_output).name}/war.parquet")
-    return out
-
-
-def get_all_fragment_filtered_json(wildcards):
-    out = []
-    for anim in ANIMALS:
-        qual_filter_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        qual_filenames = glob_wildcards(os.path.join(qual_filter_output, "{filename}.json")).filename
-        if qual_filenames:
-            out.append(f"results/wars_fragment_filtered/{Path(qual_filter_output).name}/war.json")
-    return out
-
-
 # def get_flattened_wars_pkl(wildcards):
 #     out = []
 #     for anim in ANIMALS:

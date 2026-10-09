@@ -9,11 +9,16 @@ with respect to zeitgeber time rather than fragment index.
 
 rule war_zeitgeber:
     """
-    Extract zeitgeber time features from all fragment-filtered WARs
+    Extract zeitgeber time features from the manually channel-filtered WARs.
+
+    The same branch EP and relfreq read, so the configured bad channels are left out here too.
+    This rule used to read the fragment-filtered WARs, one step earlier, so electrodes the config
+    marks as bad were in every zeitgeber figure while every other figure left them out. Channel
+    averaging uses nanmean, so a rejected channel drops out of the average instead of blanking it.
     """
     input:
-        war_parquet=get_all_fragment_filtered_parquet,
-        war_json=get_all_fragment_filtered_json,
+        war_parquet=lambda wc: get_wars_after_quality_filtered(wc, filepath_prepend="results/wars_channel_filtered_manual", filepath_append="war.parquet"),
+        war_json=lambda wc: get_wars_after_quality_filtered(wc, filepath_prepend="results/wars_channel_filtered_manual", filepath_append="war.json"),
     output:
         zeitgeber_features="results/wars_zeitgeber/zeitgeber_features.pkl",
     threads:
