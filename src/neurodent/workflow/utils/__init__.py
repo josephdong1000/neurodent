@@ -17,6 +17,12 @@ from .discovery import (
     resolve_animal_pattern,
 )
 from .animal_loading import load_animal_recordings
+from .quality_filter import (
+    write_exclusion_record,
+    clear_exclusion_record,
+    quality_filter_outcome,
+    format_exclusion_summary,
+)
 from .logging import (
     setup_snakemake_logging,
     increment_memory,
@@ -42,6 +48,10 @@ __all__ = [
     "get_discovery_animal_filter",
     "resolve_animal_pattern",
     "load_animal_recordings",
+    "write_exclusion_record",
+    "clear_exclusion_record",
+    "quality_filter_outcome",
+    "format_exclusion_summary",
     "setup_snakemake_logging",
     "increment_memory",
     "load_wars",
