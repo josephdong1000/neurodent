@@ -70,14 +70,18 @@ def load_animal_recordings(
             exactly the configured one.
         logger (logging.Logger | None, optional): Logger for progress messages; a
             module logger is used when ``None``.
+        validate_only (bool, optional): Discover and check without loading anything; see
+            Returns. Defaults to False.
 
     Returns:
         AnimalOrganizer: Consolidated organizer with ``genotype``/``sex`` set and
         ``long_recordings`` populated. When ``validate_only=True`` no data is loaded and a
-        summary ``dict`` (``{"n_sessions", "n_files", "sessions"}``) is returned instead —
-        this runs the *same* discovery + skip + ``manual_datetimes`` validation the real load
-        does (raising identically on any mismatch), so it is the single pre-flight checkpoint
-        the dry-run reuses.
+        summary ``dict`` (``{"n_sessions", "n_files", "sessions"}``) is returned instead.
+        That runs discovery, skip_sessions and every ``manual_datetimes`` check that needs no
+        file contents, raising as the real load would. Anything that reads a file (the
+        reader, units, channel names, the split, merges, time overlaps) is only checked by a
+        real load. ``snakemake --dry-run`` does not call this at all; the preflight script
+        ``scripts/iqsec2/validate_config.py`` does.
 
     Raises:
         KeyError: If ``animal_id`` is not in ``constants.ANIMAL_METADATA`` or a
@@ -241,9 +245,8 @@ def load_animal_recordings(
         )
 
         if validate_only:
-            # Discovery + skip_sessions + the real manual_datetime validation ran above
-            # (raising on any mismatch) with NO per-file load. Record what would load and
-            # move on — no channel split, no consolidation.
+            # Discovery, skip_sessions and the file-free manual_datetime checks ran above,
+            # with no file read. Record what would load and move on: no split, no merge.
             groups = session_ao._animalday_folder_groups
             val_sessions.update(groups.keys())
             val_files += sum(len(v) for v in groups.values())
