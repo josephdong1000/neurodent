@@ -973,11 +973,9 @@ class AoTimelineMixin:
             list: Sorted (folder_path, lro) tuples in temporal order based on median timestamp
 
         Note:
-            Extracts file_end_datetimes from each LRO (timestamps from LastEdit fields in metadata CSV files),
-            calculates the median timestamp of constituent recordings within each LRO, and sorts LROs
-            by this median timestamp. This ensures proper temporal ordering based on actual recording
-            content rather than folder naming conventions. Falls back to folder modification time if
-            no valid timestamps are available.
+            Takes file_end_datetimes from each LRO, calculates the median timestamp of its
+            files, and sorts LROs by it, so the order follows the recordings rather than how
+            folders are named. An LRO with no valid timestamps sorts last, with a warning.
         """
         # Call static version for sorting logic
         sorted_folder_lro_pairs = self._sort_lros_by_median_time_static(

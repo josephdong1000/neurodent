@@ -20,6 +20,8 @@ except Exception:  # pragma: no cover
 
 import numpy as np
 import mne
+
+from neurodent import constants
 from scipy.signal import iirfilter, iirnotch, sosfiltfilt, filtfilt, stft, windows
 
 try:
@@ -46,7 +48,7 @@ class FrequencyDomainSpikeDetector:
     # Default detection parameters
     DEFAULT_PARAMS = {
         "bp": [3.0, 40.0],  # bandpass filter Hz
-        "notch": 60.0,  # notch filter Hz
+        "notch": float(constants.LINE_FREQ),  # notch filter Hz
         "notch_q": 30.0,  # notch filter quality factor
         "freq_slices": [10.0, 20.0],  # STFT energy slices Hz
         "window_s": 0.125,  # STFT window size s

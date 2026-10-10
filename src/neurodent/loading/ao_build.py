@@ -53,11 +53,6 @@ class AoBuildMixin:
             if len(items) == 1:
                 item_to_pass = items[0]
                 kw = kwargs.copy()
-                if self._is_item_file(item_to_pass) and isinstance(
-                    item_to_pass, (list, tuple)
-                ):
-                    # LRO handles lists of files directly, but we pass input_type='files'? Wait, LRO handles it natively now
-                    pass
                 lro = _lro.LongRecordingOrganizer(item_to_pass, **kw)
                 # A single-item session never reaches the multi-item filter below, so a
                 # lone dead file would otherwise propagate a 0-sample LRO downstream with

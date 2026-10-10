@@ -8,7 +8,6 @@ their fragment-accessor callers), the class declaration, and ``split_recording``
 """
 
 import math
-import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Literal, Union
@@ -112,8 +111,10 @@ class LongRecordingOrganizer(
             - 'si': Use SpikeInterface extractors
             - 'mne': Use MNE-Python extractors (creates intermediate file)
             - None: No data loading (item must be None, recording must be provided)
-        truncate (bool | int, optional): If True, truncate to first 10 files.
-            If an integer, truncate to first n files. Defaults to False.
+        truncate (bool | int, optional): Not supported, and anything that would truncate
+            raises ValueError. It used to warn that it would truncate and then load every
+            file. To load fewer sessions, pass ``truncate`` to AnimalOrganizer. Defaults to
+            False.
         cache_policy (Literal['auto', 'always', 'force_regenerate'], optional):
             Cache policy for intermediate files. Defaults to 'auto'.
         multiprocess_mode (Literal['dask', 'serial'], optional): Whether to load files
@@ -176,11 +177,13 @@ class LongRecordingOrganizer(
             self.item = item
 
         self.n_truncate = parse_truncate(truncate)
-        self.truncate = True if self.n_truncate > 0 else False
-        if self.truncate:
-            warnings.warn(
-                f"LongRecording will be truncated to the first {self.n_truncate} files"
+        if self.n_truncate > 0:
+            raise ValueError(
+                f"truncate={truncate!r}: LongRecordingOrganizer does not truncate. It used to "
+                "warn that it would and then load every file. To load fewer sessions, pass "
+                "truncate to AnimalOrganizer."
             )
+        self.truncate = False
 
         self.manual_datetimes = manual_datetimes
         self.datetimes_are_start = datetimes_are_start

@@ -182,7 +182,7 @@ class LroMergeMixin:
             ImportError: If SpikeInterface is not available.
 
         Example:
-            >>> lro = LongRecordingOrganizer("/path/to/data", mode="bin")
+            >>> lro = LongRecordingOrganizer(item, mode="si", extract_func="read_intan")
             >>> splits = lro.split({"AnimalA": ["Ch1", "Ch2"], "AnimalB": ["Ch3", "Ch4"]})
             >>> splits["AnimalA"].save_recording("/output/AnimalA", format="zarr")
         """
@@ -258,7 +258,6 @@ class LroMergeMixin:
                 recording=sub_rec,
                 manual_datetimes=self.manual_datetimes,
                 datetimes_are_start=self.datetimes_are_start,
-                truncate=self.n_truncate if self.truncate else False,
             )
 
             # Inherit file-level timestamps and durations as copies. Merging appends to these
