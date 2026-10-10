@@ -76,9 +76,12 @@ def load_animal_recordings(
     Returns:
         AnimalOrganizer: Consolidated organizer with ``genotype``/``sex`` set and
         ``long_recordings`` populated. When ``validate_only=True`` no data is loaded and a
-        summary ``dict`` (``{"n_sessions", "n_files", "sessions"}``) is returned instead.
-        That runs discovery, skip_sessions and every ``manual_datetimes`` check that needs no
-        file contents, raising as the real load would. Anything that reads a file (the
+        summary ``dict`` (``{"n_sessions", "n_files", "sessions", "sources"}``) is returned
+        instead. ``sources`` holds one entry per source with the reader settings it resolved
+        (``lro_kwargs``), the channels it would be split to (``split_to``) and the discovered
+        ``items``, so a preflight can open exactly what a load would.
+        The dry run itself runs discovery, skip_sessions and every ``manual_datetimes``
+        check that needs no file contents, raising as the real load would. Anything that reads a file (the
         reader, units, channel names, the split, merges, time overlaps) is only checked by a
         real load. ``snakemake --dry-run`` does not call this at all; the preflight script
         ``scripts/iqsec2/validate_config.py`` does.
@@ -97,6 +100,7 @@ def load_animal_recordings(
 
     all_lros = []
     val_sessions, val_files = set(), 0   # validate_only accounting (no data load)
+    val_sources = []  # validate_only: what each source would read, and how
     analysis_config = config["analysis"]["war_generation"]
 
     # Resolve genotype from metadata (Metadata-First)
@@ -142,7 +146,7 @@ def load_animal_recordings(
     else:
         work_items = [(info, None) for info in animal_folders]
 
-    for folder_info, source_spec in work_items:
+    for source_index, (folder_info, source_spec) in enumerate(work_items):
         # Unpack tuple from Snakefile
         folder_path, source_animal_id, session_key = folder_info
 
@@ -250,6 +254,12 @@ def load_animal_recordings(
             groups = session_ao._animalday_folder_groups
             val_sessions.update(groups.keys())
             val_files += sum(len(v) for v in groups.values())
+            val_sources.append({
+                "source": source_index if source_specs else None,
+                "lro_kwargs": {k: v for k, v in session_lro_kwargs.items() if k != "manual_datetimes"},
+                "split_to": subset,
+                "items": [item for items in groups.values() for item in items],
+            })
             continue
 
         if splits_source:
@@ -261,7 +271,7 @@ def load_animal_recordings(
 
     if validate_only:
         return {"n_sessions": len(val_sessions), "n_files": val_files,
-                "sessions": sorted(val_sessions)}
+                "sessions": sorted(val_sessions), "sources": val_sources}
 
     # Consolidate into single AnimalOrganizer
     logger.info(f"Consolidating {len(all_lros)} recordings into single AnimalOrganizer for {animal_id}")

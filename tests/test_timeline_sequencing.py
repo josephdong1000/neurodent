@@ -29,6 +29,10 @@ class TestTimelineSequencing:
         ao._is_item_file = AnimalOrganizer._is_item_file.__get__(ao, AnimalOrganizer)
         ao._items_have_index = AnimalOrganizer._items_have_index.__get__(ao, AnimalOrganizer)
         ao._session_sort_key = AnimalOrganizer._session_sort_key.__get__(ao, AnimalOrganizer)
+        # Helpers _process_manual_datetimes calls for per-file lists and skipped sessions
+        ao._check_session_list = AnimalOrganizer._check_session_list.__get__(ao, AnimalOrganizer)
+        ao._check_skipped_session_keys = AnimalOrganizer._check_skipped_session_keys.__get__(ao, AnimalOrganizer)
+        ao._skipped_sessions = set()
         # Bind _iter_valid_recordings so the post-load guard in _create_long_recordings works
         ao._iter_valid_recordings = AnimalOrganizer._iter_valid_recordings.__get__(ao, AnimalOrganizer)
         # _create_long_recordings now filters 0-sample LROs on the single-item path as well
