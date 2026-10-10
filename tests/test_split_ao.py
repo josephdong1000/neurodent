@@ -331,7 +331,7 @@ class TestFromLros:
         lros = [lro1, lro2]
 
         # Should raise ValueError with helpful message
-        with pytest.raises(ValueError, match="Cannot merge LROs for"):
+        with pytest.raises(ValueError, match="Cannot merge the recordings that start on Jan-01-2023 into one animalday"):
             AnimalOrganizer.from_lros(
                 lros=lros,
                 animal_id="TestAnimal",

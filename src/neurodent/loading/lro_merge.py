@@ -6,13 +6,37 @@ Mixin for :class:`~neurodent.loading.long_recording_organizer.LongRecordingOrgan
 import copy
 import logging
 import warnings
+from datetime import timedelta
 
 try:
     import spikeinterface.core as si
 except Exception:  # pragma: no cover - optional at import time
     si = None
 
+from neurodent.constants import RECORDING_TIME_TOLERANCE_S
 from neurodent.core.utils import resolve_channels
+
+
+def file_intervals(lro) -> list:
+    """Each live file's ``(start, end)`` in a recording, or an empty list when timing is unknown.
+
+    A file is live when it has an end datetime and a positive duration. 0-sample files carry
+    a 0 duration and are left out, as ``_update_metadata_after_merge`` leaves them out.
+
+    Args:
+        lro: A LongRecordingOrganizer, or anything with ``file_end_datetimes`` and
+            ``file_durations`` lists. Objects without them give an empty list.
+
+    Returns:
+        list[tuple[datetime, datetime]]: One interval per live file, in the recording's order.
+    """
+    ends = getattr(lro, "file_end_datetimes", None) or []
+    durations = getattr(lro, "file_durations", None) or []
+    return [
+        (end - timedelta(seconds=float(duration)), end)
+        for end, duration in zip(ends, durations)
+        if end is not None and duration is not None and duration > 0
+    ]
 
 
 class LroMergeMixin:
@@ -120,14 +144,16 @@ class LroMergeMixin:
                 truncate=self.n_truncate if self.truncate else False,
             )
 
-            # Inherit file-level timestamps and durations (post-instantiation assignment)
+            # Inherit file-level timestamps and durations as copies. Merging appends to these
+            # lists in place, so children sharing the parent's list objects would each see
+            # the files merged into the others.
             if hasattr(self, "file_end_datetimes"):
-                child_lro.file_end_datetimes = self.file_end_datetimes
+                child_lro.file_end_datetimes = list(self.file_end_datetimes)
 
             # Inherit parent durations to ensure consistency with timestamps
             if hasattr(self, "file_durations") and self.file_durations:
-                child_lro.file_durations = self.file_durations
-                child_lro.cumulative_file_durations = self.cumulative_file_durations
+                child_lro.file_durations = list(self.file_durations)
+                child_lro.cumulative_file_durations = list(self.cumulative_file_durations)
 
             # Inherit bad channels that are present in this split
             if self.bad_channel_names:
@@ -159,7 +185,9 @@ class LroMergeMixin:
             other_lro (LongRecordingOrganizer): The LRO to merge into this one
 
         Raises:
-            ValueError: If LROs are incompatible (different channels, sampling rates, etc.)
+            ValueError: If LROs are incompatible (different channels, sampling rates, etc.),
+                or if ``other_lro`` starts before this one ends by more than
+                ``RECORDING_TIME_TOLERANCE_S``. A larger gap is logged, not raised.
             ImportError: If SpikeInterface is not available
         """
         if si is None:
@@ -167,6 +195,7 @@ class LroMergeMixin:
 
         # Validate merge compatibility
         self._validate_merge_compatibility(other_lro)
+        self._validate_merge_timeline(other_lro)
 
         # Skip recording concatenation if other_lro has 0 samples (e.g. empty
         # tail file), but still update metadata so dt_end etc. stay correct.
@@ -224,13 +253,16 @@ class LroMergeMixin:
         first, so the wall is hit immediately rather than partway through.
 
         Per-step validation, channel renaming, 0-sample handling and metadata
-        accumulation are all preserved; only the concatenation is deferred.
+        accumulation are all preserved; only the concatenation is deferred. Each entry's
+        start is checked against the end of everything merged before it.
 
         Args:
             other_lros (list[LongRecordingOrganizer]): LROs to merge, in temporal order.
 
         Raises:
-            ValueError: If any LRO is incompatible with this one.
+            ValueError: If any LRO is incompatible with this one, or starts before the
+                recordings merged ahead of it end, by more than ``RECORDING_TIME_TOLERANCE_S``.
+                A larger gap is logged, not raised.
             ImportError: If SpikeInterface is not available.
         """
         if si is None:
@@ -239,6 +271,7 @@ class LroMergeMixin:
         recordings = [self.LongRecording]
         for other_lro in other_lros:
             self._validate_merge_compatibility(other_lro)
+            self._validate_merge_timeline(other_lro)
 
             # A 0-sample tail contributes no samples but its metadata still matters, so
             # keep it out of the concatenation and fold its metadata in, as merge() does.
@@ -310,6 +343,42 @@ class LroMergeMixin:
             raise ValueError("This LRO does not have a valid LongRecording")
         if not hasattr(other_lro, "LongRecording") or other_lro.LongRecording is None:
             raise ValueError("Other LRO does not have a valid LongRecording")
+
+    def _validate_merge_timeline(self, other_lro):
+        """Raise if ``other_lro`` starts before this recording ends, beyond clock jitter.
+
+        Merging concatenates samples, so what is appended has to come after what is already
+        there. An overlap means a misplaced timestamp or the same data loaded twice, and both
+        used to be concatenated without a word, after which every feature was computed on the
+        doubled or misordered data. A gap is legitimate, since recordings get stopped and
+        restarted, so it is logged instead. Recordings without file timing are not checked.
+
+        Args:
+            other_lro (LongRecordingOrganizer): The recording about to be appended.
+
+        Raises:
+            ValueError: If ``other_lro`` starts more than ``RECORDING_TIME_TOLERANCE_S``
+                before this recording's last file ends.
+        """
+        mine, theirs = file_intervals(self), file_intervals(other_lro)
+        if not mine or not theirs:
+            return
+        my_end = max(end for _, end in mine)
+        their_start = min(start for start, _ in theirs)
+        residual = (their_start - my_end).total_seconds()
+        if residual < -RECORDING_TIME_TOLERANCE_S:
+            raise ValueError(
+                f"{other_lro.display_name} starts at {their_start}, {-residual:.1f} s before "
+                f"the recording it would be appended to ({self.display_name}) ends at "
+                f"{my_end}. Either a timestamp is wrong or the same data is being loaded "
+                f"twice, for example by two sources or sessions that reach the same files. "
+                f"Overlaps up to {RECORDING_TIME_TOLERANCE_S:g} s are treated as clock jitter."
+            )
+        if residual > RECORDING_TIME_TOLERANCE_S:
+            logging.warning(
+                f"{residual:.1f} s gap inside one merged recording: {self.display_name} ends at "
+                f"{my_end} and {other_lro.display_name} starts at {their_start}."
+            )
 
     def _update_metadata_after_merge(self, other_lro):
         """Update this LRO's metadata after merging with another LRO.

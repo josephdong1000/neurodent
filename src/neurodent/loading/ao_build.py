@@ -214,6 +214,7 @@ class AoBuildMixin:
                 "(wrong file pattern, wrong data root, or corrupt data). "
                 "Check the warnings above for per-file root causes."
             )
+        self._validate_no_overlap_across_recordings(self.long_recordings, self.animal_id)
         self._log_timeline_summary()
 
         if len(self.long_recordings) != len(self.unique_animaldays):
@@ -232,6 +233,48 @@ class AoBuildMixin:
     def cleanup_rec(self):
         for lrec in self.long_recordings:
             lrec.cleanup_rec()
+
+    @staticmethod
+    def _validate_no_overlap_across_recordings(lros, animal_id):
+        """Raise if two files of one animal claim the same wall time, beyond clock jitter.
+
+        Merging checks each recording against the one it is appended to, but recordings that
+        start on different dates are never merged, so an overlap between animaldays (a
+        session anchor that lands inside the previous day's session, or the same files
+        reached by two sources) is visible only here. Every live file of every recording is
+        pooled and walked in order of its own start time, so the order of ``lros`` does not
+        matter. Recordings without file timing contribute nothing.
+
+        Args:
+            lros: The animal's recordings.
+            animal_id: Names the animal in the error message.
+
+        Raises:
+            ValueError: If any file starts more than ``RECORDING_TIME_TOLERANCE_S`` before an
+                earlier-starting file ends.
+        """
+        from neurodent.constants import RECORDING_TIME_TOLERANCE_S
+
+        from .lro_merge import file_intervals
+
+        files = sorted(
+            ((start, end, lro.display_name) for lro in lros for start, end in file_intervals(lro)),
+            key=lambda f: f[0],
+        )
+        latest = None  # (end, name) of the file that reaches furthest so far
+        for start, end, name in files:
+            if latest is not None:
+                overlap = (latest[0] - start).total_seconds()
+                if overlap > RECORDING_TIME_TOLERANCE_S:
+                    raise ValueError(
+                        f"Animal '{animal_id}': a file of {name} starts at {start}, "
+                        f"{overlap:.1f} s before a file of {latest[1]} ends at {latest[0]}. "
+                        f"Two recordings of one animal cannot cover the same time; either a "
+                        f"timestamp is wrong or the same data is loaded twice. Overlaps up to "
+                        f"{RECORDING_TIME_TOLERANCE_S:g} s are treated as clock jitter."
+                    )
+            if latest is None or end > latest[0]:
+                latest = (end, name)
 
     @staticmethod
     def _filter_zero_sample_lros(lro_pairs, get_name):
@@ -403,11 +446,10 @@ class AoBuildMixin:
                     # Flat concatenation rather than a fold; see LroMergeMixin.merge_many.
                     base_lro.merge_many([lro for _, lro in sorted_pairs[1:]])
                 except ValueError as e:
-                    # Provide detailed error for incompatible LROs
+                    # The cause (channels, sampling rate or timing) is in the message itself.
                     raise ValueError(
-                        f"Cannot merge LROs for {animalday}: {e}\n"
-                        f"All LROs with the same date must have compatible metadata "
-                        f"(same channels, sampling rate, etc.)."
+                        f"Cannot merge the recordings that start on {date_str} into one "
+                        f"animalday for {animal_id}: {e}"
                     ) from e
 
                 merged_lros.append(base_lro)
@@ -442,8 +484,10 @@ class AoBuildMixin:
         for lro, animalday in zip(merged_lros, merged_animaldays):
             lro.animalday = animalday
 
-        # Step 5: Validate and reconcile channel names across all merged LROs
+        # Step 5: Validate and reconcile channel names across all merged LROs, and check
+        # that no two recordings cover the same time (merging checked only within a date).
         ao.channel_names = cls._validate_channel_names(merged_lros)
+        cls._validate_no_overlap_across_recordings(merged_lros, animal_id)
 
         # Step 6: CRITICAL VALIDATION - ensure no duplicates after merge
         if len(ao.long_recordings) != len(set(ao.unique_animaldays)):
