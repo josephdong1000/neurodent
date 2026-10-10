@@ -35,8 +35,6 @@ def test_split_inherits_all_critical_metadata():
     lro.manual_datetimes = [datetime.datetime(2023, 1, 1, 10, 0, 0)] # e.g. start time provided manually
     lro.datetimes_are_start = True
     lro.bad_channel_names = ["Ch1", "Ch3"] 
-    lro.n_truncate = 5
-    lro.truncate = True
     
     # Rich metadata to test deepcopy
     # We need to set lro.meta to something that has attributes we can check
@@ -66,8 +64,8 @@ def test_split_inherits_all_critical_metadata():
     assert child.datetimes_are_start == lro.datetimes_are_start
     
     # C. Truncate
-    assert child.n_truncate == lro.n_truncate
-    assert child.truncate == lro.truncate
+    # truncate is not inherited: an organizer refuses to truncate, so children never do.
+    assert child.truncate is False
     
     # D. Metadata (Deep Copy)
     assert child.meta.mult_to_uV == lro.meta.mult_to_uV
