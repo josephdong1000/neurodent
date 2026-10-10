@@ -497,10 +497,9 @@ class TestSplit:
 
     def test_split_no_recordings_raises_error(self):
         """Test that split raises error when no recordings loaded."""
-        ao = AnimalOrganizer.from_lros(
-            lros=[MagicMock(spec=LongRecordingOrganizer, channel_names=["Ch0"])],
-            animal_id="Test",
-        )
+        lro = MagicMock(spec=LongRecordingOrganizer, channel_names=["Ch0"])
+        lro.get_date_string.return_value = "Jan-01-2023"
+        ao = AnimalOrganizer.from_lros(lros=[lro], animal_id="Test")
         ao.long_recordings = []  # Clear recordings
         
         with pytest.raises(ValueError, match="No recordings loaded to split"):

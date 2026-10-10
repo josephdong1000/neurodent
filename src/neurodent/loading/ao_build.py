@@ -6,6 +6,7 @@ Mixin for :class:`~neurodent.loading.animal_organizer.AnimalOrganizer`.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Literal, Union
 
@@ -214,6 +215,7 @@ class AoBuildMixin:
                 "(wrong file pattern, wrong data root, or corrupt data). "
                 "Check the warnings above for per-file root causes."
             )
+        self._order_recordings_by_time()
         self._validate_no_overlap_across_recordings(self.long_recordings, self.animal_id)
         self._log_timeline_summary()
 
@@ -233,6 +235,25 @@ class AoBuildMixin:
     def cleanup_rec(self):
         for lrec in self.long_recordings:
             lrec.cleanup_rec()
+
+    def _order_recordings_by_time(self):
+        """Put ``long_recordings``, and their labels with them, in order of each one's first file.
+
+        Sessions come out of discovery in filesystem and ``{index}`` order, so without this
+        the first recording, which sets the reference channel spelling, depended on how the
+        files happened to be listed. If any recording has no file times, or the labels no
+        longer pair one to one with the recordings, the order is left alone; the caller
+        reports the second case.
+        """
+        from .lro_merge import file_intervals
+
+        starts = [min((s for s, _ in file_intervals(lro)), default=None) for lro in self.long_recordings]
+        if None in starts or len(self.unique_animaldays) != len(self.long_recordings):
+            return
+        order = sorted(range(len(starts)), key=starts.__getitem__)
+        self.long_recordings = [self.long_recordings[i] for i in order]
+        self.unique_animaldays = [self.unique_animaldays[i] for i in order]
+        self.animaldays = self.unique_animaldays
 
     @staticmethod
     def _validate_no_overlap_across_recordings(lros, animal_id):
@@ -352,6 +373,11 @@ class AoBuildMixin:
             order (sorted by median timestamp). This ensures proper handling of
             multi-session recordings consolidated via generate_wars.py.
 
+            The resulting animaldays are in date order, so ``long_recordings``,
+            ``animaldays`` and the reference channel spelling (taken from the first
+            animalday) do not depend on how the input was ordered. Before, dates were
+            sorted as text, which put 'Feb-01-2020' ahead of 'Jan-31-2020'.
+
         Example:
             >>> # After splitting a multi-animal recording across multiple sessions
             >>> all_lros = []
@@ -393,7 +419,10 @@ class AoBuildMixin:
         merged_lros = []
         merged_animaldays = []
 
-        for date_str in sorted(date_to_lros.keys()):  # Sort for deterministic ordering
+        # Chronological, not alphabetical: as text 'Feb-01-2020' sorts before 'Jan-31-2020'.
+        # The first animalday is the channel-name reference, and everything that pairs
+        # lists by position downstream expects time order.
+        for date_str in sorted(date_to_lros, key=lambda d: datetime.strptime(d, "%b-%d-%Y")):
             lro_group = date_to_lros[date_str]
             animalday = f"{animal_id} {genotype} {date_str}"
 

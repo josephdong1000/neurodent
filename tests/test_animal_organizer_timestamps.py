@@ -420,7 +420,8 @@ class TestAnimalOrganizerTimestampHandling:
 
         # Create mocks with timing information
         def mock_lro_side_effect(*args, **kwargs):
-            folder_path = args[0]
+            # args[0] is a DiscoveredFile, whose ``in`` looks at metadata keys, not the path.
+            folder_path = " ".join(args[0].get_path_list())
             if "2023-01-15" in folder_path:
                 return self._create_mock_lro("folder1", start_times[0])
             else:

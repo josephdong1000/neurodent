@@ -25,13 +25,16 @@ def file_intervals(lro) -> list:
 
     Args:
         lro: A LongRecordingOrganizer, or anything with ``file_end_datetimes`` and
-            ``file_durations`` lists. Objects without them give an empty list.
+            ``file_durations`` lists. Objects without them, or with something other than a
+            list or tuple there (such as a test double), give an empty list.
 
     Returns:
         list[tuple[datetime, datetime]]: One interval per live file, in the recording's order.
     """
-    ends = getattr(lro, "file_end_datetimes", None) or []
-    durations = getattr(lro, "file_durations", None) or []
+    ends = getattr(lro, "file_end_datetimes", None)
+    durations = getattr(lro, "file_durations", None)
+    if not isinstance(ends, (list, tuple)) or not isinstance(durations, (list, tuple)):
+        return []
     return [
         (end - timedelta(seconds=float(duration)), end)
         for end, duration in zip(ends, durations)

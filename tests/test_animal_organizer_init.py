@@ -12,6 +12,7 @@ class TestAnimalOrganizerInitialization:
     @pytest.fixture
     def mock_lro(self):
         lro = MagicMock(spec=LongRecordingOrganizer)
+        lro.get_date_string.return_value = "Jan-01-2022"
         lro.channel_names = ["ch1", "ch2"]
         lro.base_folder_path = "/tmp/mock/folder"
         lro.labels = {}
