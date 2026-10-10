@@ -9,7 +9,67 @@ import os
 
 import numpy as np
 
-__all__ = ["read_bin_csv_pair"]
+__all__ = ["SidecarFormatError", "read_bin_csv_pair"]
+
+
+class SidecarFormatError(RuntimeError):
+    """A sidecar describes its payload in a way this reader would misread.
+
+    Deliberately not a ValueError. The loader treats a ValueError from a file pair as a
+    corrupt or empty file, drops it and carries on, which is right for a zero-byte payload
+    but would turn a units or layout mismatch into silently lost or misread data. This error
+    stops the load instead.
+    """
+
+
+def _single_value(rows, column, csv_path):
+    """The one value a column holds on every row, or None when the column is absent."""
+    if column not in rows[0]:
+        return None
+    values = {(row.get(column) or "").strip() for row in rows}
+    if len(values) != 1:
+        raise SidecarFormatError(
+            f"{column} differs between channels in {csv_path}: {sorted(values)}. The reader "
+            f"reads one {column} for the whole file."
+        )
+    return values.pop()
+
+
+def _check_sidecar(rows, csv_path):
+    """Refuse a sidecar whose payload description the reader cannot honour.
+
+    Units and Precision are checked only when the sidecar has those columns; every DataWave
+    export measured has them, with the values accepted here.
+    """
+    missing = [c for c in ("ProbeInfo", "SampleRate") if c not in rows[0]]
+    if missing:
+        raise SidecarFormatError(f"{csv_path} has no {missing} column(s); the reader needs both.")
+    rate = _single_value(rows, "SampleRate", csv_path)
+    try:
+        float(rate)
+    except ValueError:
+        raise SidecarFormatError(f"SampleRate {rate!r} in {csv_path} is not a number.") from None
+    units = _single_value(rows, "Units", csv_path)
+    # The micro sign (U+00B5) is what DataWave writes; the Greek mu (U+03BC) looks the same.
+    if units is not None and units not in ("\u00b5V", "\u03bcV", "uV"):
+        raise SidecarFormatError(
+            f"Units is {units!r} in {csv_path}, but the payload is read as microvolts. Rescaling "
+            "is not supported, so this file would load at the wrong scale."
+        )
+    precision = _single_value(rows, "Precision", csv_path)
+    if precision is not None and precision.lower() != "float32":
+        raise SidecarFormatError(
+            f"Precision is {precision!r} in {csv_path}, but the payload is read as float32."
+        )
+    if "BinColumn" in rows[0]:
+        # Counted from 1 in every export measured; counting from 0 is equally consistent.
+        columns = [(row.get("BinColumn") or "").strip() for row in rows]
+        in_order = [[str(i) for i in range(first, first + len(rows))] for first in (1, 0)]
+        if columns not in in_order:
+            raise SidecarFormatError(
+                f"BinColumn in {csv_path} is {columns}, not consecutive in row order; the "
+                "reader takes row i as payload column i, so channels would be mislabelled."
+            )
 
 
 def read_bin_csv_pair(discovered_file, **kwargs):
@@ -26,6 +86,18 @@ def read_bin_csv_pair(discovered_file, **kwargs):
     -------
     spikeinterface.core.NumpyRecording
         Memory-mapped recording with shape ``(n_samples, n_channels)``.
+
+    Raises
+    ------
+    ValueError
+        For a file pair a load should drop and carry on past: no .bin or no .csv, a
+        header-only sidecar, a blank ProbeInfo, an empty payload, or a payload whose size
+        does not fit the channel count.
+    SidecarFormatError
+        For a sidecar the reader would misread, which stops the load: a missing ProbeInfo or
+        SampleRate column, a SampleRate, Units or Precision that differs between channels, Units
+        other than microvolts, Precision other than float32, or a BinColumn that does not count
+        up by one in row order.
     """
     import spikeinterface.core as si_core
 
@@ -53,6 +125,7 @@ def read_bin_csv_pair(discovered_file, **kwargs):
             f"CSV metadata file has no data rows (header-only): {csv_path}"
         )
 
+    _check_sidecar(rows, csv_path)
     n_channels = len(rows)
     sampling_rate = float(rows[0]["SampleRate"])
 

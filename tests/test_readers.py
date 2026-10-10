@@ -106,3 +106,71 @@ class TestGuards:
     def test_sampling_rate_comes_from_the_sidecar(self, tmp_path):
         item = write_pair(tmp_path, [("C-009", "C-009")], rate=2000)
         assert read_bin_csv_pair(item).get_sampling_frequency() == 2000.0
+
+
+def _write_sidecar(directory, lines, n_channels=2, n_samples=100):
+    """A pair whose sidecar is exactly ``lines`` (header first) and a fitting float32 payload."""
+    csv_path = directory / "rec_Meta.csv"
+    csv_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    bin_path = directory / "rec_ColMajor.bin"
+    bin_path.write_bytes(np.zeros(n_channels * n_samples, dtype=np.float32).tobytes())
+    return DiscoveredFile(paths=(str(bin_path), str(csv_path)))
+
+
+def _rows(both=None, second=None):
+    """Two well-formed sidecar rows, with columns replaced on both rows or on the second only."""
+    first = {"Entity": "1", "BinColumn": "1", "Label": "L", "ProbeInfo": "A-010", "SampleRate": "1000",
+             "Units": "µV", "Precision": "float32", "LastEdit": STAMP, **(both or {})}
+    other = {**first, "Entity": "2", "BinColumn": "2", "ProbeInfo": "A-012", **(second or {})}
+    return [",".join(first[c] for c in HEADER.split(",")), ",".join(other[c] for c in HEADER.split(","))]
+
+
+class TestSidecarsTheReaderWouldMisread:
+    """These stop the load with SidecarFormatError rather than a ValueError.
+
+    The loader drops a file pair on ValueError and carries on, which suits an empty payload
+    but would turn a units or layout mismatch into silently lost or misread data.
+    """
+
+    @pytest.mark.parametrize("rows,message", [
+        (dict(both={"Units": "mV"}), "Units is 'mV'"),
+        (dict(both={"Precision": "float64"}), "Precision is 'float64'"),
+        (dict(second={"SampleRate": "2000"}), "SampleRate differs between channels"),
+        (dict(second={"Units": "mV"}), "Units differs between channels"),
+        (dict(second={"BinColumn": "3"}), "BinColumn in"),
+    ])
+    def test_a_mismatch_raises(self, tmp_path, rows, message):
+        from neurodent.readers import SidecarFormatError
+
+        item = _write_sidecar(tmp_path, [HEADER, *_rows(**rows)])
+
+        with pytest.raises(SidecarFormatError, match=message):
+            read_bin_csv_pair(item)
+
+    def test_a_missing_column_raises_instead_of_a_key_error(self, tmp_path):
+        """A KeyError was caught by the loader as a corrupt file and the pair dropped."""
+        from neurodent.readers import SidecarFormatError
+
+        item = _write_sidecar(tmp_path, ["Entity,Label,SampleRate", "1,L,1000", "2,R,1000"])
+
+        with pytest.raises(SidecarFormatError, match=r"no \['ProbeInfo'\] column"):
+            read_bin_csv_pair(item)
+
+    def test_both_micro_signs_and_plain_uv_are_microvolts(self, tmp_path):
+        for units in ("µV", "μV", "uV"):
+            folder = tmp_path / str(ord(units[0]))
+            folder.mkdir()
+            rec = read_bin_csv_pair(_write_sidecar(folder, [HEADER, *_rows(both={"Units": units})]))
+            assert rec.get_num_channels() == 2
+
+    def test_the_loader_stops_on_it_instead_of_dropping_the_file(self, tmp_path):
+        from neurodent.loading import LongRecordingOrganizer
+        from neurodent.readers import SidecarFormatError
+
+        item = _write_sidecar(tmp_path, [HEADER, *_rows(both={"Units": "mV"})])
+
+        with pytest.raises(SidecarFormatError):
+            LongRecordingOrganizer(
+                item, mode="si", extract_func="neurodent.readers:read_bin_csv_pair",
+                manual_datetimes=__import__("datetime").datetime(2020, 1, 1),
+            )
