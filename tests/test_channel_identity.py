@@ -166,3 +166,48 @@ def test_no_channel_names_raise():
 def test_different_channels_raise():
     with pytest.raises(ValueError, match="Channel names mismatch"):
         match_channels(["LMot", "RMot"], ["LMot", "LBar"])
+
+
+HEADER = "Entity,BinColumn,Label,ProbeInfo,SampleRate,Units,Precision,LastEdit"
+
+
+def _pair(folder, stem, names, values, seconds=2):
+    """One ColMajor bin and its sidecar; column k holds the constant values[k]."""
+    folder.mkdir(parents=True, exist_ok=True)
+    rows = [f"{i},{i},{n},{n},{RATE},µV,float32," for i, n in enumerate(names, start=1)]
+    (folder / f"{stem}_Meta.csv").write_text("\n".join([HEADER, *rows]) + "\n", encoding="utf-8")
+    data = np.tile(np.asarray(values, dtype=np.float32), (seconds * RATE, 1))
+    (folder / f"{stem}_ColMajor.bin").write_bytes(data.tobytes(order="F"))
+
+
+@pytest.mark.integration
+@pytest.mark.mutates_constants
+def test_a_two_animal_session_loads_and_merges_before_its_split(tmp_path):
+    """One file holds two animals, so every abbreviation appears once per animal.
+
+    The loader checks and merges a source's files before it splits them, so a rule that
+    matched channels by abbreviation alone, as first proposed for the order check, would
+    refuse every such load. Matching by exact name keeps the two animals' electrodes apart.
+    """
+    from neurodent.workflow import apply_samples_config
+
+    apply_samples_config({"channels": {"LMot": ["A-015", "B-015"], "RMot": ["A-016", "B-016"]}})
+    names, values = ["A-015", "A-016", "B-015", "B-016"], [1.0, 2.0, 11.0, 12.0]
+    for index in (1, 2):
+        _pair(tmp_path / "S1", f"rec-{index}", names, values)
+
+    ao = AnimalOrganizer(
+        [str(tmp_path / "{session}" / f"rec-{{index}}{s}") for s in ("_ColMajor.bin", "_Meta.csv")],
+        animal_id="X1",
+        lro_kwargs={
+            "mode": "si", "extract_func": "neurodent.readers:read_bin_csv_pair", "datetimes_are_start": True,
+            "manual_datetimes": {"S1": ["2020-01-01 00:00:00", "2020-01-01 00:00:02"]},
+        },
+    )
+
+    (lro,) = ao.long_recordings
+    assert lro.channel_names == names == _ids(lro)
+    assert lro.LongRecording.get_num_samples() == 4 * RATE, "both files merged"
+    child = lro.split({"X1": ["B-015", "B-016"]})["X1"]
+    assert child.channel_names == ["B-015", "B-016"]
+    assert [float(v) for v in child.LongRecording.get_traces(start_frame=0, end_frame=1)[0]] == [11.0, 12.0]

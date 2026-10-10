@@ -235,16 +235,25 @@ class AoBuildMixin:
 
         Sessions come out of discovery in filesystem and ``{index}`` order, so without this
         the first recording, which sets the reference channel spelling, depended on how the
-        files happened to be listed. If any recording has no file times, or the labels no
-        longer pair one to one with the recordings, the order is left alone; the caller
-        reports the second case.
+        files happened to be listed. A recording without file times cannot be placed in
+        time; it is kept after the timed ones, in discovery order, with a warning naming it.
+        If the labels no longer pair one to one with the recordings the order is left alone,
+        and the caller reports that.
         """
         from .lro_merge import file_intervals
 
-        starts = [min((s for s, _ in file_intervals(lro)), default=None) for lro in self.long_recordings]
-        if None in starts or len(self.unique_animaldays) != len(self.long_recordings):
+        if len(self.unique_animaldays) != len(self.long_recordings):
             return
-        order = sorted(range(len(starts)), key=starts.__getitem__)
+        starts = [min((s for s, _ in file_intervals(lro)), default=None) for lro in self.long_recordings]
+        untimed = [i for i, start in enumerate(starts) if start is None]
+        if untimed:
+            logging.warning(
+                f"Animal '{self.animal_id}': {len(untimed)} recording(s) have no file times "
+                f"({[self.long_recordings[i].display_name for i in untimed]}) and cannot be "
+                "placed in time; they are kept after the timed ones, in discovery order."
+            )
+        timed = [i for i, start in enumerate(starts) if start is not None]
+        order = sorted(timed, key=starts.__getitem__) + untimed
         self.long_recordings = [self.long_recordings[i] for i in order]
         self.unique_animaldays = [self.unique_animaldays[i] for i in order]
         self.animaldays = self.unique_animaldays
