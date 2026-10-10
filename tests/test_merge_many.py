@@ -22,6 +22,7 @@ class _Lro(LroMergeMixin):
 
     def __init__(self, name, n_samples=100, channel_names=("a", "b")):
         self.item = name
+        self.display_name = name
         self.channel_names = list(channel_names)
         self.LongRecording = MagicMock()
         self.LongRecording.get_total_samples.return_value = n_samples
@@ -66,15 +67,20 @@ def test_zero_sample_entry_is_excluded_but_its_metadata_is_kept(base):
     assert base._update_metadata_after_merge.call_count == 2, "but its metadata still counts"
 
 
-def test_renames_channels_when_names_differ(base):
-    """Differing raw names are renamed onto the base, as the pairwise merge did."""
-    other = _Lro("other", channel_names=("x", "y"))
+@pytest.mark.mutates_constants
+def test_renames_channels_when_names_differ():
+    """A respelled recording takes the base's spelling, recording ids included."""
+    from neurodent.workflow import apply_samples_config
+
+    apply_samples_config({"channels": {"LBar": ["L Barrel", "L Barrel Ctx"], "LMot": ["L Motor", "L Motor Ctx"]}})
+    base = _Lro("base", channel_names=("L Barrel", "L Motor"))
+    other = _Lro("other", channel_names=("L Barrel Ctx", "L Motor Ctx"))
+    original = other.LongRecording
     with patch("neurodent.loading.lro_merge.si"):
         base.merge_many([other])
 
-    other.LongRecording.rename_channels.assert_called_once_with(
-        new_channel_ids=base.channel_names
-    )
+    original.rename_channels.assert_called_once_with(new_channel_ids=["L Barrel", "L Motor"])
+    assert other.LongRecording is original.rename_channels.return_value
     assert other.channel_names == base.channel_names
 
 

@@ -1,25 +1,22 @@
 """Seven IQSEC2 animals were recorded on two rigs, and both legs end up in one WAR.
 
 The two rigs name the same electrode completely differently: the Intan leg calls it
-``A-010`` and the DataWave leg calls it ``Intan Input (1)/PortA L Vis Ctx``. Both translate
-to the same eight abbreviations in the same sequence. That is a coincidence of how the
-config was written, not something the loader arranges, and what happens when it stops being
-true depends on the animal.
+``A-010`` and the DataWave leg calls it ``Intan Input (1)/PortA L Vis Ctx``. Both are
+translated through the config's channel map to the same eight abbreviations, and the loader
+matches the two legs' channels by those abbreviations
+(``lro_merge.match_channels``), reordering a leg if its order differs. So the order the two
+lists happen to share no longer matters for correctness.
 
-For 76, 77 and 78 the DataWave leg starts on a date the Intan leg already covers, so the
-loader merges the two into one animalday. The merge compares the abbreviations as ordered
-lists (``lro_merge._validate_merge_compatibility``) and raises on any difference, so the run
-fails hours in, on the cluster.
+What still matters is that every name each leg carries translates, and to the right
+electrode. A name missing from the map fails the load hours into a cluster run, and a name
+mapped to the wrong electrode gives that channel's data another channel's name with no
+error at all. These tests catch the first in pytest and pin what was measured from the
+files for the second: every one of the 707 sidecars lists the same eight channels in one
+order, and each Intan port list resolves to the same electrodes in that order.
 
-For 80 to 83 the DataWave leg is an animalday of its own (10 January), so the two legs are
-never merged. The check across animaldays (``AnimalOrganizer._validate_channel_names``)
-only logs an order difference, and the WAR labels every animalday's columns with the order
-of its first animalday, which is the DataWave one. A difference there gives the Intan days'
-columns the wrong channel names with no error at all, and these tests are the only guard.
-
-Any of these would break it: reordering a ``_ports`` anchor in the dataset config, mapping
-an amp to another region in the generator's ``AMP_TO_REGION``, or a re-export that lists the
-sidecar rows in another order.
+Any of these would make them fail: reordering a ``_ports`` anchor in the dataset config,
+mapping an amp to another region in the generator's ``AMP_TO_REGION``, a re-export that
+spells or orders the sidecar rows differently, or a channel map entry that moves.
 """
 
 from pathlib import Path
@@ -100,7 +97,7 @@ class TestTheTwoKeySpacesAgree:
 
         assert resolved == DATAWAVE_ORDER, (
             f"port_{port} resolves to {resolved}, but the DataWave sidecars list "
-            f"{DATAWAVE_ORDER}. Merging the two legs of an animal on this port would raise."
+            f"{DATAWAVE_ORDER}. Check the port anchor and the channel map against the files."
         )
 
     def test_every_dual_rig_animal_uses_a_pinned_port(self, samples):
@@ -143,10 +140,11 @@ class TestTheTwoKeySpacesAgree:
 class TestTheDataWaveSourceCancelsTheSplit:
     """Each DataWave source must say channel_subset: null.
 
-    The loader decides whether to split a recording into per-animal channel groups from a key
-    on the animal, not from the source, so both legs inherit one answer. The Intan leg needs
-    the split because one file holds four animals. The DataWave leg does not, and without an
-    explicit null it is split against names it does not contain and raises.
+    The loader decides per source whether to split a recording into per-animal channel
+    groups, and a source without its own channel_subset inherits the animal's. Here that is
+    the port list the Intan leg needs, because one Intan file holds four animals. The
+    DataWave files hold this animal alone, so that leg opts out with an explicit null;
+    without it the leg is split against names it does not contain and raises.
     """
 
     @pytest.mark.parametrize("animal_id", sorted(DUAL_RIG_PORTS))
@@ -178,7 +176,7 @@ class TestTheDataWaveSourceCancelsTheSplit:
 
     @pytest.mark.parametrize("animal_id", sorted(DUAL_RIG_PORTS))
     def test_datetimes_are_start_sits_inside_lro_kwargs(self, samples, animal_id):
-        """Beside the pattern it is read by nothing, and nothing validates source keys."""
+        """Inside lro_kwargs is the only place it is read; beside the pattern the config is refused."""
         for source in _animal(samples, animal_id)["sources"]:
             assert "datetimes_are_start" not in source
             assert source["lro_kwargs"]["datetimes_are_start"] is True

@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Literal, Union
 
 from . import long_recording_organizer as _lro
-from neurodent.core.utils import resolve_channels
 
 
 class AoBuildMixin:
@@ -551,16 +550,20 @@ class AoBuildMixin:
     @staticmethod
     def _validate_channel_names(lros: list[_lro.LongRecordingOrganizer]) -> list[str]:
         """
-        Validate that all LROs have consistent channel names.
+        Make every LRO's channels match the first LRO's, matched by identity.
 
-        Compares abbreviated channel names (via ``resolve_channel``)
-        so that cosmetic variants like ``L Barrel`` vs ``L Barrel Ctx`` are
-        treated as equivalent. If raw names differ but abbreviations match,
-        the mismatched LRO's channel names are renamed to match the reference
-        LRO's raw names for downstream consistency.
+        The first LRO is the reference: its names, spelling and order become every other
+        LRO's, and its own recording ids are renamed to its names if they differ. Each later
+        LRO is matched to it channel by channel by
+        :func:`~neurodent.loading.lro_merge.match_channels` (exact names when both use the
+        same ones, abbreviations when the spelling differs, so ``L Barrel`` and
+        ``L Barrel Ctx`` are one channel), then reordered and respelled by
+        :func:`~neurodent.loading.lro_merge.conform_channels`, recording ids included.
 
-        If channel names are the same but in different order, the first LRO's
-        order is used as reference.
+        Before, a different order was only logged, so that LRO's columns were labelled with
+        the reference's names in the reference's order, and a respelling changed
+        ``channel_names`` but not the recording ids, so spike results named from the ids
+        disagreed with the WAR.
 
         Args:
             lros: List of LROs to validate.
@@ -569,48 +572,25 @@ class AoBuildMixin:
             list[str]: The canonical channel names (from the first LRO).
 
         Raises:
-            ValueError: If LROs have different abbreviated channel sets.
+            ValueError: If the first LRO has no channel names, or any LRO's channels cannot be
+                matched one to one with the first's.
         """
+        from .lro_merge import conform_channels
+
         if not lros:
             return []
 
-        first_names = lros[0].channel_names if lros[0].channel_names else []
-        if not first_names:
-            return []
-
-        reference_abbrevs = resolve_channels(first_names)
-        reference_set = set(reference_abbrevs)
-        # Map abbreviation -> canonical raw name from first LRO
-        abbrev_to_raw = dict(zip(reference_abbrevs, first_names))
+        first_names = list(lros[0].channel_names or [])
+        reference_label = f"the first recording ({lros[0].display_name})"
+        conform_channels(lros[0], first_names, reference_label)
 
         for i, lro in enumerate(lros[1:], start=1):
-            current_names = lro.channel_names if lro.channel_names else []
-            current_abbrevs = resolve_channels(current_names)
-            current_set = set(current_abbrevs)
-
-            if current_set != reference_set:
-                missing = reference_set - current_set
-                extra = current_set - reference_set
+            try:
+                conform_channels(lro, first_names, reference_label)
+            except ValueError as e:
                 raise ValueError(
-                    f"LRO {i} has inconsistent channel names. "
-                    f"Abbreviated missing: {missing}, Extra: {extra}"
-                )
-
-            # If raw names differ but abbreviations match, rename to reference
-            if set(current_names) != set(first_names):
-                renamed = [abbrev_to_raw[a] for a in current_abbrevs]
-                logging.warning(
-                    f"LRO {i} has variant channel names "
-                    f"({current_names} vs {first_names}), "
-                    f"renaming to reference names: {renamed}"
-                )
-                lro.channel_names = renamed
-
-            # If same channels but different order, log a warning
-            if lro.channel_names != first_names:
-                logging.warning(
-                    f"LRO {i} has channels in different order, using reference order"
-                )
+                    f"LRO {i} ({lro.display_name}) has inconsistent channel names: {e}"
+                ) from e
 
         return first_names
 
