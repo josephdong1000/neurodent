@@ -141,4 +141,5 @@ def test_the_dry_run_reports_what_each_source_would_read(tmp_path):
     assert source["split_to"] == ["A-010"]
     assert source["lro_kwargs"]["extract_func"] == READER["extract_func"]
     assert "manual_datetimes" not in source["lro_kwargs"]
-    assert [item.get_path_list()[0] for item in source["items"]] == [str(tmp_path / "S1" / "rec-1_ColMajor.bin")]
+    # Compared as paths, because on Windows discovery returns a mix of / and \ separators.
+    assert [Path(item.get_path_list()[0]) for item in source["items"]] == [tmp_path / "S1" / "rec-1_ColMajor.bin"]

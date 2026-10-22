@@ -94,8 +94,8 @@ def read_bin_csv_pair(discovered_file, **kwargs):
         header-only sidecar, a blank ProbeInfo, an empty payload, or a payload whose size
         does not fit the channel count.
     SidecarFormatError
-        For a sidecar the reader would misread, which stops the load: a missing ProbeInfo or
-        SampleRate column, a SampleRate, Units or Precision that differs between channels, Units
+        For a sidecar the reader would misread, which stops the load: one that is not UTF-8
+        text, a missing ProbeInfo or SampleRate column, a SampleRate, Units or Precision that differs between channels, Units
         other than microvolts, Precision other than float32, or a BinColumn that does not count
         up by one in row order.
     """
@@ -116,9 +116,15 @@ def read_bin_csv_pair(discovered_file, **kwargs):
     bin_path = bin_paths[0]
     csv_path = csv_paths[0]
 
-    with open(csv_path) as f:
-        reader = csv.DictReader(f)
-        rows = list(reader)
+    # Read as UTF-8 whatever the platform. The default is cp1252 on Windows, which turns the
+    # micro sign of 'µV' into two other characters. A sidecar that is not UTF-8 stops the
+    # load: its UnicodeDecodeError is a ValueError, which the loader would take for a corrupt
+    # file and drop.
+    try:
+        with open(csv_path, encoding="utf-8-sig", newline="") as f:
+            rows = list(csv.DictReader(f))
+    except UnicodeDecodeError as exc:
+        raise SidecarFormatError(f"{csv_path} is not UTF-8 text: {exc}") from exc
 
     if not rows:
         raise ValueError(

@@ -163,6 +163,42 @@ class TestSidecarsTheReaderWouldMisread:
             rec = read_bin_csv_pair(_write_sidecar(folder, [HEADER, *_rows(both={"Units": units})]))
             assert rec.get_num_channels() == 2
 
+    def test_the_sidecar_is_read_as_utf8_whatever_the_platform_default(self, tmp_path, monkeypatch):
+        """Windows opens text as cp1252 by default, which split the micro sign in two.
+
+        Every Windows CI job failed on that. This stands in for Windows by making the default
+        cp1252 for the reader's own open() calls.
+        """
+        import builtins
+
+        from neurodent import readers
+
+        real_open = builtins.open
+
+        def windows_open(file, mode="r", *args, encoding=None, **kwargs):
+            if "b" not in mode and encoding is None:
+                encoding = "cp1252"
+            return real_open(file, mode, *args, encoding=encoding, **kwargs)
+
+        monkeypatch.setattr(readers, "open", windows_open, raising=False)
+
+        rec = read_bin_csv_pair(_write_sidecar(tmp_path, [HEADER, *_rows()]))
+
+        assert rec.get_num_channels() == 2
+
+    def test_a_sidecar_that_is_not_utf8_stops_the_load(self, tmp_path):
+        """Its decode error is a ValueError, which the loader would take for a corrupt file and drop."""
+        from pathlib import Path
+
+        from neurodent.readers import SidecarFormatError
+
+        item = _write_sidecar(tmp_path, [HEADER, *_rows()])
+        csv_path = Path(item.paths[1])
+        csv_path.write_bytes(csv_path.read_text(encoding="utf-8").encode("latin-1"))
+
+        with pytest.raises(SidecarFormatError, match="is not UTF-8 text"):
+            read_bin_csv_pair(item)
+
     def test_the_loader_stops_on_it_instead_of_dropping_the_file(self, tmp_path):
         from neurodent.loading import LongRecordingOrganizer
         from neurodent.readers import SidecarFormatError
