@@ -25,7 +25,8 @@ class LroTimestampsMixin:
             datetime: The datetime corresponding to the start of the fragment
 
         Raises:
-            ValueError: If timestamp mapper is not initialized (only available in 'bin' mode)
+            ValueError: If file_end_datetimes and file_durations differ in length, for
+                example because no timestamps were resolved for this recording.
         """
         return TimestampMapper(
             self.file_end_datetimes, self.file_durations
@@ -43,20 +44,14 @@ class LroTimestampsMixin:
         """Validate that manual timestamps are provided when required for specific modes.
 
         Args:
-            mode (str): The processing mode ('si', 'mne', or 'bin')
+            mode (str): The processing mode ('si' or 'mne')
             expected_n_files (int, optional): Expected number of files for validation
 
         Raises:
             ValueError: If timestamps are required but not provided or if count mismatch
         """
         if mode in ["si", "mne"]:
-            if self.manual_datetimes is None:
-                import logging
-
-                logging.warning(
-                    f"manual_datetimes must be provided for {mode} mode when no CSV metadata is available, falling back to file creation times if possible"
-                )
-
+            # A missing manual_datetimes is reported once, by finalize_file_timestamps.
             # If list provided and expected files known, validate length
             if expected_n_files is not None and isinstance(self.manual_datetimes, list):
                 if len(self.manual_datetimes) != expected_n_files:
@@ -161,7 +156,12 @@ class LroTimestampsMixin:
                 )
 
     def finalize_file_timestamps(self):
-        """Finalize file timestamps using manual times if provided, otherwise validate CSV times."""
+        """Set file end times from manual_datetimes, or keep end times already present.
+
+        End times are already present for a recording restored from a saved folder. With
+        neither, the recording has no timestamps, which is logged; nothing falls back to
+        file creation times.
+        """
         logging.info("Finalizing file timestamps")
         if not hasattr(self, "file_durations") or not self.file_durations:
             return  # No file durations available yet
@@ -176,17 +176,17 @@ class LroTimestampsMixin:
                 f"Using manual timestamps: {len(manual_file_datetimes)} file end times specified"
             )
         else:
-            # Check if CSV times are sufficient (only for bin mode)
+            # End times already set, for example restored from a saved recording.
             if hasattr(self, "file_end_datetimes") and self.file_end_datetimes:
                 if all(x is None for x in self.file_end_datetimes):
                     raise ValueError(
                         "No dates found in any metadata object and no manual times specified!"
                     )
-                logging.info("Using CSV metadata timestamps")
+                logging.info("Keeping the file end times already set")
             else:
-                # For si/mne modes, manual timestamps are ideally required
                 logging.warning(
-                    "manual_datetimes must be provided when no CSV metadata is available! Falling back to file creation times if possible."
+                    f"No manual_datetimes for {self.display_name}, so this recording has no "
+                    "timestamps, and dating it (its animalday and window times) will fail."
                 )
 
     def get_date_string(self) -> str:

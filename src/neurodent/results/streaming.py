@@ -40,6 +40,7 @@ from neurodent import constants
 from neurodent.core.utils import resolve_channels, atomic_write_json, safe_unlink, slugify
 from .feature_handlers import handler_for
 from .filters import (
+    DEFAULT_MIN_RMS,
     FILTER_REGISTRY,
     ChannelInfo,
     FilterScope,
@@ -502,7 +503,7 @@ class LazyWindowAnalysisResult:
             filter_config = {
                 "logrms_range": {"z_range": 3},
                 "high_rms": {"max_rms": 500},
-                "low_rms": {"min_rms": 50},
+                "low_rms": {"min_rms": DEFAULT_MIN_RMS},
                 "high_beta": {"max_beta_prop": 0.4},
                 "reject_channels_by_session": {},
             }

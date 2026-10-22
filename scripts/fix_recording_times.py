@@ -67,8 +67,40 @@ def _samples_data(config_path: str) -> dict:
     return resolve_samples_config(load_samples_config(config_path))
 
 
+def _unsupported(animals) -> list:
+    """The animals this script cannot handle, each with the reason.
+
+    It reads each animal's own ``group`` and a single string ``pattern`` holding
+    ``{session}`` and ``{index}``, which is the shape of the arx datasets. It used to crash
+    with a KeyError on the first animal of any other shape, which is 5 of the 7 configs.
+    """
+    out = []
+    for a in animals:
+        reasons = []
+        if "group" not in a:
+            reasons.append("no group")
+        if "sources" in a:
+            reasons.append("has sources")
+        pattern = a.get("pattern")
+        if pattern is None:
+            reasons.append("no pattern of its own")
+        elif not isinstance(pattern, str):
+            reasons.append("pattern is not one string")
+        elif "{session}" not in pattern or "{index}" not in pattern:
+            reasons.append("pattern lacks {session} or {index}")
+        if reasons:
+            out.append(f"{a.get('id')}: {', '.join(reasons)}")
+    return out
+
+
 def scan(config_path: str, out_path: str) -> None:
     sd = _samples_data(config_path)
+    unsupported = _unsupported(sd["animals"])
+    if unsupported:
+        raise SystemExit(
+            "fix_recording_times handles only animals with a group and one string pattern "
+            "containing {session} and {index}. It cannot handle:\n  " + "\n  ".join(unsupported)
+        )
     data_root = sd["data_root"]
     groups = {}
     for a in sd["animals"]:
@@ -150,6 +182,7 @@ def apply(config_path: str, in_path: str) -> None:
         node = node[k]
 
     n = 0
+    no_group = [a.get("id") for a in node if "group" not in a and "manual_datetime" in a]
     for animal in node:
         gp = proposals.get(animal.get("group"))
         if not gp or "manual_datetime" not in animal:
@@ -169,6 +202,8 @@ def apply(config_path: str, in_path: str) -> None:
     flagged = {g: [s for s, i in gp.items() if i["flag"]] for g, gp in proposals.items()}
     flagged = {g: s for g, s in flagged.items() if s}
     print(f"applied {n} manual_datetime value(s) to {target}")
+    if no_group:
+        print(f"skipped {len(no_group)} animal(s) with no group, which this script cannot match: {no_group}")
     if flagged:
         print("FLAGGED (left unchanged - need manual review):")
         for g, s in flagged.items():

@@ -52,23 +52,11 @@ class TestLongRecordingOrganizer:
         assert organizer.truncate is False
         assert organizer.n_truncate == 0
 
-    def test_init_with_truncate_bool(self, temp_dir):
-        """Test initialization with truncate=True."""
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")  # Ignore truncation warning
-            organizer = LongRecordingOrganizer(temp_dir, mode=None, truncate=True)
-
-        assert organizer.truncate is True
-        assert organizer.n_truncate == 10  # Default truncate value
-
-    def test_init_with_truncate_int(self, temp_dir):
-        """Test initialization with truncate as integer."""
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            organizer = LongRecordingOrganizer(temp_dir, mode=None, truncate=5)
-
-        assert organizer.truncate is True
-        assert organizer.n_truncate == 5
+    @pytest.mark.parametrize("truncate", [True, 5])
+    def test_truncate_is_refused(self, temp_dir, truncate):
+        """It warned that it would truncate and then loaded every file, so it now refuses."""
+        with pytest.raises(ValueError, match="does not truncate"):
+            LongRecordingOrganizer(temp_dir, mode=None, truncate=truncate)
 
     def test_time_conversion_methods(self, temp_dir):
         """Test __time_to_idx and __idx_to_time methods."""

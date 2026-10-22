@@ -6,11 +6,11 @@ Mixin for :class:`~neurodent.loading.animal_organizer.AnimalOrganizer`.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Literal, Union
 
 from . import long_recording_organizer as _lro
-from neurodent.core.utils import resolve_channels
 
 
 class AoBuildMixin:
@@ -53,11 +53,6 @@ class AoBuildMixin:
             if len(items) == 1:
                 item_to_pass = items[0]
                 kw = kwargs.copy()
-                if self._is_item_file(item_to_pass) and isinstance(
-                    item_to_pass, (list, tuple)
-                ):
-                    # LRO handles lists of files directly, but we pass input_type='files'? Wait, LRO handles it natively now
-                    pass
                 lro = _lro.LongRecordingOrganizer(item_to_pass, **kw)
                 # A single-item session never reaches the multi-item filter below, so a
                 # lone dead file would otherwise propagate a 0-sample LRO downstream with
@@ -214,6 +209,8 @@ class AoBuildMixin:
                 "(wrong file pattern, wrong data root, or corrupt data). "
                 "Check the warnings above for per-file root causes."
             )
+        self._order_recordings_by_time()
+        self._validate_no_overlap_across_recordings(self.long_recordings, self.animal_id)
         self._log_timeline_summary()
 
         if len(self.long_recordings) != len(self.unique_animaldays):
@@ -232,6 +229,76 @@ class AoBuildMixin:
     def cleanup_rec(self):
         for lrec in self.long_recordings:
             lrec.cleanup_rec()
+
+    def _order_recordings_by_time(self):
+        """Put ``long_recordings``, and their labels with them, in order of each one's first file.
+
+        Sessions come out of discovery in filesystem and ``{index}`` order, so without this
+        the first recording, which sets the reference channel spelling, depended on how the
+        files happened to be listed. A recording without file times cannot be placed in
+        time; it is kept after the timed ones, in discovery order, with a warning naming it.
+        If the labels no longer pair one to one with the recordings the order is left alone,
+        and the caller reports that.
+        """
+        from .lro_merge import file_intervals
+
+        if len(self.unique_animaldays) != len(self.long_recordings):
+            return
+        starts = [min((s for s, _ in file_intervals(lro)), default=None) for lro in self.long_recordings]
+        untimed = [i for i, start in enumerate(starts) if start is None]
+        if untimed:
+            logging.warning(
+                f"Animal '{self.animal_id}': {len(untimed)} recording(s) have no file times "
+                f"({[self.long_recordings[i].display_name for i in untimed]}) and cannot be "
+                "placed in time; they are kept after the timed ones, in discovery order."
+            )
+        timed = [i for i, start in enumerate(starts) if start is not None]
+        order = sorted(timed, key=starts.__getitem__) + untimed
+        self.long_recordings = [self.long_recordings[i] for i in order]
+        self.unique_animaldays = [self.unique_animaldays[i] for i in order]
+        self.animaldays = self.unique_animaldays
+
+    @staticmethod
+    def _validate_no_overlap_across_recordings(lros, animal_id):
+        """Raise if two files of one animal claim the same wall time, beyond clock jitter.
+
+        Merging checks each recording against the one it is appended to, but recordings that
+        start on different dates are never merged, so an overlap between animaldays (a
+        session anchor that lands inside the previous day's session, or the same files
+        reached by two sources) is visible only here. Every live file of every recording is
+        pooled and walked in order of its own start time, so the order of ``lros`` does not
+        matter. Recordings without file timing contribute nothing.
+
+        Args:
+            lros: The animal's recordings.
+            animal_id: Names the animal in the error message.
+
+        Raises:
+            ValueError: If any file starts more than ``RECORDING_TIME_TOLERANCE_S`` before an
+                earlier-starting file ends.
+        """
+        from neurodent.constants import RECORDING_TIME_TOLERANCE_S
+
+        from .lro_merge import file_intervals
+
+        files = sorted(
+            ((start, end, lro.display_name) for lro in lros for start, end in file_intervals(lro)),
+            key=lambda f: f[0],
+        )
+        latest = None  # (end, name) of the file that reaches furthest so far
+        for start, end, name in files:
+            if latest is not None:
+                overlap = (latest[0] - start).total_seconds()
+                if overlap > RECORDING_TIME_TOLERANCE_S:
+                    raise ValueError(
+                        f"Animal '{animal_id}': a file of {name} starts at {start}, "
+                        f"{overlap:.1f} s before a file of {latest[1]} ends at {latest[0]}. "
+                        f"Two recordings of one animal cannot cover the same time; either a "
+                        f"timestamp is wrong or the same data is loaded twice. Overlaps up to "
+                        f"{RECORDING_TIME_TOLERANCE_S:g} s are treated as clock jitter."
+                    )
+            if latest is None or end > latest[0]:
+                latest = (end, name)
 
     @staticmethod
     def _filter_zero_sample_lros(lro_pairs, get_name):
@@ -309,6 +376,11 @@ class AoBuildMixin:
             order (sorted by median timestamp). This ensures proper handling of
             multi-session recordings consolidated via generate_wars.py.
 
+            The resulting animaldays are in date order, so ``long_recordings``,
+            ``animaldays`` and the reference channel spelling (taken from the first
+            animalday) do not depend on how the input was ordered. Before, dates were
+            sorted as text, which put 'Feb-01-2020' ahead of 'Jan-31-2020'.
+
         Example:
             >>> # After splitting a multi-animal recording across multiple sessions
             >>> all_lros = []
@@ -350,7 +422,10 @@ class AoBuildMixin:
         merged_lros = []
         merged_animaldays = []
 
-        for date_str in sorted(date_to_lros.keys()):  # Sort for deterministic ordering
+        # Chronological, not alphabetical: as text 'Feb-01-2020' sorts before 'Jan-31-2020'.
+        # The first animalday is the channel-name reference, and everything that pairs
+        # lists by position downstream expects time order.
+        for date_str in sorted(date_to_lros, key=lambda d: datetime.strptime(d, "%b-%d-%Y")):
             lro_group = date_to_lros[date_str]
             animalday = f"{animal_id} {genotype} {date_str}"
 
@@ -403,11 +478,10 @@ class AoBuildMixin:
                     # Flat concatenation rather than a fold; see LroMergeMixin.merge_many.
                     base_lro.merge_many([lro for _, lro in sorted_pairs[1:]])
                 except ValueError as e:
-                    # Provide detailed error for incompatible LROs
+                    # The cause (channels, sampling rate or timing) is in the message itself.
                     raise ValueError(
-                        f"Cannot merge LROs for {animalday}: {e}\n"
-                        f"All LROs with the same date must have compatible metadata "
-                        f"(same channels, sampling rate, etc.)."
+                        f"Cannot merge the recordings that start on {date_str} into one "
+                        f"animalday for {animal_id}: {e}"
                     ) from e
 
                 merged_lros.append(base_lro)
@@ -442,8 +516,10 @@ class AoBuildMixin:
         for lro, animalday in zip(merged_lros, merged_animaldays):
             lro.animalday = animalday
 
-        # Step 5: Validate and reconcile channel names across all merged LROs
+        # Step 5: Validate and reconcile channel names across all merged LROs, and check
+        # that no two recordings cover the same time (merging checked only within a date).
         ao.channel_names = cls._validate_channel_names(merged_lros)
+        cls._validate_no_overlap_across_recordings(merged_lros, animal_id)
 
         # Step 6: CRITICAL VALIDATION - ensure no duplicates after merge
         if len(ao.long_recordings) != len(set(ao.unique_animaldays)):
@@ -478,16 +554,20 @@ class AoBuildMixin:
     @staticmethod
     def _validate_channel_names(lros: list[_lro.LongRecordingOrganizer]) -> list[str]:
         """
-        Validate that all LROs have consistent channel names.
+        Make every LRO's channels match the first LRO's, matched by identity.
 
-        Compares abbreviated channel names (via ``resolve_channel``)
-        so that cosmetic variants like ``L Barrel`` vs ``L Barrel Ctx`` are
-        treated as equivalent. If raw names differ but abbreviations match,
-        the mismatched LRO's channel names are renamed to match the reference
-        LRO's raw names for downstream consistency.
+        The first LRO is the reference: its names, spelling and order become every other
+        LRO's, and its own recording ids are renamed to its names if they differ. Each later
+        LRO is matched to it channel by channel by
+        :func:`~neurodent.loading.lro_merge.match_channels` (exact names when both use the
+        same ones, abbreviations when the spelling differs, so ``L Barrel`` and
+        ``L Barrel Ctx`` are one channel), then reordered and respelled by
+        :func:`~neurodent.loading.lro_merge.conform_channels`, recording ids included.
 
-        If channel names are the same but in different order, the first LRO's
-        order is used as reference.
+        Before, a different order was only logged, so that LRO's columns were labelled with
+        the reference's names in the reference's order, and a respelling changed
+        ``channel_names`` but not the recording ids, so spike results named from the ids
+        disagreed with the WAR.
 
         Args:
             lros: List of LROs to validate.
@@ -496,48 +576,25 @@ class AoBuildMixin:
             list[str]: The canonical channel names (from the first LRO).
 
         Raises:
-            ValueError: If LROs have different abbreviated channel sets.
+            ValueError: If the first LRO has no channel names, or any LRO's channels cannot be
+                matched one to one with the first's.
         """
+        from .lro_merge import conform_channels
+
         if not lros:
             return []
 
-        first_names = lros[0].channel_names if lros[0].channel_names else []
-        if not first_names:
-            return []
-
-        reference_abbrevs = resolve_channels(first_names)
-        reference_set = set(reference_abbrevs)
-        # Map abbreviation -> canonical raw name from first LRO
-        abbrev_to_raw = dict(zip(reference_abbrevs, first_names))
+        first_names = list(lros[0].channel_names or [])
+        reference_label = f"the first recording ({lros[0].display_name})"
+        conform_channels(lros[0], first_names, reference_label)
 
         for i, lro in enumerate(lros[1:], start=1):
-            current_names = lro.channel_names if lro.channel_names else []
-            current_abbrevs = resolve_channels(current_names)
-            current_set = set(current_abbrevs)
-
-            if current_set != reference_set:
-                missing = reference_set - current_set
-                extra = current_set - reference_set
+            try:
+                conform_channels(lro, first_names, reference_label)
+            except ValueError as e:
                 raise ValueError(
-                    f"LRO {i} has inconsistent channel names. "
-                    f"Abbreviated missing: {missing}, Extra: {extra}"
-                )
-
-            # If raw names differ but abbreviations match, rename to reference
-            if set(current_names) != set(first_names):
-                renamed = [abbrev_to_raw[a] for a in current_abbrevs]
-                logging.warning(
-                    f"LRO {i} has variant channel names "
-                    f"({current_names} vs {first_names}), "
-                    f"renaming to reference names: {renamed}"
-                )
-                lro.channel_names = renamed
-
-            # If same channels but different order, log a warning
-            if lro.channel_names != first_names:
-                logging.warning(
-                    f"LRO {i} has channels in different order, using reference order"
-                )
+                    f"LRO {i} ({lro.display_name}) has inconsistent channel names: {e}"
+                ) from e
 
         return first_names
 

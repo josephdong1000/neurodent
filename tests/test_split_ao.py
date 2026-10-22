@@ -331,7 +331,7 @@ class TestFromLros:
         lros = [lro1, lro2]
 
         # Should raise ValueError with helpful message
-        with pytest.raises(ValueError, match="Cannot merge LROs for"):
+        with pytest.raises(ValueError, match="Cannot merge the recordings that start on Jan-01-2023 into one animalday"):
             AnimalOrganizer.from_lros(
                 lros=lros,
                 animal_id="TestAnimal",
@@ -497,10 +497,9 @@ class TestSplit:
 
     def test_split_no_recordings_raises_error(self):
         """Test that split raises error when no recordings loaded."""
-        ao = AnimalOrganizer.from_lros(
-            lros=[MagicMock(spec=LongRecordingOrganizer, channel_names=["Ch0"])],
-            animal_id="Test",
-        )
+        lro = MagicMock(spec=LongRecordingOrganizer, channel_names=["Ch0"])
+        lro.get_date_string.return_value = "Jan-01-2023"
+        ao = AnimalOrganizer.from_lros(lros=[lro], animal_id="Test")
         ao.long_recordings = []  # Clear recordings
         
         with pytest.raises(ValueError, match="No recordings loaded to split"):

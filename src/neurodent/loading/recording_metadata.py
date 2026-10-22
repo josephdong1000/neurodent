@@ -20,8 +20,9 @@ class RecordingMetadata:
     """Stores metadata information for neural recordings.
 
     This class handles recording metadata including channel information, sampling rates,
-    timestamps, and voltage units. It can be initialized either from a CSV metadata file
-    (for backward compatibility with DDF binary format) or directly from parameters.
+    timestamps, and voltage units. Every loader in the package initializes it from
+    parameters. It can still be read from a DataWave-style CSV sidecar, a path the
+    removed binary mode used and only tests exercise now.
 
     Attributes:
         metadata_path (str | Path | None): Path to metadata CSV file if loaded from file

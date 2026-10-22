@@ -8,16 +8,18 @@ def get_discovery_animal_filter(
 ) -> str:
     """Determine the animal filter value for discovery.
 
-    For joint sessions with 'group', use the group name for {animal} placeholder.
-    For joint sessions without 'group', use the animal id.
-    For non-joint sessions, use the animal id as usual.
+    For a source that is split down to this animal's channels and whose animal has a
+    'group', use the group name for the {animal} placeholder, because the files are shared
+    with the other animals of the group. Otherwise use the animal id. The caller decides
+    splitting per source, so one animal can use both.
 
     Parameters
     ----------
     source_animal_id : str
         The animal ID from the configuration
     is_joint : bool
-        Whether this is a joint session
+        Whether this source is split down to the animal's channels, as decided by
+        ``resolve_source_subset``. A source that is not split never reads the group's files.
     animal_groups : dict[str, str]
         Mapping of animal_id to group name
 

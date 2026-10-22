@@ -115,34 +115,29 @@ class TestAnimalOrganizerTimestampHandling:
 
     @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     @patch("glob.glob")
-    def test_list_of_datetimes_per_lro_assignment(self, mock_glob, mock_lro_class):
-        """Test that a list of datetimes gets assigned to LROs in order."""
-        # Setup
-        mock_glob.return_value = [
-            str(self.folder1),
-            str(self.folder2),
-            str(self.folder3),
-        ]
-        mock_lro_class.return_value = self._create_mock_lro()
+    def test_a_top_level_list_is_refused(self, mock_glob, mock_lro_class):
+        """It used to hand every session the whole list.
 
+        Each recording then received one start per file of the whole animal, which raised
+        on a real load as soon as the animal had more than one file, and passed the dry run.
+        Per-file starts belong in a session-keyed dict, one list per session.
+        """
+        mock_glob.return_value = [str(self.folder1), str(self.folder2), str(self.folder3)]
+        mock_lro_class.return_value = self._create_mock_lro()
         datetime_list = [
             datetime(2023, 1, 15, 10, 0, 0),
             datetime(2023, 1, 16, 11, 0, 0),
             datetime(2023, 1, 17, 12, 0, 0),
         ]
 
-        # Create AnimalOrganizer with datetime list
-        ao = results.AnimalOrganizer(
-            pattern=str(self.base_path) + "/WT_{animal}_{session}",
-            animal_id=self.animal_id,
-            
-            lro_kwargs={"manual_datetimes": datetime_list},
-        )
-
-        # Verify processing - should apply list to all folders
-        assert len(ao._processed_timestamps) == 3
-        for folder_name, timestamp in ao._processed_timestamps.items():
-            assert timestamp == datetime_list  # Each folder gets the entire list
+        for validate_only in (False, True):
+            with pytest.raises(ValueError, match="A top-level list is not supported"):
+                results.AnimalOrganizer(
+                    pattern=str(self.base_path) + "/WT_{animal}_{session}",
+                    animal_id=self.animal_id,
+                    lro_kwargs={"manual_datetimes": datetime_list},
+                    validate_only=validate_only,
+                )
 
     @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     @patch("glob.glob")
@@ -266,80 +261,32 @@ class TestAnimalOrganizerTimestampHandling:
     @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     @patch("glob.glob")
     def test_invalid_list_items_error(self, mock_glob, mock_lro_class):
-        """Test that lists with bad items raise errors.
+        """A per-file list with a bad entry is refused, the same way with or without a load.
 
-        Per-file lists now parse ISO date strings, so a list with a non-date
-        TYPE raises TypeError, while an unparseable date STRING raises a parse
-        error (ValueError).
+        A non-date type raises TypeError, and an unparseable date string raises a parse error
+        (ValueError).
         """
-        # Setup
         mock_glob.return_value = [str(self.folder1)]
         mock_lro_class.return_value = self._create_mock_lro()
 
-        # A non-date type in the list -> TypeError
-        with pytest.raises(TypeError) as exc_info:
-            results.AnimalOrganizer(
-                pattern=str(self.base_path) + "/WT_{animal}_{session}",
-                animal_id=self.animal_id,
-                lro_kwargs={
-                    "manual_datetimes": [datetime(2023, 1, 15, 10, 0, 0), 12345]
-                },
-            )
-        assert "must be datetime objects or parseable date strings" in str(
-            exc_info.value
-        )
+        for validate_only in (False, True):
+            with pytest.raises(TypeError) as exc_info:
+                results.AnimalOrganizer(
+                    pattern=str(self.base_path) + "/WT_{animal}_{session}",
+                    animal_id=self.animal_id,
+                    lro_kwargs={"manual_datetimes": {"2023-01-15": [12345]}},
+                    validate_only=validate_only,
+                )
+            assert "must be datetime objects or parseable date strings" in str(exc_info.value)
 
-        # An unparseable date string -> ValueError (dateutil ParserError)
-        with pytest.raises(ValueError):
-            results.AnimalOrganizer(
-                pattern=str(self.base_path) + "/WT_{animal}_{session}",
-                animal_id=self.animal_id,
-                lro_kwargs={
-                    "manual_datetimes": [
-                        datetime(2023, 1, 15, 10, 0, 0),
-                        "not a datetime",
-                    ]
-                },
-            )
+            with pytest.raises(ValueError):
+                results.AnimalOrganizer(
+                    pattern=str(self.base_path) + "/WT_{animal}_{session}",
+                    animal_id=self.animal_id,
+                    lro_kwargs={"manual_datetimes": {"2023-01-15": ["not a datetime"]}},
+                    validate_only=validate_only,
+                )
 
-    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
-    @patch("glob.glob")
-    def test_invalid_list_items_error(self, mock_glob, mock_lro_class):
-        """Test that lists with bad items raise errors.
-
-        Per-file lists now parse ISO date strings, so a list with a non-date
-        TYPE raises TypeError, while an unparseable date STRING raises a parse
-        error (ValueError).
-        """
-        # Setup
-        mock_glob.return_value = [str(self.folder1)]
-        mock_lro_class.return_value = self._create_mock_lro()
-
-        # A non-date type in the list -> TypeError
-        with pytest.raises(TypeError) as exc_info:
-            results.AnimalOrganizer(
-                pattern=str(self.base_path) + "/WT_{animal}_{session}",
-                animal_id=self.animal_id,
-                lro_kwargs={
-                    "manual_datetimes": [datetime(2023, 1, 15, 10, 0, 0), 12345]
-                },
-            )
-        assert "must be datetime objects or parseable date strings" in str(
-            exc_info.value
-        )
-
-        # An unparseable date string -> ValueError (dateutil ParserError)
-        with pytest.raises(ValueError):
-            results.AnimalOrganizer(
-                pattern=str(self.base_path) + "/WT_{animal}_{session}",
-                animal_id=self.animal_id,
-                lro_kwargs={
-                    "manual_datetimes": [
-                        datetime(2023, 1, 15, 10, 0, 0),
-                        "not a datetime",
-                    ]
-                },
-            )
 
     @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     @patch("glob.glob")
@@ -420,7 +367,8 @@ class TestAnimalOrganizerTimestampHandling:
 
         # Create mocks with timing information
         def mock_lro_side_effect(*args, **kwargs):
-            folder_path = args[0]
+            # args[0] is a DiscoveredFile, whose ``in`` looks at metadata keys, not the path.
+            folder_path = " ".join(args[0].get_path_list())
             if "2023-01-15" in folder_path:
                 return self._create_mock_lro("folder1", start_times[0])
             else:

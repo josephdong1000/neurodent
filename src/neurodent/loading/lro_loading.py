@@ -244,47 +244,15 @@ class LroLoadingMixin:
             Forwarded to the backend loading method.
         """
         if mode == "si":
-            if si is None:
-                raise ImportError("SpikeInterface is required for mode='si'")
-
-            if isinstance(extract_func, str):
-                func_name = extract_func
-                # Try SpikeInterface namespaces first
-                extract_func = getattr(se, func_name, getattr(si, func_name, None))
-                # Resolve file path: "path/to/readers.py:read_custom"
-                if extract_func is None and ":" in func_name:
-                    extract_func = self._resolve_func_path(func_name)
-                if extract_func is None:
-                    raise ValueError(
-                        f"Could not resolve extractor function: {func_name}. "
-                        "Provide a SpikeInterface extractor name "
-                        "or a file path (e.g. 'path/to/readers.py:func_name')."
-                    )
-            elif extract_func is None:
-                extract_func = si.load
-
             self.convert_file_with_si_to_recording(
-                extract_func=extract_func,
+                extract_func=self.resolve_extract_func(mode, extract_func),
                 cache_policy=cache_policy,
                 multiprocess_mode=multiprocess_mode,
                 **kwargs,
             )
         elif mode == "mne":
-            if isinstance(extract_func, str):
-                func_name = extract_func
-                extract_func = getattr(mne.io, func_name, None)
-                # Resolve file path: "path/to/readers.py:read_custom"
-                if extract_func is None and ":" in func_name:
-                    extract_func = self._resolve_func_path(func_name)
-                if extract_func is None:
-                    raise ValueError(
-                        f"Could not resolve extractor function: {func_name}. "
-                        "Provide an MNE extractor name "
-                        "or a file path (e.g. 'path/to/readers.py:func_name')."
-                    )
-
             self.convert_file_with_mne_to_recording(
-                extract_func=extract_func,
+                extract_func=self.resolve_extract_func(mode, extract_func),
                 cache_policy=cache_policy,
                 **kwargs,
             )
@@ -292,6 +260,53 @@ class LroLoadingMixin:
             pass
         else:
             raise ValueError(f"Invalid mode: {mode}")
+
+    @classmethod
+    def resolve_extract_func(cls, mode, extract_func):
+        """The reader a ``mode`` and an ``extract_func`` setting name, as the loader resolves it.
+
+        Shared with the preflight check, so that it opens files with exactly the reader a
+        load would use. See :meth:`detect_and_load_data` for the resolution order.
+
+        Args:
+            mode: ``"si"`` or ``"mne"``.
+            extract_func: A callable, a name, a module path or a file path, or None for
+                SpikeInterface's ``si.load``.
+
+        Returns:
+            Callable: The reader.
+
+        Raises:
+            ImportError: If SpikeInterface is needed and missing.
+            ValueError: If the name cannot be resolved, or the mode is unknown.
+        """
+        if not isinstance(extract_func, str):
+            if extract_func is None and mode == "si":
+                if si is None:
+                    raise ImportError("SpikeInterface is required for mode='si'")
+                return si.load
+            return extract_func
+        func_name = extract_func
+        if mode == "si":
+            if si is None:
+                raise ImportError("SpikeInterface is required for mode='si'")
+            # Try SpikeInterface namespaces first
+            resolved = getattr(se, func_name, getattr(si, func_name, None))
+            library = "a SpikeInterface extractor name"
+        elif mode == "mne":
+            resolved = getattr(mne.io, func_name, None)
+            library = "an MNE extractor name"
+        else:
+            raise ValueError(f"Invalid mode: {mode}")
+        # Resolve file path: "path/to/readers.py:read_custom"
+        if resolved is None and ":" in func_name:
+            resolved = cls._resolve_func_path(func_name)
+        if resolved is None:
+            raise ValueError(
+                f"Could not resolve extractor function: {func_name}. "
+                f"Provide {library} or a file path (e.g. 'path/to/readers.py:func_name')."
+            )
+        return resolved
 
     # OSError errnos that describe the storage, not the recording. A corrupt payload is a
     # data problem worth skipping; a stale NFS handle or a vanished directory is an

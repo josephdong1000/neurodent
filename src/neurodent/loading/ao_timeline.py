@@ -340,6 +340,91 @@ class AoTimelineMixin:
         )
         return result, end_dt
 
+    def _check_session_list(self, sess_key, sess_ts, sess_items) -> tuple[list, list]:
+        """Check one session's per-file start list against its files, without reading them.
+
+        The real load and ``validate_only`` both call this, so a list that does not fit its
+        session fails the dry run with the same error the load would raise.
+
+        Args:
+            sess_key: The session key (for error messages).
+            sess_ts: List of per-file start times (datetime or ISO string).
+            sess_items: The session's discovered items.
+
+        Returns:
+            tuple[list, list]: The session's items in the order the list pairs with, and
+            the parsed start of each.
+
+        Raises:
+            ValueError: If the list does not have one entry per file, an entry does not
+                parse, or two entries are equal.
+        """
+        # Order items the same way the merge/timeline does (by {index} when
+        # present). The list is positional, so this MUST match the merge order
+        # in _create_long_recordings.
+        sorted_items = sorted(sess_items, key=self._session_sort_key(sess_items))
+        if len(sess_ts) != len(sorted_items):
+            raise ValueError(
+                f"manual_datetime list for session '{sess_key}' has "
+                f"{len(sess_ts)} entries but the session has "
+                f"{len(sorted_items)} item(s): "
+                f"{[self._get_item_name(f) for f in sorted_items]}. "
+                f"Provide exactly one datetime per file, in index order."
+            )
+        context_path = self._get_context_path(sorted_items[0])
+        resolved = self._resolve_timestamp_input(list(sess_ts), context_path)
+        repeated = sorted({str(t) for t in resolved if resolved.count(t) > 1})
+        if repeated:
+            raise ValueError(
+                f"manual_datetime list for session '{sess_key}' gives the start {repeated} "
+                f"to more than one file; every file needs its own start."
+            )
+        return sorted_items, resolved
+
+    def _check_skipped_session_keys(self, manual_datetimes: dict) -> dict:
+        """Drop the entries for sessions that skip_sessions excluded, if nothing depends on them.
+
+        A config can keep a time for a session it also skips, such as a 'bad files' folder
+        listed for the record. That entry is not used. It is refused when it would be: a
+        null session cumulates from its neighbour, and a skipped neighbour is never loaded,
+        so its duration is unknown.
+
+        Args:
+            manual_datetimes: The session-keyed dict from the config.
+
+        Returns:
+            dict: The same entries, in order, without those for skipped sessions.
+
+        Raises:
+            ValueError: If a null session would cumulate from a skipped one.
+        """
+        skipped = getattr(self, "_skipped_sessions", set())
+        keys = list(manual_datetimes)
+        dropped = [k for k in keys if k in skipped]
+        if not dropped:
+            return manual_datetimes
+        first_explicit = next(
+            (i for i, k in enumerate(keys) if manual_datetimes[k] is not None), len(keys)
+        )
+        for i, key in enumerate(keys):
+            if key not in skipped:
+                continue
+            after = i + 1 < len(keys) and i + 1 > first_explicit and manual_datetimes[keys[i + 1]] is None
+            before = i >= 1 and i - 1 < first_explicit and manual_datetimes[keys[i - 1]] is None
+            if after or before:
+                neighbour = keys[i + 1] if after else keys[i - 1]
+                raise ValueError(
+                    f"manual_datetime for '{self.animal_id}': session '{neighbour}' is null, so "
+                    f"its start would be worked out from session '{key}', which skip_sessions "
+                    f"excludes and which is therefore never read. Give '{neighbour}' an explicit "
+                    f"time."
+                )
+        logging.info(
+            f"manual_datetime entries for skipped sessions {dropped} of '{self.animal_id}' "
+            "are not used."
+        )
+        return {k: v for k, v in manual_datetimes.items() if k not in skipped}
+
     def _assign_session_list(
         self, sess_key, sess_ts, sess_items, base_lro_kwargs: dict
     ) -> tuple[dict, datetime]:
@@ -363,23 +448,9 @@ class AoTimelineMixin:
             following ``null`` session to cumulate forward.
 
         Raises:
-            ValueError: If the list length != number of items in the session.
+            ValueError: As :meth:`_check_session_list`.
         """
-        # Order items the same way the merge/timeline does (by {index} when
-        # present). The list is positional, so this MUST match the merge order
-        # in _create_long_recordings.
-        sorted_items = sorted(sess_items, key=self._session_sort_key(sess_items))
-        if len(sess_ts) != len(sorted_items):
-            raise ValueError(
-                f"manual_datetime list for session '{sess_key}' has "
-                f"{len(sess_ts)} entries but the session has "
-                f"{len(sorted_items)} item(s): "
-                f"{[self._get_item_name(f) for f in sorted_items]}. "
-                f"Provide exactly one datetime per file, in index order."
-            )
-
-        context_path = self._get_context_path(sorted_items[0])
-        resolved = self._resolve_timestamp_input(list(sess_ts), context_path)
+        sorted_items, resolved = self._check_session_list(sess_key, sess_ts, sess_items)
 
         timeline = {}
         for item, start_dt in zip(sorted_items, resolved):
@@ -406,11 +477,14 @@ class AoTimelineMixin:
     ) -> dict:
         """Resolve ``manual_datetimes`` into a per-item ``{item_key: start_datetime}`` map.
 
-        When ``validate_only=True`` the key/shape validation runs exactly as normal (raising
-        identically on any session/item/length mismatch), but the function returns ``{}`` right
-        after — skipping the timeline computation, which reads every file's duration. This is
-        what makes the dry-run's single checkpoint cheap while staying byte-for-byte the same
-        validation the real load performs.
+        When ``validate_only=True`` every check that needs no file contents runs as in a real
+        load and raises the same errors: session and item keys against what was discovered,
+        each per-file list against its session's file count, that every value parses, that a
+        list repeats no start, and that some session has an explicit time. Then ``{}`` is
+        returned without building the timeline, which needs every file's duration and so
+        reads every file. Callable values are not run, since they are user code that may read
+        files. Whether recordings overlap, which needs durations, is only checked on a real
+        load.
 
         Supported forms (per animal):
 
@@ -422,8 +496,12 @@ class AoTimelineMixin:
           Scalar/list values act as resets; nulls before the first explicit
           anchor are backfilled by walking backward.
         - **dict keyed by item/filename** — value per file (scalar or per-file list).
-        - **flat list** — one datetime per discovered file across all sessions.
         - **single datetime/string** — global start for the whole animal.
+
+        A top-level list is refused: it used to give every file the whole list, which failed
+        on a real load and passed the dry run. Per-file starts go in a session-keyed dict,
+        one list per session. Keys for sessions that skip_sessions excluded are ignored,
+        unless a null session would cumulate from one.
 
         Lists and nulls require ``datetimes_are_start=True``.
         """
@@ -453,17 +531,17 @@ class AoTimelineMixin:
                     raise ValueError(
                         f"Missing entries in manual_datetimes for items: {missing}."
                     )
-                if validate_only:
-                    return {}
                 out = {}
                 for item in animal_items:
                     fname = self._get_item_name(item)
+                    if validate_only and callable(manual_datetimes[fname]):
+                        continue
                     context_path = self._get_context_path(item)
                     out[self._get_item_key(item)] = self._resolve_timestamp_input(
                         manual_datetimes[fname], context_path
                     )
                 self._validate_timestamp_ordering(out)
-                return out
+                return {} if validate_only else out
 
             elif has_session_keys:
                 logging.info(
@@ -475,6 +553,7 @@ class AoTimelineMixin:
                 # animalday_to_items.  Dict keys are the single canonical
                 # chronological source — see plan: "Allow null in
                 # manual_datetime dict (cumulate forward from prior anchor)".
+                manual_datetimes = self._check_skipped_session_keys(manual_datetimes)
                 missing_sessions = [
                     k for k in animalday_to_items
                     if k not in manual_datetimes
@@ -524,9 +603,6 @@ class AoTimelineMixin:
                         f"interpreted as start times."
                     )
 
-                if validate_only:
-                    return {}
-
                 # Find the first explicit anchor — used to backfill any
                 # null sessions BEFORE it (working backward, assuming
                 # contiguous recording).  Sessions at and after the first
@@ -544,6 +620,19 @@ class AoTimelineMixin:
                         f"explicit anchor — every session is null. At least "
                         f"one session must have a known datetime."
                     )
+
+                if validate_only:
+                    # Everything checkable without reading a file, so the dry run
+                    # fails where the load would.
+                    for sess_key, sess_ts in manual_datetimes.items():
+                        sess_items = animalday_to_items[sess_key]
+                        if isinstance(sess_ts, list):
+                            self._check_session_list(sess_key, sess_ts, sess_items)
+                        elif sess_ts is not None and not callable(sess_ts):
+                            self._resolve_timestamp_input(
+                                sess_ts, self._get_context_path(sess_items[0])
+                            )
+                    return {}
 
                 out = {}
 
@@ -669,6 +758,13 @@ class AoTimelineMixin:
                 return timeline
             warnings.warn(
                 "String timestamp resolved to non-scalar. Falling back to default processing."
+            )
+
+        elif isinstance(manual_datetimes, (list, tuple)):
+            raise ValueError(
+                f"manual_datetime for '{self.animal_id}' is a list. A top-level list is not "
+                "supported: give a dict keyed by session, whose value for a session is either "
+                "one start time or a list of one start per file in that session."
             )
 
         else:
@@ -877,11 +973,9 @@ class AoTimelineMixin:
             list: Sorted (folder_path, lro) tuples in temporal order based on median timestamp
 
         Note:
-            Extracts file_end_datetimes from each LRO (timestamps from LastEdit fields in metadata CSV files),
-            calculates the median timestamp of constituent recordings within each LRO, and sorts LROs
-            by this median timestamp. This ensures proper temporal ordering based on actual recording
-            content rather than folder naming conventions. Falls back to folder modification time if
-            no valid timestamps are available.
+            Takes file_end_datetimes from each LRO, calculates the median timestamp of its
+            files, and sorts LROs by it, so the order follows the recordings rather than how
+            folders are named. An LRO with no valid timestamps sorts last, with a warning.
         """
         # Call static version for sorting logic
         sorted_folder_lro_pairs = self._sort_lros_by_median_time_static(

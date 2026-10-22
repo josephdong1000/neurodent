@@ -70,6 +70,10 @@ class AnimalOrganizer(
             keys before grouping. For example, to merge split-day folders like
             "2023-01-15", "2023-01-15(1)", "2023-01-15(2)" into one session, pass
             ``lambda s: re.sub(r"\(\d+\)$", "", s)``. Defaults to None (no normalization).
+        validate_only (bool, optional): Run discovery, skip_sessions and every
+            manual_datetimes check that needs no file contents, then stop without loading
+            anything; ``long_recordings`` stays empty and ``channel_names`` is None. Anything
+            that reads a file is only checked by a real load. Defaults to False.
 
     Attributes:
         pattern (str | list[str]): The file pattern(s) used for discovery.
@@ -123,6 +127,9 @@ class AnimalOrganizer(
         # other (e.g. skipping a session whose files all failed to load) must go through
         # this map rather than comparing the two key spaces directly.
         self._session_to_animalday = {}
+        # Sessions skip_sessions excluded, so a manual_datetime entry kept for one of them
+        # can be told apart from a key that matches nothing.
+        self._skipped_sessions = set()
 
         for item in discovered_items:
             # All items are now DiscoveredFile objects with unified interface
@@ -135,6 +142,7 @@ class AnimalOrganizer(
                 session = self._normalize_session(session)
 
             if any(fnmatch.fnmatch(session, pat) for pat in skip_sessions):
+                self._skipped_sessions.add(session)
                 continue
 
             if session not in self._animalday_folder_groups:
@@ -197,11 +205,11 @@ class AnimalOrganizer(
         self.long_recordings: list[_lro.LongRecordingOrganizer] = []
 
         if validate_only:
-            # Cheap pre-flight checkpoint: discovery + skip_sessions + the REAL
-            # _process_manual_datetimes validation have already run above (they raise on any
-            # session/datetime mismatch) — WITHOUT the expensive per-file load/resample. The
-            # dry-run reuses THIS single checkpoint, so "dry-run OK" can never disagree with
-            # "it loads" (they run the identical validation code).
+            # Cheap pre-flight check: discovery, skip_sessions and every manual_datetimes
+            # check that needs no file contents have run above, raising as a real load
+            # would. Nothing that reads a file runs here: the reader, units, channel names,
+            # the split, merges and time overlaps are only checked by a real load. Snakemake's
+            # dry run does not call this; scripts/iqsec2/validate_config.py does.
             self.channel_names = None
             return
 

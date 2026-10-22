@@ -372,6 +372,112 @@ def _validate_unique_animal_ids(animals_list: list) -> None:
         seen_slugs[slug] = index
 
 
+# The keys a per-animal ``sources`` entry may carry. load_animal_recordings reads exactly
+# these from each source, so any other key would be dropped without a word.
+SOURCE_KEYS = frozenset({"pattern", "lro_kwargs", "manual_datetime", "skip_sessions", "channel_subset"})
+
+
+def _check_channel_subset(value, where: str) -> None:
+    """Raise unless a channel_subset is null or a non-empty list of channel names.
+
+    A bare string used to be accepted and only failed later, inside the split, as one
+    "not found" per character of the string.
+
+    Args:
+        value: The configured channel_subset.
+        where: Names the animal, and the source if there is one, for the error message.
+
+    Raises:
+        ValueError: If the value is neither null nor a non-empty list of strings, or lists
+            a channel twice.
+    """
+    if value is None:
+        return
+    if not isinstance(value, list) or not value or not all(isinstance(c, str) for c in value):
+        raise ValueError(
+            f"{where}: channel_subset must be null or a non-empty list of channel names, "
+            f"got {value!r}."
+        )
+    repeated = sorted({c for c in value if value.count(c) > 1})
+    if repeated:
+        raise ValueError(f"{where}: channel_subset lists {repeated} more than once.")
+
+
+def _validate_source_specs(animals_list: list) -> None:
+    """Raise if an animal's ``sources`` entries would be misread by the loader.
+
+    The loader reads the keys in ``SOURCE_KEYS`` from each source and nothing else, so a
+    misspelled or misplaced key used to change what loaded without any message. The
+    likeliest is ``datetimes_are_start`` written beside the pattern: nothing reads it there,
+    the dataset default applies instead, and the source's manual times can be read as the
+    wrong end of each file.
+
+    Args:
+        animals_list: Animal entries after the exclude filter.
+
+    Raises:
+        ValueError: If ``sources`` is present but is not a non-empty list, if a source is not
+            a mapping, if a source has a key outside ``SOURCE_KEYS``, or if a channel_subset on
+            the animal or on a source is neither null nor a non-empty list of strings.
+    """
+    for animal in animals_list:
+        animal_id = animal.get("id")
+        if "channel_subset" in animal:
+            _check_channel_subset(animal["channel_subset"], f"animal {animal_id!r}")
+        if "sources" not in animal:
+            continue
+        sources = animal["sources"]
+        if not isinstance(sources, list) or not sources:
+            raise ValueError(
+                f"animal {animal_id!r}: sources must be a non-empty list of source entries, "
+                f"got {sources!r}. Remove the key to load from the animal's own pattern."
+            )
+        for index, source in enumerate(sources):
+            where = f"animal {animal_id!r}, source {index}"
+            if not isinstance(source, dict):
+                raise ValueError(f"{where}: a source must be a mapping of keys, got {source!r}.")
+            unknown = sorted(set(source) - SOURCE_KEYS)
+            if unknown:
+                hint = ""
+                if "datetimes_are_start" in unknown:
+                    hint = " datetimes_are_start belongs inside the source's lro_kwargs."
+                raise ValueError(
+                    f"{where}: unknown key(s) {unknown}. A source may carry only "
+                    f"{sorted(SOURCE_KEYS)}, and anything else would be ignored.{hint}"
+                )
+            if "channel_subset" in source:
+                _check_channel_subset(source["channel_subset"], where)
+
+
+def resolve_source_subset(animal_subset, source_spec):
+    """The channels one source of an animal is split down to, or None when it is not split.
+
+    Splitting is decided per source, because whether a file holds several animals is a
+    property of that file, not of the animal or of the format it was saved in. A source's
+    own ``channel_subset`` wins, and an explicit null there means its files hold this animal
+    alone. A source without the key inherits the animal's, the way it inherits the animal's
+    pattern, reader settings and times.
+
+    Args:
+        animal_subset: The animal-level ``channel_subset``, or None when there is none.
+        source_spec: One entry of the animal's ``sources``, or None for an animal without
+            sources.
+
+    Returns:
+        list[str] | None: The channel list to split to, or None to load every channel.
+    """
+    if source_spec and "channel_subset" in source_spec:
+        return source_spec["channel_subset"]
+    return animal_subset
+
+
+def _split_subsets(animal: dict) -> list:
+    """Every channel list one animal is split to, one per source that is split."""
+    animal_subset = animal.get("channel_subset")
+    subsets = (resolve_source_subset(animal_subset, s) for s in animal.get("sources") or [None])
+    return [s for s in subsets if s is not None]
+
+
 def expand_animals_config(samples_config: dict) -> dict:
     """Expand the unified ``animals`` list into pipeline keys.
 
@@ -402,6 +508,14 @@ def expand_animals_config(samples_config: dict) -> dict:
     -------
     dict
         Expanded configuration with pipeline keys populated.
+
+    Raises
+    ------
+    ValueError
+        If two animals share an id or slug, if a ``sources`` entry carries a key the loader
+        would ignore (see ``SOURCE_KEYS``), if a channel_subset is neither null nor a list of
+        distinct channel names, if an animal declares a group but splits nothing, or if two
+        animals of one group claim the same channel. Excluded animals are not checked.
 
     Examples
     --------
@@ -539,31 +653,35 @@ def expand_animals_config(samples_config: dict) -> dict:
     animal_channel_subsets: dict[str, list[str]] = {}
     animal_groups: dict[str, str] = {}
 
+    _validate_source_specs(animals_list)
+    split_subsets = {animal["id"]: _split_subsets(animal) for animal in animals_list}
+
     for animal in animals_list:
         if "channel_subset" in animal:
             animal_channel_subsets[animal["id"]] = animal["channel_subset"]
         if "group" in animal:
             animal_groups[animal["id"]] = animal["group"]
 
-    # Validate no overlapping channels within the same group
-    if animal_channel_subsets and animal_groups:
-        # Group animals by their group name
-        groups_to_animals: dict[str, list[str]] = {}
-        for animal_id, group_name in animal_groups.items():
-            groups_to_animals.setdefault(group_name, []).append(animal_id)
+    # A group only names the shared files that split sources are found in. On an animal
+    # with nothing to split it would be silently unused.
+    for animal_id, group_name in animal_groups.items():
+        if not split_subsets[animal_id]:
+            raise ValueError(
+                f"animal {animal_id!r} declares group {group_name!r} but no channel_subset, on "
+                "the animal or on any of its sources, so nothing would be split out of the "
+                "group's files. Give it the channels it owns, or remove the group."
+            )
 
-        # Check for channel overlaps within each group
-        for group_name, animal_ids in groups_to_animals.items():
-            # Get all channels for animals in this group
-            all_channels_in_group: list[tuple[str, str]] = []  # (animal_id, channel)
-            for animal_id in animal_ids:
-                if animal_id in animal_channel_subsets:
-                    for channel in animal_channel_subsets[animal_id]:
-                        all_channels_in_group.append((animal_id, channel))
-
-            # Check for duplicates
-            seen_channels: dict[str, str] = {}  # channel -> first animal_id
-            for animal_id, channel in all_channels_in_group:
+    # Animals of one group are split out of the same files, so no two may claim one channel.
+    # Every split source counts, including a source's own list.
+    groups_to_animals: dict[str, list[str]] = {}
+    for animal_id, group_name in animal_groups.items():
+        groups_to_animals.setdefault(group_name, []).append(animal_id)
+    for group_name, animal_ids in groups_to_animals.items():
+        seen_channels: dict[str, str] = {}  # channel -> first animal_id
+        for animal_id in animal_ids:
+            owned = {channel for subset in split_subsets[animal_id] for channel in subset}
+            for channel in sorted(owned):
                 if channel in seen_channels:
                     raise ValueError(
                         f"Channel '{channel}' is assigned to both '{seen_channels[channel]}' "

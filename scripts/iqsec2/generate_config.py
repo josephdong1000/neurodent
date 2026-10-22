@@ -768,7 +768,8 @@ def _bin_lro_kwargs_lines(indent):
 
     datetimes_are_start is true because the per-file manual_datetime lists this generator
     writes hold start times, computed from the sidecar's LastEdit minus the payload
-    duration. It has to sit inside lro_kwargs: beside the pattern it is read by nothing.
+    duration. It has to sit inside lro_kwargs, the only place a source's reader settings
+    are read; the config is refused if it sits beside the pattern.
     """
     pad = " " * indent
     return [
@@ -1384,14 +1385,14 @@ def main(argv=None):
                     lines = [f"{pad}pattern:"]
                     lines += [f"{pad}- \"{base}{suffix}\"" for suffix in
                               ("_ColMajor.bin", "_Meta.csv")]
-                    # Not a property of the file type. Whether channels get picked out of a
-                    # file ought to follow what the file holds, but the loader decides it
-                    # from a key on the ANIMAL, so this leg inherits the rhd leg's answer
-                    # and has to opt out by hand. Without it the split looks for 'A-010' in
-                    # files that name the same electrode 'Intan Input (1)/PortA L Vis Ctx'
-                    # and raises. These 707 files were each measured to hold this animal
-                    # alone; elsewhere in this tree 12 DataWave files hold four animals and
-                    # would want the split.
+                    # The loader decides splitting per source, and a source without its
+                    # own channel_subset inherits the animal's, which here is the rhd leg's
+                    # port list. These 707 files were each measured to hold this animal
+                    # alone, so this leg opts out with null. Without it the split would look
+                    # for 'A-010' in files that name the same electrode
+                    # 'Intan Input (1)/PortA L Vis Ctx' and raise. Nothing about the format
+                    # decides this: elsewhere in this tree 12 DataWave files hold four
+                    # animals, and a source for them would list its own channels instead.
                     lines.append(f"{pad}channel_subset: null")
                     lines += _bin_lro_kwargs_lines(indent)
                     lines.append(f"{pad}manual_datetime:")

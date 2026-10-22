@@ -100,6 +100,10 @@ def register_filter(spec: FilterSpec) -> None:
     _FILTER_REGISTRY[spec.name] = spec
 
 
+# The low-RMS threshold every entry point defaults to, in µV. It was 30 in two places and
+# 50 in four, so the same call could mask different windows depending on its route.
+DEFAULT_MIN_RMS = 50
+
 # ---------------------------------------------------------------------------
 # Pure filter implementations
 # ---------------------------------------------------------------------------
@@ -141,7 +145,7 @@ def _filter_low_rms(
     channel_info: ChannelInfo,
     n_windows: int,
     *,
-    min_rms: float = 30,
+    min_rms: float = DEFAULT_MIN_RMS,
     **_kwargs: Any,
 ) -> np.ndarray:
     np_rms = extract_linear_array(df_stats["rms"])

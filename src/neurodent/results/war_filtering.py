@@ -12,6 +12,7 @@ import pandas as pd
 from neurodent import constants
 from .feature_handlers import handler_for
 from .filters import (
+    DEFAULT_MIN_RMS,
     FILTER_REGISTRY,
     ChannelInfo,
     FilterScope,
@@ -68,7 +69,7 @@ class WARFilterMixin:
             self.result, self._channel_info(), len(self.result), max_rms=max_rms
         )
 
-    def get_filter_low_rms(self, *, min_rms=30, **kwargs):
+    def get_filter_low_rms(self, *, min_rms=DEFAULT_MIN_RMS, **kwargs):
         """Filter windows based on rms.
 
         Args:
@@ -251,7 +252,7 @@ class WARFilterMixin:
         filter_config: dict = {
             "logrms_range": {"z_range": kwargs.pop("z_range", 3)},
             "high_rms":     {"max_rms": kwargs.pop("max_rms", 500)},
-            "low_rms":      {"min_rms": kwargs.pop("min_rms", 50)},
+            "low_rms":      {"min_rms": kwargs.pop("min_rms", DEFAULT_MIN_RMS)},
             "high_beta":    {"max_beta_prop": kwargs.pop("max_beta_prop", 0.4)},
             "reject_channels_by_session": {"save_bad_channels": save_bad_channels},
         }
@@ -316,7 +317,7 @@ class WARFilterMixin:
         mask = self.get_filter_high_rms(max_rms=max_rms)
         return self._create_filtered_copy(mask, filter_name="high_rms")
 
-    def filter_low_rms(self, min_rms: float = 50) -> "WindowAnalysisResult":
+    def filter_low_rms(self, min_rms: float = DEFAULT_MIN_RMS) -> "WindowAnalysisResult":
         """Filter out windows with RMS below threshold.
 
         Args:
@@ -442,7 +443,7 @@ class WARFilterMixin:
             filter_config = {
                 "logrms_range": {"z_range": 3},
                 "high_rms": {"max_rms": 500},
-                "low_rms": {"min_rms": 50},
+                "low_rms": {"min_rms": DEFAULT_MIN_RMS},
                 "high_beta": {"max_beta_prop": 0.4},
                 "reject_channels_by_session": {},
             }

@@ -6,13 +6,154 @@ Mixin for :class:`~neurodent.loading.long_recording_organizer.LongRecordingOrgan
 import copy
 import logging
 import warnings
+from datetime import timedelta
 
 try:
     import spikeinterface.core as si
 except Exception:  # pragma: no cover - optional at import time
     si = None
 
+from neurodent.constants import RECORDING_TIME_TOLERANCE_S
 from neurodent.core.utils import resolve_channels
+
+
+def file_intervals(lro) -> list:
+    """Each live file's ``(start, end)`` in a recording, or an empty list when timing is unknown.
+
+    A file is live when it has an end datetime and a positive duration. 0-sample files carry
+    a 0 duration and are left out, as ``_update_metadata_after_merge`` leaves them out.
+
+    Args:
+        lro: A LongRecordingOrganizer, or anything with ``file_end_datetimes`` and
+            ``file_durations`` lists. Objects without them, or with something other than a
+            list or tuple there (such as a test double), give an empty list.
+
+    Returns:
+        list[tuple[datetime, datetime]]: One interval per live file, in the recording's order.
+    """
+    ends = getattr(lro, "file_end_datetimes", None)
+    durations = getattr(lro, "file_durations", None)
+    if not isinstance(ends, (list, tuple)) or not isinstance(durations, (list, tuple)):
+        return []
+    return [
+        (end - timedelta(seconds=float(duration)), end)
+        for end, duration in zip(ends, durations)
+        if end is not None and duration is not None and duration > 0
+    ]
+
+
+def _is_si_recording(rec) -> bool:
+    base = getattr(si, "BaseRecording", None)
+    return isinstance(base, type) and isinstance(rec, base)
+
+
+def _repeated(values) -> list:
+    return sorted({v for v in values if values.count(v) > 1})
+
+
+def match_channels(reference_names, names, reference_label="the reference recording", label="the other recording"):
+    """For each channel of a reference recording, the position of the same channel in another.
+
+    Channels are matched by exact name when both recordings use the same names. That keeps
+    a recording of several animals unambiguous, where one abbreviation stands for one
+    electrode per animal. Otherwise they are matched by abbreviation, so 'L Barrel' and
+    'L Barrel Ctx' are one channel, which needs each abbreviation to appear once on each
+    side. Position plays no part, so two recordings that list the same electrodes in a
+    different order still match.
+
+    Args:
+        reference_names: The reference recording's channel names.
+        names: The other recording's channel names.
+        reference_label: Names the reference recording in error messages.
+        label: Names the other recording in error messages.
+
+    Returns:
+        list[int]: ``order`` such that ``names[order[k]]`` is the channel ``reference_names[k]``.
+
+    Raises:
+        ValueError: If either list is empty or repeats a name, if the two do not hold the same
+            channels, or if they are spelled differently and an abbreviation repeats.
+    """
+    reference_names, names = list(reference_names or []), list(names or [])
+    for listed, who in ((reference_names, reference_label), (names, label)):
+        if not listed:
+            raise ValueError(f"{who} has no channel names, so its channels cannot be matched.")
+        if _repeated(listed):
+            raise ValueError(
+                f"{who} lists channel names {_repeated(listed)} more than once, so they cannot "
+                "identify channels."
+            )
+    if set(names) == set(reference_names):
+        return [names.index(n) for n in reference_names]
+
+    reference_abbrevs, abbrevs = resolve_channels(reference_names), resolve_channels(names)
+    if set(abbrevs) != set(reference_abbrevs):
+        raise ValueError(
+            f"Channel names mismatch: {reference_label} has {reference_names} (abbrevs: "
+            f"{reference_abbrevs}), {label} has {names} (abbrevs: {abbrevs})"
+        )
+    for listed, who in ((reference_abbrevs, reference_label), (abbrevs, label)):
+        if _repeated(listed):
+            raise ValueError(
+                f"Channel names mismatch: the two recordings spell their channels differently "
+                f"({reference_names} and {names}), and in {who} the abbreviations "
+                f"{_repeated(listed)} stand for more than one channel, so they cannot be matched."
+            )
+    return [abbrevs.index(a) for a in reference_abbrevs]
+
+
+def conform_channels(lro, reference_names, reference_label="the reference recording"):
+    """Reorder and respell a recording's channels to match a reference, data included.
+
+    Channels are matched by :func:`match_channels`. The recording is put in the reference's
+    order, and its channel ids, its ``channel_names``, its metadata, its bad channels and any
+    ``channel_name`` property all take the reference's spelling, so whatever is read from the
+    recording later agrees with what the analysis labels it. Before, a respelling changed
+    ``channel_names`` but not the recording ids, which spike results are named from, and a
+    different order was only logged, so that recording's columns carried other channels'
+    names.
+
+    Args:
+        lro: The LongRecordingOrganizer to change in place.
+        reference_names: The channel names, in order, it should end up with.
+        reference_label: Names the reference in messages.
+
+    Raises:
+        ValueError: As :func:`match_channels`.
+    """
+    reference_names = list(reference_names or [])
+    current = list(lro.channel_names or [])
+    order = match_channels(reference_names, current, reference_label, lro.display_name)
+    rec = getattr(lro, "LongRecording", None)
+
+    if order != list(range(len(order))):
+        logging.warning(
+            f"{lro.display_name} lists its channels in a different order ({current}); "
+            f"reordered to match {reference_label}: {reference_names}"
+        )
+        if rec is not None:
+            ids = list(rec.get_channel_ids())
+            rec = rec.select_channels(channel_ids=[ids[j] for j in order])
+
+    old_names = [current[j] for j in order]
+    ids_differ = _is_si_recording(rec) and [str(i) for i in rec.get_channel_ids()] != reference_names
+    if rec is not None and (old_names != reference_names or ids_differ):
+        if old_names != reference_names:
+            logging.info(f"Renaming channels {old_names} -> {reference_names} to match {reference_label}")
+        rec = rec.rename_channels(new_channel_ids=reference_names)
+        if _is_si_recording(rec) and "channel_name" in rec.get_property_keys():
+            rec.set_property("channel_name", reference_names)
+
+    if rec is not None:
+        lro.LongRecording = rec
+    lro.channel_names = reference_names
+    meta = getattr(lro, "meta", None)
+    if meta is not None and hasattr(meta, "channel_names"):
+        meta.channel_names = list(reference_names)
+    respelled = dict(zip(old_names, reference_names))
+    bad = getattr(lro, "bad_channel_names", None)
+    if isinstance(bad, list) and bad:
+        lro.bad_channel_names = [respelled.get(name, name) for name in bad]
 
 
 class LroMergeMixin:
@@ -41,7 +182,7 @@ class LroMergeMixin:
             ImportError: If SpikeInterface is not available.
 
         Example:
-            >>> lro = LongRecordingOrganizer("/path/to/data", mode="bin")
+            >>> lro = LongRecordingOrganizer(item, mode="si", extract_func="read_intan")
             >>> splits = lro.split({"AnimalA": ["Ch1", "Ch2"], "AnimalB": ["Ch3", "Ch4"]})
             >>> splits["AnimalA"].save_recording("/output/AnimalA", format="zarr")
         """
@@ -117,17 +258,18 @@ class LroMergeMixin:
                 recording=sub_rec,
                 manual_datetimes=self.manual_datetimes,
                 datetimes_are_start=self.datetimes_are_start,
-                truncate=self.n_truncate if self.truncate else False,
             )
 
-            # Inherit file-level timestamps and durations (post-instantiation assignment)
+            # Inherit file-level timestamps and durations as copies. Merging appends to these
+            # lists in place, so children sharing the parent's list objects would each see
+            # the files merged into the others.
             if hasattr(self, "file_end_datetimes"):
-                child_lro.file_end_datetimes = self.file_end_datetimes
+                child_lro.file_end_datetimes = list(self.file_end_datetimes)
 
             # Inherit parent durations to ensure consistency with timestamps
             if hasattr(self, "file_durations") and self.file_durations:
-                child_lro.file_durations = self.file_durations
-                child_lro.cumulative_file_durations = self.cumulative_file_durations
+                child_lro.file_durations = list(self.file_durations)
+                child_lro.cumulative_file_durations = list(self.cumulative_file_durations)
 
             # Inherit bad channels that are present in this split
             if self.bad_channel_names:
@@ -159,7 +301,9 @@ class LroMergeMixin:
             other_lro (LongRecordingOrganizer): The LRO to merge into this one
 
         Raises:
-            ValueError: If LROs are incompatible (different channels, sampling rates, etc.)
+            ValueError: If LROs are incompatible (different channels, sampling rates, etc.),
+                or if ``other_lro`` starts before this one ends by more than
+                ``RECORDING_TIME_TOLERANCE_S``. A larger gap is logged, not raised.
             ImportError: If SpikeInterface is not available
         """
         if si is None:
@@ -167,6 +311,7 @@ class LroMergeMixin:
 
         # Validate merge compatibility
         self._validate_merge_compatibility(other_lro)
+        self._validate_merge_timeline(other_lro)
 
         # Skip recording concatenation if other_lro has 0 samples (e.g. empty
         # tail file), but still update metadata so dt_end etc. stay correct.
@@ -185,21 +330,13 @@ class LroMergeMixin:
             f"Merging LRO {getattr(other_lro, 'item', 'unknown')} into {getattr(self, 'item', 'unknown')}"
         )
 
-        # If channel names differ but abbreviations matched (validated above),
-        # rename other recording's channels to match self's for SI concatenation.
-        other_rec = other_lro.LongRecording
-        if self.channel_names != other_lro.channel_names:
-            logging.info(
-                f"Renaming channels {other_lro.channel_names} -> {self.channel_names} "
-                "for merge compatibility"
-            )
-            other_rec = other_rec.rename_channels(
-                new_channel_ids=self.channel_names
-            )
-            other_lro.channel_names = list(self.channel_names)
+        # Concatenation needs identical channel ids in identical order, so the other
+        # recording is reordered and respelled to this one's channels, matched by identity.
+        conform_channels(self, self.channel_names, self.display_name)
+        conform_channels(other_lro, self.channel_names, self.display_name)
 
         self.LongRecording = si.concatenate_recordings(
-            [self.LongRecording, other_rec]
+            [self.LongRecording, other_lro.LongRecording]
         )
 
         # Update metadata after merge
@@ -224,21 +361,27 @@ class LroMergeMixin:
         first, so the wall is hit immediately rather than partway through.
 
         Per-step validation, channel renaming, 0-sample handling and metadata
-        accumulation are all preserved; only the concatenation is deferred.
+        accumulation are all preserved; only the concatenation is deferred. Each entry's
+        start is checked against the end of everything merged before it.
 
         Args:
             other_lros (list[LongRecordingOrganizer]): LROs to merge, in temporal order.
 
         Raises:
-            ValueError: If any LRO is incompatible with this one.
+            ValueError: If any LRO is incompatible with this one, or starts before the
+                recordings merged ahead of it end, by more than ``RECORDING_TIME_TOLERANCE_S``.
+                A larger gap is logged, not raised.
             ImportError: If SpikeInterface is not available.
         """
         if si is None:
             raise ImportError("SpikeInterface is required for LRO merging")
 
+        if other_lros:
+            conform_channels(self, self.channel_names, self.display_name)
         recordings = [self.LongRecording]
         for other_lro in other_lros:
             self._validate_merge_compatibility(other_lro)
+            self._validate_merge_timeline(other_lro)
 
             # A 0-sample tail contributes no samples but its metadata still matters, so
             # keep it out of the concatenation and fold its metadata in, as merge() does.
@@ -250,16 +393,8 @@ class LroMergeMixin:
                 self._update_metadata_after_merge(other_lro)
                 continue
 
-            other_rec = other_lro.LongRecording
-            if self.channel_names != other_lro.channel_names:
-                logging.info(
-                    f"Renaming channels {other_lro.channel_names} -> {self.channel_names} "
-                    "for merge compatibility"
-                )
-                other_rec = other_rec.rename_channels(new_channel_ids=self.channel_names)
-                other_lro.channel_names = list(self.channel_names)
-
-            recordings.append(other_rec)
+            conform_channels(other_lro, self.channel_names, self.display_name)
+            recordings.append(other_lro.LongRecording)
             self._update_metadata_after_merge(other_lro)
 
         if len(recordings) > 1:
@@ -277,17 +412,10 @@ class LroMergeMixin:
         Raises:
             ValueError: If LROs are incompatible
         """
-        # Check channel names — compare by abbreviation to tolerate naming
-        # variants (e.g. "L Barrel" vs "L Barrel Ctx" both → "LBar").
-        # Unparseable names pass through as-is for exact comparison.
-        self_abbrevs = resolve_channels(self.channel_names)
-        other_abbrevs = resolve_channels(other_lro.channel_names)
-        if self_abbrevs != other_abbrevs:
-            raise ValueError(
-                f"Channel names mismatch: this LRO has {self.channel_names} "
-                f"(abbrevs: {self_abbrevs}), other LRO has {other_lro.channel_names} "
-                f"(abbrevs: {other_abbrevs})"
-            )
+        # Same channels, matched by identity rather than position: exact names when both
+        # use the same ones, abbreviations when the spelling differs. A different order is
+        # fine, since the merge reorders the other recording to match.
+        match_channels(self.channel_names, other_lro.channel_names, self.display_name, other_lro.display_name)
 
         # Check sampling rates
         if hasattr(self.meta, "f_s") and hasattr(other_lro.meta, "f_s"):
@@ -310,6 +438,42 @@ class LroMergeMixin:
             raise ValueError("This LRO does not have a valid LongRecording")
         if not hasattr(other_lro, "LongRecording") or other_lro.LongRecording is None:
             raise ValueError("Other LRO does not have a valid LongRecording")
+
+    def _validate_merge_timeline(self, other_lro):
+        """Raise if ``other_lro`` starts before this recording ends, beyond clock jitter.
+
+        Merging concatenates samples, so what is appended has to come after what is already
+        there. An overlap means a misplaced timestamp or the same data loaded twice, and both
+        used to be concatenated without a word, after which every feature was computed on the
+        doubled or misordered data. A gap is legitimate, since recordings get stopped and
+        restarted, so it is logged instead. Recordings without file timing are not checked.
+
+        Args:
+            other_lro (LongRecordingOrganizer): The recording about to be appended.
+
+        Raises:
+            ValueError: If ``other_lro`` starts more than ``RECORDING_TIME_TOLERANCE_S``
+                before this recording's last file ends.
+        """
+        mine, theirs = file_intervals(self), file_intervals(other_lro)
+        if not mine or not theirs:
+            return
+        my_end = max(end for _, end in mine)
+        their_start = min(start for start, _ in theirs)
+        residual = (their_start - my_end).total_seconds()
+        if residual < -RECORDING_TIME_TOLERANCE_S:
+            raise ValueError(
+                f"{other_lro.display_name} starts at {their_start}, {-residual:.1f} s before "
+                f"the recording it would be appended to ({self.display_name}) ends at "
+                f"{my_end}. Either a timestamp is wrong or the same data is being loaded "
+                f"twice, for example by two sources or sessions that reach the same files. "
+                f"Overlaps up to {RECORDING_TIME_TOLERANCE_S:g} s are treated as clock jitter."
+            )
+        if residual > RECORDING_TIME_TOLERANCE_S:
+            logging.warning(
+                f"{residual:.1f} s gap inside one merged recording: {self.display_name} ends at "
+                f"{my_end} and {other_lro.display_name} starts at {their_start}."
+            )
 
     def _update_metadata_after_merge(self, other_lro):
         """Update this LRO's metadata after merging with another LRO.
