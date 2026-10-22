@@ -353,98 +353,432 @@ samples_data:
   # --- 013120_IQSEC2_78_76_Recordings: 143 files, 4 sessions, 128 amp channels on A,B,C,D
   #   PortB not loaded. Empty headstage: 0 of 8 canonical amps live.
   #   PortC not loaded. Empty headstage: 0 of 8 canonical amps live.
-  #   INCOMPLETE RECORD: this animal's implant was also recorded by the DataWave rig,
-  #   leaving roughly 46 more bin files and about 23 more hours under 'PythonEEG Data
-  #   Bins/IQSEC2/013120_IQSEC2_78_76_Recordings' that no pattern in this config reaches.
-  #   The two legs abut rather than overlap. What is loaded here is real and correctly
-  #   attributed, but it is not the whole recording, and coverage is uneven across animals
-  #   for that reason.
+  #   SECOND RIG: this animal was recorded on the DataWave rig as well, 46 files and about
+  #   22.6 hours under 'PythonEEG Data
+  #   Bins/IQSEC2/013120_IQSEC2_78_76_Recordings/Datawave_76'. Both legs are loaded, as
+  #   two sources. Order: rhd leg first, then DataWave. The DataWave leg's first file
+  #   starts 2020-02-03 10:57:22.340000, and because an animalday is named after its first
+  #   file's date it lands on Feb-03-2020, which an rhd session already occupies, so the
+  #   two merge into one animalday.
   - id: IQSEC2_76
     genotype: +/x
     sex: Female
     channel_subset: *port_a
-    pattern: "{data_root}/PythonEEG Data/IQSEC2/013120_IQSEC2_78_76_Recordings/{session}_{index}.rhd"
-    lro_kwargs:
-      extract_func: "read_intan"
-      stream_id: "0"
-      datetimes_are_start: true
-      ignore_integrity_checks: true
-    manual_datetime:
-      013120_IQSEC2_78_4B_76_1B_IntanRecording_200131: '2020-01-31 11:23:18'
-      013120_IQSEC2_78_4B_76_1B_IntanRecording_200201: '2020-02-01 00:23:19'
-      013120_IQSEC2_78_4B_76_1B_IntanRecording_200202: '2020-02-02 00:23:20'
-      013120_IQSEC2_78_4B_76_1B_IntanRecording_200203: '2020-02-03 00:23:22'
-  #   INCOMPLETE RECORD: this animal's implant was also recorded by the DataWave rig,
-  #   leaving roughly 46 more bin files and about 23 more hours under 'PythonEEG Data
-  #   Bins/IQSEC2/013120_IQSEC2_78_76_Recordings' that no pattern in this config reaches.
-  #   The two legs abut rather than overlap. What is loaded here is real and correctly
-  #   attributed, but it is not the whole recording, and coverage is uneven across animals
-  #   for that reason.
+    sources:
+    # rhd leg
+    - pattern: "{data_root}/PythonEEG Data/IQSEC2/013120_IQSEC2_78_76_Recordings/{session}_{index}.rhd"
+      lro_kwargs:
+        extract_func: "read_intan"
+        stream_id: "0"
+        datetimes_are_start: true
+        ignore_integrity_checks: true
+      manual_datetime:
+        013120_IQSEC2_78_4B_76_1B_IntanRecording_200131: '2020-01-31 11:23:18'
+        013120_IQSEC2_78_4B_76_1B_IntanRecording_200201: '2020-02-01 00:23:19'
+        013120_IQSEC2_78_4B_76_1B_IntanRecording_200202: '2020-02-02 00:23:20'
+        013120_IQSEC2_78_4B_76_1B_IntanRecording_200203: '2020-02-03 00:23:22'
+    # DataWave leg
+    - pattern:
+      - "{data_root}/PythonEEG Data Bins/IQSEC2/013120_IQSEC2_78_76_Recordings/{session}/020320_IQSEC2_76_Recording ({index})_ColMajor.bin"
+      - "{data_root}/PythonEEG Data Bins/IQSEC2/013120_IQSEC2_78_76_Recordings/{session}/020320_IQSEC2_76_Recording ({index})_Meta.csv"
+      channel_subset: null
+      lro_kwargs:
+        mode: "si"
+        extract_func: "neurodent.readers:read_bin_csv_pair"
+        datetimes_are_start: true
+      manual_datetime:
+        Datawave_76:
+        - '2020-02-03 10:57:22.340000'
+        - '2020-02-03 11:27:29.180000'
+        - '2020-02-03 11:57:28.820000'
+        - '2020-02-03 12:27:28.910000'
+        - '2020-02-03 12:57:29.820000'
+        - '2020-02-03 13:27:29.910000'
+        - '2020-02-03 13:57:29.910000'
+        - '2020-02-03 14:27:29.910000'
+        - '2020-02-03 14:57:29.550000'
+        - '2020-02-03 15:27:30.090000'
+        - '2020-02-03 15:57:29.820000'
+        - '2020-02-03 16:27:30.000000'
+        - '2020-02-03 16:57:29.820000'
+        - '2020-02-03 17:27:29.910000'
+        - '2020-02-03 17:57:30.910000'
+        - '2020-02-03 18:27:30.910000'
+        - '2020-02-03 18:57:30.820000'
+        - '2020-02-03 19:27:30.820000'
+        - '2020-02-03 19:57:30.910000'
+        - '2020-02-03 20:27:31.000000'
+        - '2020-02-03 20:57:31.640000'
+        - '2020-02-03 21:27:31.910000'
+        - '2020-02-03 21:57:32.000000'
+        - '2020-02-03 22:27:31.820000'
+        - '2020-02-03 22:57:31.910000'
+        - '2020-02-03 23:27:32.000000'
+        - '2020-02-03 23:57:31.820000'
+        - '2020-02-04 00:27:31.820000'
+        - '2020-02-04 00:57:31.910000'
+        - '2020-02-04 01:27:32.910000'
+        - '2020-02-04 01:57:32.820000'
+        - '2020-02-04 02:27:32.820000'
+        - '2020-02-04 02:57:32.910000'
+        - '2020-02-04 03:27:32.910000'
+        - '2020-02-04 03:57:33.000000'
+        - '2020-02-04 04:27:32.820000'
+        - '2020-02-04 04:57:33.820000'
+        - '2020-02-04 05:27:33.820000'
+        - '2020-02-04 05:57:33.730000'
+        - '2020-02-04 06:27:33.910000'
+        - '2020-02-04 06:57:33.910000'
+        - '2020-02-04 07:27:34.000000'
+        - '2020-02-04 07:57:33.820000'
+        - '2020-02-04 08:27:33.910000'
+        - '2020-02-04 08:57:34.820000'
+        - '2020-02-04 09:27:38.790000'
+  #   SECOND RIG: this animal was recorded on the DataWave rig as well, 46 files and about
+  #   22.6 hours under 'PythonEEG Data
+  #   Bins/IQSEC2/013120_IQSEC2_78_76_Recordings/Datawave_78'. Both legs are loaded, as
+  #   two sources. Order: rhd leg first, then DataWave. The DataWave leg's first file
+  #   starts 2020-02-03 10:57:21.860000, and because an animalday is named after its first
+  #   file's date it lands on Feb-03-2020, which an rhd session already occupies, so the
+  #   two merge into one animalday.
   - id: IQSEC2_78
     genotype: +/x
     sex: Female
     channel_subset: *port_d
-    pattern: "{data_root}/PythonEEG Data/IQSEC2/013120_IQSEC2_78_76_Recordings/{session}_{index}.rhd"
-    lro_kwargs:
-      extract_func: "read_intan"
-      stream_id: "0"
-      datetimes_are_start: true
-      ignore_integrity_checks: true
-    manual_datetime:
-      013120_IQSEC2_78_4B_76_1B_IntanRecording_200131: '2020-01-31 11:23:18'
-      013120_IQSEC2_78_4B_76_1B_IntanRecording_200201: '2020-02-01 00:23:19'
-      013120_IQSEC2_78_4B_76_1B_IntanRecording_200202: '2020-02-02 00:23:20'
-      013120_IQSEC2_78_4B_76_1B_IntanRecording_200203: '2020-02-03 00:23:22'
+    sources:
+    # rhd leg
+    - pattern: "{data_root}/PythonEEG Data/IQSEC2/013120_IQSEC2_78_76_Recordings/{session}_{index}.rhd"
+      lro_kwargs:
+        extract_func: "read_intan"
+        stream_id: "0"
+        datetimes_are_start: true
+        ignore_integrity_checks: true
+      manual_datetime:
+        013120_IQSEC2_78_4B_76_1B_IntanRecording_200131: '2020-01-31 11:23:18'
+        013120_IQSEC2_78_4B_76_1B_IntanRecording_200201: '2020-02-01 00:23:19'
+        013120_IQSEC2_78_4B_76_1B_IntanRecording_200202: '2020-02-02 00:23:20'
+        013120_IQSEC2_78_4B_76_1B_IntanRecording_200203: '2020-02-03 00:23:22'
+    # DataWave leg
+    - pattern:
+      - "{data_root}/PythonEEG Data Bins/IQSEC2/013120_IQSEC2_78_76_Recordings/{session}/020320_IQSEC2_78_Recording ({index})_ColMajor.bin"
+      - "{data_root}/PythonEEG Data Bins/IQSEC2/013120_IQSEC2_78_76_Recordings/{session}/020320_IQSEC2_78_Recording ({index})_Meta.csv"
+      channel_subset: null
+      lro_kwargs:
+        mode: "si"
+        extract_func: "neurodent.readers:read_bin_csv_pair"
+        datetimes_are_start: true
+      manual_datetime:
+        Datawave_78:
+        - '2020-02-04 00:57:38.820000'
+        - '2020-02-04 01:27:38.730000'
+        - '2020-02-04 01:57:39.730000'
+        - '2020-02-04 02:27:39.640000'
+        - '2020-02-04 02:57:39.910000'
+        - '2020-02-04 03:27:39.990000'
+        - '2020-02-04 03:57:39.090000'
+        - '2020-02-04 04:27:38.550000'
+        - '2020-02-04 04:57:39.730000'
+        - '2020-02-04 05:27:39.640000'
+        - '2020-02-04 05:57:40.370000'
+        - '2020-02-04 06:27:40.910000'
+        - '2020-02-04 06:57:40.730000'
+        - '2020-02-04 07:27:40.730000'
+        - '2020-02-04 07:57:41.080000'
+        - '2020-02-04 08:27:40.730000'
+        - '2020-02-04 08:57:40.640000'
+        - '2020-02-04 09:27:47.180000'
+        - '2020-02-03 10:57:21.860000'
+        - '2020-02-03 11:27:36.180000'
+        - '2020-02-03 11:57:35.820000'
+        - '2020-02-03 12:27:35.910000'
+        - '2020-02-03 12:57:35.730000'
+        - '2020-02-03 13:27:36.090000'
+        - '2020-02-03 13:57:35.730000'
+        - '2020-02-03 14:27:35.910000'
+        - '2020-02-03 14:57:36.370000'
+        - '2020-02-03 15:27:36.640000'
+        - '2020-02-03 15:57:37.270000'
+        - '2020-02-03 16:27:37.180000'
+        - '2020-02-03 16:57:36.640000'
+        - '2020-02-03 17:27:36.910000'
+        - '2020-02-03 17:57:36.820000'
+        - '2020-02-03 18:27:37.820000'
+        - '2020-02-03 18:57:37.820000'
+        - '2020-02-03 19:27:37.640000'
+        - '2020-02-03 19:57:37.820000'
+        - '2020-02-03 20:27:38.820000'
+        - '2020-02-03 20:57:38.640000'
+        - '2020-02-03 21:27:39.080000'
+        - '2020-02-03 21:57:38.090000'
+        - '2020-02-03 22:27:37.640000'
+        - '2020-02-03 22:57:37.730000'
+        - '2020-02-03 23:27:38.180000'
+        - '2020-02-03 23:57:38.730000'
+        - '2020-02-04 00:27:38.640000'
   # --- 012720_IQSEC2_77: 140 files, 4 sessions, 96 amp channels on A,C,D
   #   PortA not loaded. Empty headstage: 0 of 8 canonical amps live.
   #   PortD not loaded. A CDKL5 animal, not IQSEC2: these 140 rhd are a joint recording
   #   filed identically under PythonEEG Data/CDKL5. All 8 canonical amps are live, so this
   #   is a real implant belonging to another study.
-  #   INCOMPLETE RECORD: this animal's implant was also recorded by the DataWave rig,
-  #   leaving roughly 43 more bin files and about 21 more hours under 'PythonEEG Data
-  #   Bins/IQSEC2/012720_IQSEC2_77' that no pattern in this config reaches. The two legs
-  #   abut rather than overlap. What is loaded here is real and correctly attributed, but
-  #   it is not the whole recording, and coverage is uneven across animals for that
-  #   reason.
+  #   SECOND RIG: this animal was recorded on the DataWave rig as well, 43 files and about
+  #   20.9 hours under 'PythonEEG Data Bins/IQSEC2/012720_IQSEC2_77/Datawave_77'. Both
+  #   legs are loaded, as two sources. Order: rhd leg first, then DataWave. The DataWave
+  #   leg's first file starts 2020-01-30 13:46:01.880000, and because an animalday is
+  #   named after its first file's date it lands on Jan-30-2020, which an rhd session
+  #   already occupies, so the two merge into one animalday.
   - id: IQSEC2_77
     genotype: +/x
     sex: Female
     channel_subset: *port_c
-    pattern: "{data_root}/PythonEEG Data/IQSEC2/012720_IQSEC2_77/{session}_{index}.rhd"
-    lro_kwargs:
-      extract_func: "read_intan"
-      stream_id: "0"
-      datetimes_are_start: true
-      ignore_integrity_checks: true
-    manual_datetime:
-      012720_IQSEC2_77_cage3B_CDKL5_wt_cage4B_IntanRecording_200127: '2020-01-27 16:05:07'
-      012720_IQSEC2_77_cage3B_CDKL5_wt_cage4B_IntanRecording_200128: '2020-01-28 00:05:07'
-      012720_IQSEC2_77_cage3B_CDKL5_wt_cage4B_IntanRecording_200129: '2020-01-29 00:05:08'
-      012720_IQSEC2_77_cage3B_CDKL5_wt_cage4B_IntanRecording_200130: '2020-01-30 00:05:10'
+    sources:
+    # rhd leg
+    - pattern: "{data_root}/PythonEEG Data/IQSEC2/012720_IQSEC2_77/{session}_{index}.rhd"
+      lro_kwargs:
+        extract_func: "read_intan"
+        stream_id: "0"
+        datetimes_are_start: true
+        ignore_integrity_checks: true
+      manual_datetime:
+        012720_IQSEC2_77_cage3B_CDKL5_wt_cage4B_IntanRecording_200127: '2020-01-27 16:05:07'
+        012720_IQSEC2_77_cage3B_CDKL5_wt_cage4B_IntanRecording_200128: '2020-01-28 00:05:07'
+        012720_IQSEC2_77_cage3B_CDKL5_wt_cage4B_IntanRecording_200129: '2020-01-29 00:05:08'
+        012720_IQSEC2_77_cage3B_CDKL5_wt_cage4B_IntanRecording_200130: '2020-01-30 00:05:10'
+    # DataWave leg
+    - pattern:
+      - "{data_root}/PythonEEG Data Bins/IQSEC2/012720_IQSEC2_77/{session}/013020_IQSEC2_77_Recording-{index}_ColMajor.bin"
+      - "{data_root}/PythonEEG Data Bins/IQSEC2/012720_IQSEC2_77/{session}/013020_IQSEC2_77_Recording-{index}_Meta.csv"
+      channel_subset: null
+      lro_kwargs:
+        mode: "si"
+        extract_func: "neurodent.readers:read_bin_csv_pair"
+        datetimes_are_start: true
+      manual_datetime:
+        Datawave_77:
+        - '2020-01-30 13:46:01.880000'
+        - '2020-01-30 13:47:54.770000'
+        - '2020-01-30 14:18:07.910000'
+        - '2020-01-30 14:48:08.000000'
+        - '2020-01-30 15:18:07.090000'
+        - '2020-01-30 15:48:07.640000'
+        - '2020-01-30 16:18:07.910000'
+        - '2020-01-30 16:48:08.000000'
+        - '2020-01-30 17:18:08.000000'
+        - '2020-01-30 17:48:07.730000'
+        - '2020-01-30 18:18:08.190000'
+        - '2020-01-30 18:48:09.000000'
+        - '2020-01-30 19:18:09.270000'
+        - '2020-01-30 19:48:08.550000'
+        - '2020-01-30 20:18:09.000000'
+        - '2020-01-30 20:48:09.550000'
+        - '2020-01-30 21:18:09.550000'
+        - '2020-01-30 21:48:10.010000'
+        - '2020-01-30 22:18:10.900000'
+        - '2020-01-30 22:48:11.080000'
+        - '2020-01-30 23:18:18.560000'
+        - '2020-01-30 23:48:10.680000'
+        - '2020-01-31 00:18:33.330000'
+        - '2020-01-31 00:49:05.400000'
+        - '2020-01-31 01:18:24.830000'
+        - '2020-01-31 01:48:16.590000'
+        - '2020-01-31 02:18:11.440000'
+        - '2020-01-31 02:48:10.000000'
+        - '2020-01-31 03:18:10.640000'
+        - '2020-01-31 03:48:10.870000'
+        - '2020-01-31 04:18:15.680000'
+        - '2020-01-31 04:48:10.820000'
+        - '2020-01-31 05:18:11.280000'
+        - '2020-01-31 05:48:12.420000'
+        - '2020-01-31 06:18:17.490000'
+        - '2020-01-31 06:48:12.730000'
+        - '2020-01-31 07:18:12.820000'
+        - '2020-01-31 07:48:12.730000'
+        - '2020-01-31 08:18:12.640000'
+        - '2020-01-31 08:48:13.090000'
+        - '2020-01-31 09:18:12.990000'
+        - '2020-01-31 09:48:11.830000'
+        - '2020-01-31 10:18:18.930000'
   # --- 011320 IQSEC2_80_81_82_83: 182 files, 6 sessions, 128 amp channels on A,B,C,D
-  #   INCOMPLETE RECORD: this animal's implant was also recorded by the DataWave rig,
-  #   leaving roughly 143 more bin files and about 71 more hours under 'PythonEEG Data
-  #   Bins/IQSEC2/011320 IQSEC2_80_81_82_83' that no pattern in this config reaches. The
-  #   two legs abut rather than overlap. What is loaded here is real and correctly
-  #   attributed, but it is not the whole recording, and coverage is uneven across animals
-  #   for that reason.
+  #   SECOND RIG: this animal was recorded on the DataWave rig as well, 143 files and
+  #   about 70.8 hours under 'PythonEEG Data Bins/IQSEC2/011320
+  #   IQSEC2_80_81_82_83/Datawave_80'. Both legs are loaded, as two sources. Order:
+  #   DataWave leg first, then rhd. The DataWave leg's first file starts 2020-01-10
+  #   12:14:22.760000, and because an animalday is named after its first file's date it
+  #   lands on Jan-10-2020, which no rhd session occupies, so it becomes an animalday of
+  #   its own spanning several calendar dates. The statistics weight animaldays by
+  #   duration, so its length is accounted for.
   - id: IQSEC2_80
     genotype: +/x
     sex: Female
     channel_subset: *port_a
-    pattern: "{data_root}/PythonEEG Data/IQSEC2/011320 IQSEC2_80_81_82_83/{session}_{index}.rhd"
-    lro_kwargs:
-      extract_func: "read_intan"
-      stream_id: "0"
-      datetimes_are_start: true
-      ignore_integrity_checks: true
-    manual_datetime:
-      011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200113: '2020-01-13 11:34:46'
-      011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200114: '2020-01-14 00:08:18'
-      011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200115: '2020-01-15 00:08:19'
-      011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200115: '2020-01-15 16:22:12'
-      011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200116: '2020-01-16 00:22:13'
-      011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200117: '2020-01-17 00:22:15'
+    sources:
+    # rhd leg
+    - pattern: "{data_root}/PythonEEG Data/IQSEC2/011320 IQSEC2_80_81_82_83/{session}_{index}.rhd"
+      lro_kwargs:
+        extract_func: "read_intan"
+        stream_id: "0"
+        datetimes_are_start: true
+        ignore_integrity_checks: true
+      manual_datetime:
+        011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200113: '2020-01-13 11:34:46'
+        011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200114: '2020-01-14 00:08:18'
+        011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200115: '2020-01-15 00:08:19'
+        011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200115: '2020-01-15 16:22:12'
+        011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200116: '2020-01-16 00:22:13'
+        011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200117: '2020-01-17 00:22:15'
+    # DataWave leg
+    - pattern:
+      - "{data_root}/PythonEEG Data Bins/IQSEC2/011320 IQSEC2_80_81_82_83/{session}/011020_IQSEC2_80_cage1B_Recording-{index}_ColMajor.bin"
+      - "{data_root}/PythonEEG Data Bins/IQSEC2/011320 IQSEC2_80_81_82_83/{session}/011020_IQSEC2_80_cage1B_Recording-{index}_Meta.csv"
+      channel_subset: null
+      lro_kwargs:
+        mode: "si"
+        extract_func: "neurodent.readers:read_bin_csv_pair"
+        datetimes_are_start: true
+      manual_datetime:
+        Datawave_80:
+        - '2020-01-10 12:14:22.760000'
+        - '2020-01-10 12:31:46.820000'
+        - '2020-01-10 13:01:47.000000'
+        - '2020-01-10 13:31:46.910000'
+        - '2020-01-10 14:01:46.820000'
+        - '2020-01-10 14:31:47.820000'
+        - '2020-01-10 15:01:47.820000'
+        - '2020-01-10 15:31:47.910000'
+        - '2020-01-10 16:01:47.820000'
+        - '2020-01-10 16:31:48.570000'
+        - '2020-01-10 17:01:50.250000'
+        - '2020-01-10 17:31:48.820000'
+        - '2020-01-10 18:01:48.730000'
+        - '2020-01-10 18:31:48.910000'
+        - '2020-01-10 19:01:48.910000'
+        - '2020-01-10 19:31:48.820000'
+        - '2020-01-10 20:01:49.510000'
+        - '2020-01-10 20:31:54.220000'
+        - '2020-01-10 21:01:49.820000'
+        - '2020-01-10 21:31:49.820000'
+        - '2020-01-10 22:01:49.910000'
+        - '2020-01-10 22:31:49.820000'
+        - '2020-01-10 23:01:49.820000'
+        - '2020-01-10 23:31:50.820000'
+        - '2020-01-11 00:01:49.910000'
+        - '2020-01-11 00:31:50.280000'
+        - '2020-01-11 01:01:51.360000'
+        - '2020-01-11 01:31:50.910000'
+        - '2020-01-11 02:01:50.730000'
+        - '2020-01-11 02:31:50.820000'
+        - '2020-01-11 03:01:51.910000'
+        - '2020-01-11 03:31:52.000000'
+        - '2020-01-11 04:01:51.730000'
+        - '2020-01-11 04:31:51.910000'
+        - '2020-01-11 05:01:51.820000'
+        - '2020-01-11 05:31:51.910000'
+        - '2020-01-11 06:01:51.820000'
+        - '2020-01-11 06:31:52.820000'
+        - '2020-01-11 07:01:52.910000'
+        - '2020-01-11 07:31:52.910000'
+        - '2020-01-11 08:01:52.820000'
+        - '2020-01-11 08:31:52.820000'
+        - '2020-01-11 09:01:52.910000'
+        - '2020-01-11 09:31:53.820000'
+        - '2020-01-11 10:01:53.820000'
+        - '2020-01-11 10:31:53.910000'
+        - '2020-01-11 11:01:53.920000'
+        - '2020-01-11 11:31:54.720000'
+        - '2020-01-11 12:01:53.820000'
+        - '2020-01-11 12:31:54.370000'
+        - '2020-01-11 13:01:54.360000'
+        - '2020-01-11 13:31:54.910000'
+        - '2020-01-11 14:01:54.820000'
+        - '2020-01-11 14:31:54.820000'
+        - '2020-01-11 15:01:54.910000'
+        - '2020-01-11 15:31:54.820000'
+        - '2020-01-11 16:01:55.820000'
+        - '2020-01-11 16:31:55.910000'
+        - '2020-01-11 17:01:55.820000'
+        - '2020-01-11 17:31:55.910000'
+        - '2020-01-11 18:01:55.730000'
+        - '2020-01-11 18:31:55.730000'
+        - '2020-01-11 19:01:56.000000'
+        - '2020-01-11 19:31:56.640000'
+        - '2020-01-11 20:01:57.000000'
+        - '2020-01-11 20:31:56.920000'
+        - '2020-01-11 21:01:57.540000'
+        - '2020-01-11 21:31:57.370000'
+        - '2020-01-11 22:01:57.540000'
+        - '2020-01-11 22:31:56.910000'
+        - '2020-01-11 23:01:57.920000'
+        - '2020-01-11 23:31:58.270000'
+        - '2020-01-12 00:01:58.360000'
+        - '2020-01-12 00:31:57.740000'
+        - '2020-01-12 01:01:59.540000'
+        - '2020-01-12 01:31:58.360000'
+        - '2020-01-12 02:01:58.730000'
+        - '2020-01-12 02:31:58.910000'
+        - '2020-01-12 03:01:58.910000'
+        - '2020-01-12 03:31:58.820000'
+        - '2020-01-12 04:01:58.650000'
+        - '2020-01-12 04:31:59.950000'
+        - '2020-01-12 05:02:04.090000'
+        - '2020-01-12 05:32:03.910000'
+        - '2020-01-12 06:02:04.000000'
+        - '2020-01-12 06:32:04.000000'
+        - '2020-01-12 07:02:04.730000'
+        - '2020-01-12 07:32:04.270000'
+        - '2020-01-12 08:02:04.550000'
+        - '2020-01-12 08:32:04.820000'
+        - '2020-01-12 09:02:04.910000'
+        - '2020-01-12 09:32:04.730000'
+        - '2020-01-12 10:02:05.910000'
+        - '2020-01-12 10:32:05.820000'
+        - '2020-01-12 11:02:05.910000'
+        - '2020-01-12 11:32:05.820000'
+        - '2020-01-12 12:02:05.640000'
+        - '2020-01-12 12:32:06.180000'
+        - '2020-01-12 13:02:06.730000'
+        - '2020-01-12 13:32:06.820000'
+        - '2020-01-12 14:02:06.730000'
+        - '2020-01-12 14:32:07.090000'
+        - '2020-01-12 15:02:06.820000'
+        - '2020-01-12 15:32:06.910000'
+        - '2020-01-12 16:02:06.910000'
+        - '2020-01-12 16:32:07.550000'
+        - '2020-01-12 17:02:08.000000'
+        - '2020-01-12 17:32:07.730000'
+        - '2020-01-12 18:02:07.820000'
+        - '2020-01-12 18:32:08.090000'
+        - '2020-01-12 19:02:07.910000'
+        - '2020-01-12 19:32:07.820000'
+        - '2020-01-12 20:02:07.820000'
+        - '2020-01-12 20:32:08.730000'
+        - '2020-01-12 21:02:09.370000'
+        - '2020-01-12 21:32:09.270000'
+        - '2020-01-12 22:02:08.730000'
+        - '2020-01-12 22:32:08.910000'
+        - '2020-01-12 23:02:09.650000'
+        - '2020-01-12 23:32:10.990000'
+        - '2020-01-13 00:02:09.640000'
+        - '2020-01-13 00:32:10.090000'
+        - '2020-01-13 01:02:10.090000'
+        - '2020-01-13 01:32:10.460000'
+        - '2020-01-13 02:02:11.010000'
+        - '2020-01-13 02:32:11.720000'
+        - '2020-01-13 03:02:10.730000'
+        - '2020-01-13 03:32:11.360000'
+        - '2020-01-13 04:02:10.730000'
+        - '2020-01-13 04:32:10.730000'
+        - '2020-01-13 05:02:11.290000'
+        - '2020-01-13 05:32:13.350000'
+        - '2020-01-13 06:02:11.820000'
+        - '2020-01-13 06:32:12.090000'
+        - '2020-01-13 07:02:11.550000'
+        - '2020-01-13 07:32:12.270000'
+        - '2020-01-13 08:02:12.370000'
+        - '2020-01-13 08:32:12.910000'
+        - '2020-01-13 09:02:12.280000'
+        - '2020-01-13 09:32:13.450000'
+        - '2020-01-13 10:02:13.270000'
+        - '2020-01-13 10:32:13.000000'
+        - '2020-01-13 11:02:16.680000'
   #   Animal 81 died 2020-01-16 per the reference sheet. 1 session(s) starting after that
   #   date are excluded: the rig kept recording other animals, so this port is an empty
   #   headstage there. Dropped:
@@ -467,78 +801,552 @@ samples_data:
   #   while the (+/+) entry carries age 46, matching no implant date. Genetics agrees: the
   #   litter holds five (+/x) hets, implying a wild-type sire, who cannot produce (+/+)
   #   daughters.
-  #   INCOMPLETE RECORD: this animal's implant was also recorded by the DataWave rig,
-  #   leaving roughly 143 more bin files and about 71 more hours under 'PythonEEG Data
-  #   Bins/IQSEC2/011320 IQSEC2_80_81_82_83' that no pattern in this config reaches. The
-  #   two legs abut rather than overlap. What is loaded here is real and correctly
-  #   attributed, but it is not the whole recording, and coverage is uneven across animals
-  #   for that reason.
+  #   SECOND RIG: this animal was recorded on the DataWave rig as well, 143 files and
+  #   about 70.8 hours under 'PythonEEG Data Bins/IQSEC2/011320
+  #   IQSEC2_80_81_82_83/Datawave_81'. Both legs are loaded, as two sources. Order:
+  #   DataWave leg first, then rhd. The DataWave leg's first file starts 2020-01-10
+  #   12:14:22.760000, and because an animalday is named after its first file's date it
+  #   lands on Jan-10-2020, which no rhd session occupies, so it becomes an animalday of
+  #   its own spanning several calendar dates. The statistics weight animaldays by
+  #   duration, so its length is accounted for.
   - id: IQSEC2_81
     genotype: +/y
     sex: Male
     channel_subset: *port_b
-    skip_sessions:
-    - 011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200117
-    pattern: "{data_root}/PythonEEG Data/IQSEC2/011320 IQSEC2_80_81_82_83/{session}_{index}.rhd"
-    lro_kwargs:
-      extract_func: "read_intan"
-      stream_id: "0"
-      datetimes_are_start: true
-      ignore_integrity_checks: true
-    manual_datetime:
-      011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200113: '2020-01-13 11:34:46'
-      011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200114: '2020-01-14 00:08:18'
-      011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200115: '2020-01-15 00:08:19'
-      011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200115: '2020-01-15 16:22:12'
-      011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200116: '2020-01-16 00:22:13'
+    sources:
+    # rhd leg
+    - pattern: "{data_root}/PythonEEG Data/IQSEC2/011320 IQSEC2_80_81_82_83/{session}_{index}.rhd"
+      skip_sessions:
+      - 011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200117
+      lro_kwargs:
+        extract_func: "read_intan"
+        stream_id: "0"
+        datetimes_are_start: true
+        ignore_integrity_checks: true
+      manual_datetime:
+        011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200113: '2020-01-13 11:34:46'
+        011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200114: '2020-01-14 00:08:18'
+        011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200115: '2020-01-15 00:08:19'
+        011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200115: '2020-01-15 16:22:12'
+        011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200116: '2020-01-16 00:22:13'
+    # DataWave leg
+    - pattern:
+      - "{data_root}/PythonEEG Data Bins/IQSEC2/011320 IQSEC2_80_81_82_83/{session}/011020_IQSEC2_81_cage2B_Recording-{index}_ColMajor.bin"
+      - "{data_root}/PythonEEG Data Bins/IQSEC2/011320 IQSEC2_80_81_82_83/{session}/011020_IQSEC2_81_cage2B_Recording-{index}_Meta.csv"
+      channel_subset: null
+      lro_kwargs:
+        mode: "si"
+        extract_func: "neurodent.readers:read_bin_csv_pair"
+        datetimes_are_start: true
+      manual_datetime:
+        Datawave_81:
+        - '2020-01-10 12:14:22.760000'
+        - '2020-01-10 12:31:47.100000'
+        - '2020-01-10 13:01:47.910000'
+        - '2020-01-10 13:31:47.910000'
+        - '2020-01-10 14:01:47.820000'
+        - '2020-01-10 14:31:47.820000'
+        - '2020-01-10 15:01:48.820000'
+        - '2020-01-10 15:31:48.820000'
+        - '2020-01-10 16:01:48.820000'
+        - '2020-01-10 16:31:49.770000'
+        - '2020-01-10 17:01:52.960000'
+        - '2020-01-10 17:31:49.730000'
+        - '2020-01-10 18:01:49.730000'
+        - '2020-01-10 18:31:49.910000'
+        - '2020-01-10 19:01:50.000000'
+        - '2020-01-10 19:31:49.820000'
+        - '2020-01-10 20:01:50.420000'
+        - '2020-01-10 20:31:56.220000'
+        - '2020-01-10 21:01:50.000000'
+        - '2020-01-10 21:31:50.180000'
+        - '2020-01-10 22:01:49.820000'
+        - '2020-01-10 22:31:50.910000'
+        - '2020-01-10 23:01:50.730000'
+        - '2020-01-10 23:31:50.920000'
+        - '2020-01-11 00:01:51.810000'
+        - '2020-01-11 00:31:51.100000'
+        - '2020-01-11 01:01:52.180000'
+        - '2020-01-11 01:31:51.730000'
+        - '2020-01-11 02:01:51.910000'
+        - '2020-01-11 02:31:52.000000'
+        - '2020-01-11 03:01:51.820000'
+        - '2020-01-11 03:31:52.910000'
+        - '2020-01-11 04:01:52.640000'
+        - '2020-01-11 04:31:52.730000'
+        - '2020-01-11 05:01:53.360000'
+        - '2020-01-11 05:31:53.090000'
+        - '2020-01-11 06:01:52.640000'
+        - '2020-01-11 06:31:52.820000'
+        - '2020-01-11 07:01:53.730000'
+        - '2020-01-11 07:31:53.910000'
+        - '2020-01-11 08:01:53.640000'
+        - '2020-01-11 08:31:54.000000'
+        - '2020-01-11 09:01:53.730000'
+        - '2020-01-11 09:31:54.730000'
+        - '2020-01-11 10:01:54.820000'
+        - '2020-01-11 10:31:54.360000'
+        - '2020-01-11 11:01:54.010000'
+        - '2020-01-11 11:31:55.540000'
+        - '2020-01-11 12:01:54.820000'
+        - '2020-01-11 12:31:55.370000'
+        - '2020-01-11 13:01:55.360000'
+        - '2020-01-11 13:31:55.640000'
+        - '2020-01-11 14:01:55.730000'
+        - '2020-01-11 14:31:55.820000'
+        - '2020-01-11 15:01:56.540000'
+        - '2020-01-11 15:31:55.550000'
+        - '2020-01-11 16:01:55.730000'
+        - '2020-01-11 16:31:55.910000'
+        - '2020-01-11 17:01:56.820000'
+        - '2020-01-11 17:31:56.730000'
+        - '2020-01-11 18:01:56.820000'
+        - '2020-01-11 18:31:56.920000'
+        - '2020-01-11 19:01:58.080000'
+        - '2020-01-11 19:31:57.460000'
+        - '2020-01-11 20:01:57.910000'
+        - '2020-01-11 20:31:57.380000'
+        - '2020-01-11 21:01:58.900000'
+        - '2020-01-11 21:31:58.280000'
+        - '2020-01-11 22:01:59.170000'
+        - '2020-01-11 22:31:57.730000'
+        - '2020-01-11 23:01:57.830000'
+        - '2020-01-11 23:31:59.090000'
+        - '2020-01-12 00:01:59.270000'
+        - '2020-01-12 00:31:58.650000'
+        - '2020-01-12 01:01:59.990000'
+        - '2020-01-12 01:31:59.360000'
+        - '2020-01-12 02:01:58.640000'
+        - '2020-01-12 02:31:59.730000'
+        - '2020-01-12 03:01:59.820000'
+        - '2020-01-12 03:32:00.270000'
+        - '2020-01-12 04:01:59.560000'
+        - '2020-01-12 04:32:00.820000'
+        - '2020-01-12 05:02:09.910000'
+        - '2020-01-12 05:32:10.000000'
+        - '2020-01-12 06:02:10.720000'
+        - '2020-01-12 06:32:09.820000'
+        - '2020-01-12 07:02:09.550000'
+        - '2020-01-12 07:32:10.090000'
+        - '2020-01-12 08:02:10.640000'
+        - '2020-01-12 08:32:11.000000'
+        - '2020-01-12 09:02:10.820000'
+        - '2020-01-12 09:32:10.460000'
+        - '2020-01-12 10:02:10.910000'
+        - '2020-01-12 10:32:11.270000'
+        - '2020-01-12 11:02:11.640000'
+        - '2020-01-12 11:32:11.280000'
+        - '2020-01-12 12:02:12.820000'
+        - '2020-01-12 12:32:12.900000'
+        - '2020-01-12 13:02:11.550000'
+        - '2020-01-12 13:32:11.730000'
+        - '2020-01-12 14:02:12.640000'
+        - '2020-01-12 14:32:12.270000'
+        - '2020-01-12 15:02:12.730000'
+        - '2020-01-12 15:32:12.640000'
+        - '2020-01-12 16:02:12.540000'
+        - '2020-01-12 16:32:12.370000'
+        - '2020-01-12 17:02:13.550000'
+        - '2020-01-12 17:32:13.730000'
+        - '2020-01-12 18:02:14.180000'
+        - '2020-01-12 18:32:14.000000'
+        - '2020-01-12 19:02:13.730000'
+        - '2020-01-12 19:32:14.270000'
+        - '2020-01-12 20:02:13.640000'
+        - '2020-01-12 20:32:14.370000'
+        - '2020-01-12 21:02:14.640000'
+        - '2020-01-12 21:32:24.180000'
+        - '2020-01-12 22:02:14.730000'
+        - '2020-01-12 22:32:15.180000'
+        - '2020-01-12 23:02:15.380000'
+        - '2020-01-12 23:32:16.630000'
+        - '2020-01-13 00:02:16.180000'
+        - '2020-01-13 00:32:16.090000'
+        - '2020-01-13 01:02:15.640000'
+        - '2020-01-13 01:32:16.090000'
+        - '2020-01-13 02:02:15.650000'
+        - '2020-01-13 02:32:17.540000'
+        - '2020-01-13 03:02:17.090000'
+        - '2020-01-13 03:32:16.360000'
+        - '2020-01-13 04:02:16.820000'
+        - '2020-01-13 04:32:16.460000'
+        - '2020-01-13 05:02:17.020000'
+        - '2020-01-13 05:32:18.980000'
+        - '2020-01-13 06:02:17.550000'
+        - '2020-01-13 06:32:17.180000'
+        - '2020-01-13 07:02:17.640000'
+        - '2020-01-13 07:32:17.910000'
+        - '2020-01-13 08:02:17.550000'
+        - '2020-01-13 08:32:17.820000'
+        - '2020-01-13 09:02:18.460000'
+        - '2020-01-13 09:32:19.450000'
+        - '2020-01-13 10:02:18.180000'
+        - '2020-01-13 10:32:18.090000'
+        - '2020-01-13 11:02:22.260000'
   #   Same records conflict as animal 81 and resolved the same way, in favour of the
   #   reference sheet's IQSEC2(+/y). See the note on 81 for the full evidence.
-  #   INCOMPLETE RECORD: this animal's implant was also recorded by the DataWave rig,
-  #   leaving roughly 143 more bin files and about 71 more hours under 'PythonEEG Data
-  #   Bins/IQSEC2/011320 IQSEC2_80_81_82_83' that no pattern in this config reaches. The
-  #   two legs abut rather than overlap. What is loaded here is real and correctly
-  #   attributed, but it is not the whole recording, and coverage is uneven across animals
-  #   for that reason.
+  #   SECOND RIG: this animal was recorded on the DataWave rig as well, 143 files and
+  #   about 70.8 hours under 'PythonEEG Data Bins/IQSEC2/011320
+  #   IQSEC2_80_81_82_83/Datawave_82'. Both legs are loaded, as two sources. Order:
+  #   DataWave leg first, then rhd. The DataWave leg's first file starts 2020-01-10
+  #   12:14:23.760000, and because an animalday is named after its first file's date it
+  #   lands on Jan-10-2020, which no rhd session occupies, so it becomes an animalday of
+  #   its own spanning several calendar dates. The statistics weight animaldays by
+  #   duration, so its length is accounted for.
   - id: IQSEC2_82
     genotype: +/y
     sex: Male
     channel_subset: *port_c
-    pattern: "{data_root}/PythonEEG Data/IQSEC2/011320 IQSEC2_80_81_82_83/{session}_{index}.rhd"
-    lro_kwargs:
-      extract_func: "read_intan"
-      stream_id: "0"
-      datetimes_are_start: true
-      ignore_integrity_checks: true
-    manual_datetime:
-      011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200113: '2020-01-13 11:34:46'
-      011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200114: '2020-01-14 00:08:18'
-      011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200115: '2020-01-15 00:08:19'
-      011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200115: '2020-01-15 16:22:12'
-      011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200116: '2020-01-16 00:22:13'
-      011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200117: '2020-01-17 00:22:15'
-  #   INCOMPLETE RECORD: this animal's implant was also recorded by the DataWave rig,
-  #   leaving roughly 143 more bin files and about 71 more hours under 'PythonEEG Data
-  #   Bins/IQSEC2/011320 IQSEC2_80_81_82_83' that no pattern in this config reaches. The
-  #   two legs abut rather than overlap. What is loaded here is real and correctly
-  #   attributed, but it is not the whole recording, and coverage is uneven across animals
-  #   for that reason.
+    sources:
+    # rhd leg
+    - pattern: "{data_root}/PythonEEG Data/IQSEC2/011320 IQSEC2_80_81_82_83/{session}_{index}.rhd"
+      lro_kwargs:
+        extract_func: "read_intan"
+        stream_id: "0"
+        datetimes_are_start: true
+        ignore_integrity_checks: true
+      manual_datetime:
+        011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200113: '2020-01-13 11:34:46'
+        011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200114: '2020-01-14 00:08:18'
+        011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200115: '2020-01-15 00:08:19'
+        011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200115: '2020-01-15 16:22:12'
+        011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200116: '2020-01-16 00:22:13'
+        011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200117: '2020-01-17 00:22:15'
+    # DataWave leg
+    - pattern:
+      - "{data_root}/PythonEEG Data Bins/IQSEC2/011320 IQSEC2_80_81_82_83/{session}/011020_IQSEC2_82_cage3B_Recording-{index}_ColMajor.bin"
+      - "{data_root}/PythonEEG Data Bins/IQSEC2/011320 IQSEC2_80_81_82_83/{session}/011020_IQSEC2_82_cage3B_Recording-{index}_Meta.csv"
+      channel_subset: null
+      lro_kwargs:
+        mode: "si"
+        extract_func: "neurodent.readers:read_bin_csv_pair"
+        datetimes_are_start: true
+      manual_datetime:
+        Datawave_82:
+        - '2020-01-10 12:14:23.760000'
+        - '2020-01-10 12:31:47.290000'
+        - '2020-01-10 13:01:48.910000'
+        - '2020-01-10 13:31:49.000000'
+        - '2020-01-10 14:01:48.640000'
+        - '2020-01-10 14:31:48.910000'
+        - '2020-01-10 15:01:49.820000'
+        - '2020-01-10 15:31:49.820000'
+        - '2020-01-10 16:01:49.820000'
+        - '2020-01-10 16:31:50.320000'
+        - '2020-01-10 17:01:54.320000'
+        - '2020-01-10 17:31:50.640000'
+        - '2020-01-10 18:01:50.820000'
+        - '2020-01-10 18:31:50.910000'
+        - '2020-01-10 19:01:50.820000'
+        - '2020-01-10 19:31:50.910000'
+        - '2020-01-10 20:01:51.420000'
+        - '2020-01-10 20:31:57.220000'
+        - '2020-01-10 21:01:51.360000'
+        - '2020-01-10 21:31:51.270000'
+        - '2020-01-10 22:01:50.820000'
+        - '2020-01-10 22:31:50.910000'
+        - '2020-01-10 23:01:50.730000'
+        - '2020-01-10 23:31:51.650000'
+        - '2020-01-11 00:01:52.500000'
+        - '2020-01-11 00:31:57.160000'
+        - '2020-01-11 01:01:55.520000'
+        - '2020-01-11 01:31:52.570000'
+        - '2020-01-11 02:01:54.980000'
+        - '2020-01-11 02:31:52.910000'
+        - '2020-01-11 03:01:52.820000'
+        - '2020-01-11 03:31:53.820000'
+        - '2020-01-11 04:01:53.730000'
+        - '2020-01-11 04:31:53.640000'
+        - '2020-01-11 05:01:53.900000'
+        - '2020-01-11 05:31:52.910000'
+        - '2020-01-11 06:01:53.640000'
+        - '2020-01-11 06:31:53.550000'
+        - '2020-01-11 07:01:54.000000'
+        - '2020-01-11 07:31:53.820000'
+        - '2020-01-11 08:01:54.550000'
+        - '2020-01-11 08:31:54.820000'
+        - '2020-01-11 09:01:54.820000'
+        - '2020-01-11 09:31:55.640000'
+        - '2020-01-11 10:01:55.820000'
+        - '2020-01-11 10:31:55.720000'
+        - '2020-01-11 11:01:54.760000'
+        - '2020-01-11 11:31:58.430000'
+        - '2020-01-11 12:01:56.090000'
+        - '2020-01-11 12:31:55.320000'
+        - '2020-01-11 13:02:00.140000'
+        - '2020-01-11 13:31:56.730000'
+        - '2020-01-11 14:01:56.640000'
+        - '2020-01-11 14:31:56.550000'
+        - '2020-01-11 15:01:57.080000'
+        - '2020-01-11 15:31:56.550000'
+        - '2020-01-11 16:01:56.730000'
+        - '2020-01-11 16:31:56.820000'
+        - '2020-01-11 17:01:57.640000'
+        - '2020-01-11 17:31:57.730000'
+        - '2020-01-11 18:01:57.730000'
+        - '2020-01-11 18:31:58.370000'
+        - '2020-01-11 19:01:59.080000'
+        - '2020-01-11 19:31:57.740000'
+        - '2020-01-11 20:01:59.450000'
+        - '2020-01-11 20:31:58.410000'
+        - '2020-01-11 21:02:03.330000'
+        - '2020-01-11 21:31:59.590000'
+        - '2020-01-11 22:02:04.490000'
+        - '2020-01-11 22:31:58.640000'
+        - '2020-01-11 23:01:59.220000'
+        - '2020-01-11 23:32:03.340000'
+        - '2020-01-12 00:02:00.450000'
+        - '2020-01-12 00:32:00.420000'
+        - '2020-01-12 01:02:05.310000'
+        - '2020-01-12 01:32:00.450000'
+        - '2020-01-12 02:01:59.550000'
+        - '2020-01-12 02:32:00.640000'
+        - '2020-01-12 03:02:00.730000'
+        - '2020-01-12 03:32:00.720000'
+        - '2020-01-12 04:02:00.150000'
+        - '2020-01-12 04:32:06.190000'
+        - '2020-01-12 05:02:15.640000'
+        - '2020-01-12 05:32:16.090000'
+        - '2020-01-12 06:02:16.260000'
+        - '2020-01-12 06:32:15.370000'
+        - '2020-01-12 07:02:15.640000'
+        - '2020-01-12 07:32:16.000000'
+        - '2020-01-12 08:02:15.910000'
+        - '2020-01-12 08:32:15.910000'
+        - '2020-01-12 09:02:15.820000'
+        - '2020-01-12 09:32:16.280000'
+        - '2020-01-12 10:02:17.090000'
+        - '2020-01-12 10:32:17.360000'
+        - '2020-01-12 11:02:16.460000'
+        - '2020-01-12 11:32:17.010000'
+        - '2020-01-12 12:02:18.180000'
+        - '2020-01-12 12:32:18.080000'
+        - '2020-01-12 13:02:17.280000'
+        - '2020-01-12 13:32:17.640000'
+        - '2020-01-12 14:02:18.000000'
+        - '2020-01-12 14:32:18.270000'
+        - '2020-01-12 15:02:17.550000'
+        - '2020-01-12 15:32:18.280000'
+        - '2020-01-12 16:02:19.350000'
+        - '2020-01-12 16:32:18.100000'
+        - '2020-01-12 17:02:19.010000'
+        - '2020-01-12 17:32:19.180000'
+        - '2020-01-12 18:02:19.360000'
+        - '2020-01-12 18:32:18.730000'
+        - '2020-01-12 19:02:19.640000'
+        - '2020-01-12 19:32:19.720000'
+        - '2020-01-12 20:02:19.280000'
+        - '2020-01-12 20:32:19.650000'
+        - '2020-01-12 21:02:20.580000'
+        - '2020-01-12 21:32:33.870000'
+        - '2020-01-12 22:02:20.640000'
+        - '2020-01-12 22:32:20.630000'
+        - '2020-01-12 23:02:20.020000'
+        - '2020-01-12 23:32:22.540000'
+        - '2020-01-13 00:02:21.630000'
+        - '2020-01-13 00:32:20.910000'
+        - '2020-01-13 01:02:21.280000'
+        - '2020-01-13 01:32:21.540000'
+        - '2020-01-13 02:02:21.290000'
+        - '2020-01-13 02:32:22.810000'
+        - '2020-01-13 03:02:22.270000'
+        - '2020-01-13 03:32:22.090000'
+        - '2020-01-13 04:02:22.000000'
+        - '2020-01-13 04:32:21.460000'
+        - '2020-01-13 05:02:22.660000'
+        - '2020-01-13 05:32:24.430000'
+        - '2020-01-13 06:02:22.190000'
+        - '2020-01-13 06:32:23.540000'
+        - '2020-01-13 07:02:22.460000'
+        - '2020-01-13 07:32:23.650000'
+        - '2020-01-13 08:02:24.900000'
+        - '2020-01-13 08:32:23.370000'
+        - '2020-01-13 09:02:23.820000'
+        - '2020-01-13 09:32:24.450000'
+        - '2020-01-13 10:02:24.180000'
+        - '2020-01-13 10:32:24.270000'
+        - '2020-01-13 11:02:28.570000'
+  #   SECOND RIG: this animal was recorded on the DataWave rig as well, 143 files and
+  #   about 70.8 hours under 'PythonEEG Data Bins/IQSEC2/011320
+  #   IQSEC2_80_81_82_83/Datawave_83'. Both legs are loaded, as two sources. Order:
+  #   DataWave leg first, then rhd. The DataWave leg's first file starts 2020-01-10
+  #   12:14:23.760000, and because an animalday is named after its first file's date it
+  #   lands on Jan-10-2020, which no rhd session occupies, so it becomes an animalday of
+  #   its own spanning several calendar dates. The statistics weight animaldays by
+  #   duration, so its length is accounted for.
   - id: IQSEC2_83
     genotype: +/x
     sex: Female
     channel_subset: *port_d
-    pattern: "{data_root}/PythonEEG Data/IQSEC2/011320 IQSEC2_80_81_82_83/{session}_{index}.rhd"
-    lro_kwargs:
-      extract_func: "read_intan"
-      stream_id: "0"
-      datetimes_are_start: true
-      ignore_integrity_checks: true
-    manual_datetime:
-      011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200113: '2020-01-13 11:34:46'
-      011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200114: '2020-01-14 00:08:18'
-      011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200115: '2020-01-15 00:08:19'
-      011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200115: '2020-01-15 16:22:12'
-      011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200116: '2020-01-16 00:22:13'
-      011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200117: '2020-01-17 00:22:15'
+    sources:
+    # rhd leg
+    - pattern: "{data_root}/PythonEEG Data/IQSEC2/011320 IQSEC2_80_81_82_83/{session}_{index}.rhd"
+      lro_kwargs:
+        extract_func: "read_intan"
+        stream_id: "0"
+        datetimes_are_start: true
+        ignore_integrity_checks: true
+      manual_datetime:
+        011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200113: '2020-01-13 11:34:46'
+        011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200114: '2020-01-14 00:08:18'
+        011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200115: '2020-01-15 00:08:19'
+        011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200115: '2020-01-15 16:22:12'
+        011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200116: '2020-01-16 00:22:13'
+        011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200117: '2020-01-17 00:22:15'
+    # DataWave leg
+    - pattern:
+      - "{data_root}/PythonEEG Data Bins/IQSEC2/011320 IQSEC2_80_81_82_83/{session}/011020_IQSEC2_83_cage4B_Recording-{index}_ColMajor.bin"
+      - "{data_root}/PythonEEG Data Bins/IQSEC2/011320 IQSEC2_80_81_82_83/{session}/011020_IQSEC2_83_cage4B_Recording-{index}_Meta.csv"
+      channel_subset: null
+      lro_kwargs:
+        mode: "si"
+        extract_func: "neurodent.readers:read_bin_csv_pair"
+        datetimes_are_start: true
+      manual_datetime:
+        Datawave_83:
+        - '2020-01-10 12:14:23.760000'
+        - '2020-01-10 12:31:46.570000'
+        - '2020-01-10 13:01:49.910000'
+        - '2020-01-10 13:31:49.910000'
+        - '2020-01-10 14:01:49.730000'
+        - '2020-01-10 14:31:49.820000'
+        - '2020-01-10 15:01:49.730000'
+        - '2020-01-10 15:31:50.910000'
+        - '2020-01-10 16:01:50.820000'
+        - '2020-01-10 16:31:51.140000'
+        - '2020-01-10 17:01:55.410000'
+        - '2020-01-10 17:31:51.460000'
+        - '2020-01-10 18:01:51.910000'
+        - '2020-01-10 18:31:52.000000'
+        - '2020-01-10 19:01:51.910000'
+        - '2020-01-10 19:31:51.730000'
+        - '2020-01-10 20:01:52.510000'
+        - '2020-01-10 20:31:57.950000'
+        - '2020-01-10 21:01:52.900000'
+        - '2020-01-10 21:31:51.360000'
+        - '2020-01-10 22:01:51.820000'
+        - '2020-01-10 22:31:51.910000'
+        - '2020-01-10 23:01:51.640000'
+        - '2020-01-10 23:31:52.560000'
+        - '2020-01-11 00:01:53.500000'
+        - '2020-01-11 00:31:58.070000'
+        - '2020-01-11 01:01:55.520000'
+        - '2020-01-11 01:31:53.480000'
+        - '2020-01-11 02:01:55.980000'
+        - '2020-01-11 02:31:54.000000'
+        - '2020-01-11 03:01:53.730000'
+        - '2020-01-11 03:31:53.820000'
+        - '2020-01-11 04:01:54.640000'
+        - '2020-01-11 04:31:54.550000'
+        - '2020-01-11 05:01:55.440000'
+        - '2020-01-11 05:31:53.820000'
+        - '2020-01-11 06:01:53.640000'
+        - '2020-01-11 06:31:54.550000'
+        - '2020-01-11 07:01:54.910000'
+        - '2020-01-11 07:31:54.550000'
+        - '2020-01-11 08:01:55.640000'
+        - '2020-01-11 08:31:55.820000'
+        - '2020-01-11 09:01:55.820000'
+        - '2020-01-11 09:31:56.460000'
+        - '2020-01-11 10:01:56.820000'
+        - '2020-01-11 10:31:57.260000'
+        - '2020-01-11 11:01:55.670000'
+        - '2020-01-11 11:31:59.340000'
+        - '2020-01-11 12:01:56.910000'
+        - '2020-01-11 12:31:56.410000'
+        - '2020-01-11 13:02:00.960000'
+        - '2020-01-11 13:31:57.820000'
+        - '2020-01-11 14:01:57.460000'
+        - '2020-01-11 14:31:57.730000'
+        - '2020-01-11 15:01:58.350000'
+        - '2020-01-11 15:31:56.460000'
+        - '2020-01-11 16:01:57.640000'
+        - '2020-01-11 16:31:57.730000'
+        - '2020-01-11 17:01:58.640000'
+        - '2020-01-11 17:31:58.640000'
+        - '2020-01-11 18:01:58.640000'
+        - '2020-01-11 18:31:59.280000'
+        - '2020-01-11 19:02:00.530000'
+        - '2020-01-11 19:31:58.650000'
+        - '2020-01-11 20:02:00.270000'
+        - '2020-01-11 20:31:59.410000'
+        - '2020-01-11 21:02:04.240000'
+        - '2020-01-11 21:32:00.770000'
+        - '2020-01-11 22:02:04.670000'
+        - '2020-01-11 22:31:59.640000'
+        - '2020-01-11 23:02:00.130000'
+        - '2020-01-11 23:32:04.070000'
+        - '2020-01-12 00:02:01.450000'
+        - '2020-01-12 00:32:00.780000'
+        - '2020-01-12 01:02:06.310000'
+        - '2020-01-12 01:32:01.360000'
+        - '2020-01-12 02:02:00.460000'
+        - '2020-01-12 02:32:01.550000'
+        - '2020-01-12 03:02:01.730000'
+        - '2020-01-12 03:32:02.080000'
+        - '2020-01-12 04:02:00.970000'
+        - '2020-01-12 04:32:07.420000'
+        - '2020-01-12 05:02:21.280000'
+        - '2020-01-12 05:32:22.270000'
+        - '2020-01-12 06:02:21.710000'
+        - '2020-01-12 06:32:20.190000'
+        - '2020-01-12 07:02:21.460000'
+        - '2020-01-12 07:32:21.730000'
+        - '2020-01-12 08:02:21.540000'
+        - '2020-01-12 08:32:21.820000'
+        - '2020-01-12 09:02:21.640000'
+        - '2020-01-12 09:32:21.920000'
+        - '2020-01-12 10:02:22.810000'
+        - '2020-01-12 10:32:22.270000'
+        - '2020-01-12 11:02:22.280000'
+        - '2020-01-12 11:32:22.560000'
+        - '2020-01-12 12:02:23.630000'
+        - '2020-01-12 12:32:23.170000'
+        - '2020-01-12 13:02:22.100000'
+        - '2020-01-12 13:32:23.460000'
+        - '2020-01-12 14:02:23.540000'
+        - '2020-01-12 14:32:23.090000'
+        - '2020-01-12 15:02:23.370000'
+        - '2020-01-12 15:32:23.830000'
+        - '2020-01-12 16:02:25.160000'
+        - '2020-01-12 16:32:22.740000'
+        - '2020-01-12 17:02:24.560000'
+        - '2020-01-12 17:32:25.810000'
+        - '2020-01-12 18:02:24.450000'
+        - '2020-01-12 18:32:24.460000'
+        - '2020-01-12 19:02:24.730000'
+        - '2020-01-12 19:32:24.900000'
+        - '2020-01-12 20:02:24.010000'
+        - '2020-01-12 20:32:25.290000'
+        - '2020-01-12 21:02:26.700000'
+        - '2020-01-12 21:32:42.200000'
+        - '2020-01-12 22:02:26.280000'
+        - '2020-01-12 22:32:27.170000'
+        - '2020-01-12 23:02:25.930000'
+        - '2020-01-12 23:32:28.090000'
+        - '2020-01-13 00:02:27.170000'
+        - '2020-01-13 00:32:26.820000'
+        - '2020-01-13 01:02:27.100000'
+        - '2020-01-13 01:32:27.810000'
+        - '2020-01-13 02:02:26.200000'
+        - '2020-01-13 02:32:28.900000'
+        - '2020-01-13 03:02:27.180000'
+        - '2020-01-13 03:32:27.910000'
+        - '2020-01-13 04:02:27.540000'
+        - '2020-01-13 04:32:26.920000'
+        - '2020-01-13 05:02:27.840000'
+        - '2020-01-13 05:32:30.520000'
+        - '2020-01-13 06:02:27.740000'
+        - '2020-01-13 06:32:28.900000'
+        - '2020-01-13 07:02:28.190000'
+        - '2020-01-13 07:32:29.110000'
+        - '2020-01-13 08:02:30.620000'
+        - '2020-01-13 08:32:29.190000'
+        - '2020-01-13 09:02:30.270000'
+        - '2020-01-13 09:32:29.270000'
+        - '2020-01-13 10:02:29.360000'
+        - '2020-01-13 10:32:29.090000'
+        - '2020-01-13 11:02:34.970000'
   # --- 20200505_IQSEC2_97_98_99: 163 files, 4 sessions, 128 amp channels on A,B,C,D
   #   PortD not loaded. Empty headstage: 0 of 8 canonical amps live.
   - id: IQSEC2_97
@@ -765,7 +1573,6 @@ samples_data:
     lro_kwargs:
       mode: "si"
       extract_func: "neurodent.readers:read_bin_csv_pair"
-      multiprocess_mode: "serial"
       datetimes_are_start: true
     manual_datetime:
       Part 1:
@@ -928,7 +1735,6 @@ samples_data:
     lro_kwargs:
       mode: "si"
       extract_func: "neurodent.readers:read_bin_csv_pair"
-      multiprocess_mode: "serial"
       datetimes_are_start: true
     manual_datetime:
       52 IQSEC2 Mut Male:
@@ -1024,7 +1830,6 @@ samples_data:
     lro_kwargs:
       mode: "si"
       extract_func: "neurodent.readers:read_bin_csv_pair"
-      multiprocess_mode: "serial"
       datetimes_are_start: true
     manual_datetime:
       42 IQSEC2 CT Male:
@@ -1067,7 +1872,6 @@ samples_data:
     lro_kwargs:
       mode: "si"
       extract_func: "neurodent.readers:read_bin_csv_pair"
-      multiprocess_mode: "serial"
       datetimes_are_start: true
     manual_datetime:
       43 IQSEC2 CT Male:
@@ -1102,7 +1906,6 @@ samples_data:
     lro_kwargs:
       mode: "si"
       extract_func: "neurodent.readers:read_bin_csv_pair"
-      multiprocess_mode: "serial"
       datetimes_are_start: true
     manual_datetime:
       44 IQSEC2 CT Male:
