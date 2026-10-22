@@ -19,6 +19,8 @@ import glob
 
 # Import workflow utilities
 from neurodent.workflow.utils import deep_merge_dict, merge_dataset_config, expand_animals_config, format_config_value, increment_memory, load_samples_config, resolve_samples_config
+from neurodent.workflow.utils import format_exclusion_summary, quality_filter_outcome
+from snakemake.logging import logger
 
 
 # Load configuration
@@ -140,25 +142,20 @@ def get_animal_id(wildcards):
     return ANIMAL_TO_FULL_ID_MAP[wildcards.animal]
 
 
-def get_all_fragment_filtered_parquet(wildcards):
-    out = []
-    for anim in ANIMALS:
-        # Only process animals that have quality-filtered output
-        qual_filter_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        qual_filenames = glob_wildcards(os.path.join(qual_filter_output, "{filename}.parquet")).filename
-        if qual_filenames:  # Only if quality filtering produced files
-            out.append(f"results/wars_fragment_filtered/{Path(qual_filter_output).name}/war.parquet")
-    return out
+# Animals war_quality_filter excluded, with the reason it recorded. Every helper below that
+# gathers per-animal outputs from after the quality filter goes through _passed_quality_filter,
+# so an excluded animal is reported once in the main log rather than silently missing from the
+# results, and the run ends by listing every exclusion (onsuccess and onerror, at the end).
+QUALITY_FILTER_EXCLUDED = {}
 
 
-def get_all_fragment_filtered_json(wildcards):
-    out = []
-    for anim in ANIMALS:
-        qual_filter_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        qual_filenames = glob_wildcards(os.path.join(qual_filter_output, "{filename}.json")).filename
-        if qual_filenames:
-            out.append(f"results/wars_fragment_filtered/{Path(qual_filter_output).name}/war.json")
-    return out
+def _passed_quality_filter(anim):
+    """True if war_quality_filter kept this animal; otherwise record and report why it did not."""
+    kept, reason = quality_filter_outcome(checkpoints.war_quality_filter.get(animal=anim).output[0])
+    if not kept and anim not in QUALITY_FILTER_EXCLUDED:
+        QUALITY_FILTER_EXCLUDED[anim] = reason
+        logger.warning(f"war_quality_filter excluded {anim}: {reason}. It is absent from every later step.")
+    return kept
 
 
 # def get_flattened_wars_pkl(wildcards):
@@ -181,61 +178,28 @@ def get_all_fragment_filtered_json(wildcards):
 #     return out
 
 def get_wars_after_quality_filtered(wildcards, filepath_prepend, filepath_append):
-    """General case function to get any desired WAR files for steps after quality filter"""
-    out = []
-    for anim in ANIMALS:
-        checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        animal_name = Path(checkpoint_output).name
-        qual_filenames = glob.glob(os.path.join(checkpoint_output, "war.parquet"))
-        if qual_filenames:
-            out.append(str(Path(filepath_prepend) / animal_name / filepath_append))
-    return out
+    """Paths under filepath_prepend for every animal war_quality_filter kept."""
+    return [
+        str(Path(filepath_prepend) / anim / filepath_append)
+        for anim in ANIMALS
+        if _passed_quality_filter(anim)
+    ]
 
 def get_all_flattened_manual_wars(wildcards):
     """Get all manually channel-filtered flattened WAR paths"""
-    out = []
-    for anim in ANIMALS:
-        checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        qual_filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.parquet")).filename
-        if qual_filenames:
-            out.append(f"results/wars_flattened_manual/{Path(checkpoint_output).name}/war.parquet")
-    return out
+    return get_wars_after_quality_filtered(wildcards, "results/wars_flattened_manual", "war.parquet")
 
 
 def get_all_flattened_lof_wars(wildcards):
     """Get all LOF channel-filtered flattened WAR paths"""
-    out = []
-    for anim in ANIMALS:
-        checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        qual_filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.parquet")).filename
-        if qual_filenames:
-            out.append(f"results/wars_flattened_lof/{Path(checkpoint_output).name}/war.parquet")
-    return out
+    return get_wars_after_quality_filtered(wildcards, "results/wars_flattened_lof", "war.parquet")
 
 
 def get_diagnostic_figures_unfiltered(wildcards):
-    outputs = []
-    for anim in ANIMALS:
-        checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        hypothetical_war_path = Path(checkpoint_output) / "war.parquet"
-        if os.path.exists(hypothetical_war_path):
-            # print(f"thing exists: {hypothetical_war_path}")
-            # outputs.extend(expand("results/diagnostic_figures/{a}/unfiltered", a=glob_wildcards()))
-            outputs.append(f"results/diagnostic_figures/{Path(checkpoint_output).name}/unfiltered")
-    return outputs
+    return get_wars_after_quality_filtered(wildcards, "results/diagnostic_figures", "unfiltered")
 
 def get_diagnostic_figures_filtered(wildcards):
-    outputs = []
-    for anim in ANIMALS:
-        checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        hypothetical_war_path = Path(checkpoint_output) / "war.parquet"
-        if os.path.exists(hypothetical_war_path):
-            # print(f"thing exists: {hypothetical_war_path}")
-            # outputs.extend(expand("results/diagnostic_figures/{a}/unfiltered", a=glob_wildcards()))
-            outputs.append(f"results/diagnostic_figures/{Path(checkpoint_output).name}/filtered")
-        # else:
-        #     print(f"does NOT exist: {hypothetical_war_path}")
-    return outputs
+    return get_wars_after_quality_filtered(wildcards, "results/diagnostic_figures", "filtered")
 
 
 
@@ -332,3 +296,17 @@ rule dag:
     shell: "snakemake --dag --forceall | dot -Tpng > {output}"
 
 localrules: graphs, rulegraph, filegraph, dag
+
+
+def _report_quality_filter_exclusions():
+    summary = format_exclusion_summary(QUALITY_FILTER_EXCLUDED)
+    if summary:
+        logger.warning(summary)
+
+
+onsuccess:
+    _report_quality_filter_exclusions()
+
+
+onerror:
+    _report_quality_filter_exclusions()

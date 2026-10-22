@@ -125,8 +125,6 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
     except Exception as e:
         logger.error(f"Failed to generate WAR for {animal_key}: {e}")
         raise
-    finally:
-        cluster.close()
 
 
 def main():

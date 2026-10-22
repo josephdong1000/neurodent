@@ -10,7 +10,11 @@ downstream analysis (only good quality WARs).
 
 checkpoint war_quality_filter:
     """
-    Filter WARs based on quality criteria and symlink good ones to filtered directory
+    Filter WARs based on quality criteria and copy the good ones to the filtered directory.
+
+    An excluded animal gets an empty output directory holding an EXCLUDED.json that says why.
+    The Snakefile reads it back, so the exclusion is reported in the main log and in the
+    end-of-run summary instead of the animal silently missing from every later step.
     """
     input:
         war_parquet="results/wars/{animal}/war.parquet",
@@ -33,6 +37,8 @@ checkpoint war_quality_filter:
         import sys
         import json
         from datetime import datetime
+
+        from neurodent.workflow.utils import clear_exclusion_record, write_exclusion_record
 
         # Set up logging for this animal
         log_file = Path(log[0])
@@ -78,7 +84,9 @@ checkpoint war_quality_filter:
         logger.info(f"Original animal name: {combined_name}")
 
         if exclude_bad_animaldays and combined_name in bad_folder_animalday:
-            logger.warning(f"REJECTED: Animal {animal} ({combined_name}) is in bad_folder_animalday list")
+            reason = "listed in bad_folder_animalday, and samples.quality_filter.exclude_bad_animaldays is on"
+            logger.warning(f"REJECTED: Animal {animal} ({combined_name}): {reason}")
+            write_exclusion_record(destination_dir, combined_name, reason)
             return
 
         try:
@@ -89,9 +97,14 @@ checkpoint war_quality_filter:
                 logger.info(f"Animal genotype: {genotype}")
 
                 if exclude_unknown_genotypes and genotype == "Unknown":
-                    logger.warning(f"REJECTED: Animal {animal} has unknown genotype")
+                    reason = "genotype is Unknown, and samples.quality_filter.exclude_unknown_genotypes is on"
+                    logger.warning(f"REJECTED: Animal {animal}: {reason}")
+                    write_exclusion_record(destination_dir, combined_name, reason)
                     return
 
+            # A record left by an earlier run that excluded this animal would otherwise make it
+            # look excluded again to anything reading the directory.
+            clear_exclusion_record(destination_dir)
             logger.info(f"ACCEPTED: Animal {animal} passed all quality filters")
             logger.info(f"Copying files to: {destination_dir}")
 
