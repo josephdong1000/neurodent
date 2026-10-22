@@ -1,0 +1,597 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Windowed Analysis Tutorial\n",
+    "\n",
+    "This tutorial provides a deep dive into Neurodent's windowed analysis capabilities for extracting features from continuous EEG data.\n",
+    "\n",
+    "## Overview\n",
+    "\n",
+    "Windowed Analysis Results (WAR) is the core feature extraction system in Neurodent. It:\n",
+    "\n",
+    "1. Divides continuous EEG data into time windows\n",
+    "2. Computes features for each window\n",
+    "3. Aggregates results across time and channels\n",
+    "4. Provides filtering and quality control methods\n",
+    "\n",
+    "This approach is efficient for long recordings and enables parallel processing."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import logging\n",
+    "import tempfile\n",
+    "from datetime import datetime\n",
+    "from pathlib import Path\n",
+    "\n",
+    "from IPython.display import display\n",
+    "\n",
+    "from neurodent import (\n",
+    "    AnimalOrganizer,\n",
+    "    AnimalAnalyzer,\n",
+    "    WindowAnalysisResult,\n",
+    "    ZeitgeberAnalysisResult,\n",
+    "    constants,\n",
+    "    set_channel_map,\n",
+    ")\n",
+    "\n",
+    "logging.basicConfig(level=logging.INFO)\n",
+    "logger = logging.getLogger()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "set_channel_map({\n",
+    "    \"LMot\": [\"C-015\", \"D-015\"],\n",
+    "    \"RMot\": [\"C-016\", \"D-016\"],\n",
+    "    \"LBar\": [\"C-014\", \"D-014\"],\n",
+    "    \"RBar\": [\"C-017\", \"D-017\"],\n",
+    "    \"LHip\": [\"C-012\", \"D-012\"],\n",
+    "    \"RHip\": [\"C-019\", \"D-019\"],\n",
+    "    \"LAud\": [\"C-009\", \"D-009\"],\n",
+    "    \"RAud\": [\"C-022\", \"D-022\"],\n",
+    "    \"LVis\": [\"C-010\", \"D-010\"],\n",
+    "    \"RVis\": [\"C-021\", \"D-021\"],\n",
+    "})\n",
+    "\n",
+    "# Per-animal genotype and sex. Every WindowAnalysisResult re-reads this at construction.\n",
+    "constants.ANIMAL_METADATA = {\n",
+    "    \"A10\": {\"genotype\": \"WT\", \"sex\": \"Male\"},\n",
+    "    \"F22\": {\"genotype\": \"KO\", \"sex\": \"Female\"},\n",
+    "}"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 1. Feature Categories\n",
+    "\n",
+    "Neurodent extracts three main categories of features:\n",
+    "\n",
+    "### Linear Features (per channel)\n",
+    "Single-value metrics for each channel in each time window:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Available linear features\n",
+    "print(\"Linear features:\")\n",
+    "for feature in constants.LINEAR_FEATURES:\n",
+    "    print(f\"  - {feature}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Band Features (per frequency band)\n",
+    "Features computed for each frequency band (delta, theta, alpha, beta, gamma):"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Available band features\n",
+    "print(\"\\nBand features:\")\n",
+    "for feature in constants.BAND_FEATURES:\n",
+    "    print(f\"  - {feature}\")\n",
+    "\n",
+    "# Frequency bands\n",
+    "print(\"\\nFrequency bands:\")\n",
+    "for band, (lo, hi) in constants.FREQ_BANDS.items():\n",
+    "    print(f\"  {band.capitalize()}: {lo}-{hi} Hz\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Matrix Features (connectivity)\n",
+    "Features measuring relationships between channels:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Available matrix features\n",
+    "print(\"\\nMatrix features:\")\n",
+    "for feature in constants.MATRIX_FEATURES:\n",
+    "    print(f\"  - {feature}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 2. Computing Windowed Analysis\n",
+    "\n",
+    "### Basic Usage"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from neurodent.data import sample_dataset\n",
+    "\n",
+    "SAMPLE_DATA = sample_dataset()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Using your own data\n",
+    "\n",
+    "Replace `SAMPLE_DATA` with your own directory and set `extract_func` for your format.\n",
+    "[Data Loading](../quickstart/data_loading.ipynb) covers readers and patterns.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Using the included example data.\n",
+    "# The paired ColMajor .bin + Meta .csv recordings are 60 seconds long, which at the default\n",
+    "# 5 s window gives 12 windows. (The .edf files in the same folder are only 5 seconds long\n",
+    "# and would yield a single window.)\n",
+    "animal_id = \"A10\"\n",
+    "\n",
+    "ao = AnimalOrganizer(\n",
+    "    pattern=[\n",
+    "        str(SAMPLE_DATA / \"{animal}\" / \"*_ColMajor.bin\"),\n",
+    "        str(SAMPLE_DATA / \"{animal}\" / \"*_Meta.csv\"),\n",
+    "    ],\n",
+    "    animal_id=animal_id,\n",
+    "    lro_kwargs={\n",
+    "        \"mode\": \"si\",  # mode options: 'si' (SpikeInterface), 'mne', or None\n",
+    "        \"extract_func\": \"neurodent.readers:read_bin_csv_pair\",\n",
+    "        \"manual_datetimes\": datetime(2023, 12, 13, 12, 0),\n",
+    "    },\n",
+    ")\n",
+    "\n",
+    "analyzer = AnimalAnalyzer(ao)\n",
+    "analyzer.compute_bad_channels()\n",
+    "\n",
+    "# Compute all features\n",
+    "war_all = analyzer.compute_windowed_analysis(\n",
+    "    features=['all'],\n",
+    "    exclude=['nspike', 'lognspike'],  # Exclude spike features if no spikes\n",
+    "    multiprocess_mode='serial'\n",
+    ")\n",
+    "\n",
+    "print(f\"Computed {len(war_all.result)} windows\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Access information in a WindowAnalysisResult\n",
+    "\n",
+    "You can access the summary of a WindowAnalysisResult using the `get_info` method, and access the computed features in the WindowedAnalysis object using the `get_result` method."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "war_info = war_all.get_info()\n",
+    "print(war_info)\n",
+    "\n",
+    "result = war_all.get_result(\n",
+    "    features=[\"all\"],\n",
+    "    exclude=['nspike', 'lognspike']\n",
+    ")\n",
+    "display(result)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Selective Feature Computation\n",
+    "\n",
+    "For faster processing, compute only needed features:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Compute specific features\n",
+    "war_selective = AnimalAnalyzer(ao).compute_windowed_analysis(\n",
+    "    features=['rms', 'logrms', 'psdband', 'cohere'],\n",
+    "    multiprocess_mode='serial'\n",
+    ")\n",
+    "\n",
+    "result = war_selective.get_result(\n",
+    "    features=['rms', 'logrms', 'psdband', 'cohere']\n",
+    ")\n",
+    "\n",
+    "print(f\"Result columns: {list(result.keys())}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Parallel Processing\n",
+    "\n",
+    "`multiprocess_mode` accepts two values: `'serial'` and `'dask'`. Serial is the right choice\n",
+    "for debugging and for small recordings like the example data.\n",
+    "\n",
+    "`'dask'` builds one `dask.delayed` task per window and calls `dask.compute()`. In the cell below,\n",
+    "`dask.compute()` uses Dask's threaded scheduler instead of distributing anything. To get\n",
+    "process-level parallelism, start a cluster and a client, then run the\n",
+    "analysis inside that context. This is the approach that the Snakemake pipeline uses for real datasets.\n",
+    "See [Parallel Processing](../quickstart/configuration.ipynb) in the configuration guide for\n",
+    "a `LocalCluster` example.\n",
+    "\n",
+    "The Dask path also drops the last fragment unconditionally, even when it is a full window,\n",
+    "so the count below is one lower than the serial run above."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Dask mode, for distributed computing.\n",
+    "war_dask = AnimalAnalyzer(ao).compute_windowed_analysis(\n",
+    "    features=['rms', 'psdband'],\n",
+    "    multiprocess_mode='dask'\n",
+    ")\n",
+    "\n",
+    "print(f\"Dask run produced {len(war_dask.result)} windows\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 3. Data Quality and Filtering\n",
+    "\n",
+    "### Method Chaining\n",
+    "\n",
+    "Apply multiple filters in sequence. This is the recommended format."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "war_filtered = (\n",
+    "    war_all\n",
+    "    .filter_logrms_range(z_range=3)           # Remove outliers (±3 SD)\n",
+    "    .filter_high_rms(max_rms=500)             # Remove high amplitude artifacts\n",
+    "    .filter_low_rms(min_rms=10)               # Remove low amplitude periods\n",
+    "    # .filter_high_beta(max_beta_prop=0.4)      # Remove high beta activity\n",
+    "    .filter_reject_channels_by_session()      # Reject bad channels\n",
+    ")\n",
+    "\n",
+    "print(\"Filtering completed!\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Configuration-Driven Filtering\n",
+    "\n",
+    "An alternative approach uses a configuration dictionary:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "filter_config = {\n",
+    "    'logrms_range': {'z_range': 3},\n",
+    "    'high_rms': {'max_rms': 500},\n",
+    "    'low_rms': {'min_rms': 10},\n",
+    "    # 'high_beta': {'max_beta_prop': 0.4},\n",
+    "    'reject_channels_by_session': {},\n",
+    "    'morphological_smoothing': {'smoothing_seconds': 4.0}\n",
+    "}\n",
+    "\n",
+    "war_filtered_config = war_all.apply_filters(\n",
+    "    filter_config,\n",
+    "    min_valid_channels=3\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Available Filters\n",
+    "\n",
+    "Chainable methods on a `WindowAnalysisResult`, each returning a new result:\n",
+    "\n",
+    "- `filter_logrms_range(z_range=3)`: Remove outliers based on log RMS\n",
+    "- `filter_high_rms(max_rms=500)`: Remove high amplitude artifacts\n",
+    "- `filter_low_rms(min_rms=50)`: Remove low amplitude periods\n",
+    "- `filter_high_beta(max_beta_prop=0.4)`: Remove high beta activity (muscle artifacts)\n",
+    "- `filter_reject_channels(bad_channels)`: Reject named channels everywhere\n",
+    "- `filter_reject_channels_by_session(bad_channels_dict)`: Reject channels per recording session\n",
+    "- `filter_all(...)`: Apply the standard set in one call\n",
+    "\n",
+    "Morphological smoothing works differently from the rest.\n",
+    "`get_filter_morphological_smoothing()` takes an existing mask rather than producing one,\n",
+    "since it post-processes. It is normally applied through the `morphological_smoothing` key\n",
+    "of `apply_filters()` (shown above).\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 4. Data Aggregation\n",
+    "\n",
+    "Average across time windows, producing a single row per group (e.g., per recording session\n",
+    "and light/dark phase). Channel information is preserved.\n",
+    "\n",
+    "`aggregate_time_windows()` modifies the object in place and returns `None`, so work on a\n",
+    "copy if you still need the per-window data afterwards, as the circadian section below does."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Aggregate time windows on a copy, keeping war_filtered per-window for later sections\n",
+    "war_aggregated = war_filtered.copy()\n",
+    "war_aggregated.aggregate_time_windows()\n",
+    "\n",
+    "print(f\"Before aggregation: {len(war_filtered.result)} rows\")\n",
+    "print(f\"After aggregation:  {len(war_aggregated.result)} rows\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 5. Channel Management\n",
+    "\n",
+    "### Reorder and Pad Channels\n",
+    "\n",
+    "Ensure consistent channel ordering across animals:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Define standard channel order\n",
+    "standard_channels = [\n",
+    "    \"LMot\", \"RMot\",  # Motor cortex\n",
+    "    \"LBar\", \"RBar\",  # Barrel cortex\n",
+    "    \"LAud\", \"RAud\",  # Auditory cortex\n",
+    "    \"LVis\", \"RVis\",  # Visual cortex\n",
+    "    \"LHip\", \"RHip\"   # Hippocampus\n",
+    "]\n",
+    "\n",
+    "war_filtered.reorder_and_pad_channels(\n",
+    "    standard_channels,\n",
+    "    use_abbrevs=True  # Use abbreviated channel names\n",
+    ")\n",
+    "\n",
+    "print(f\"Channels: {war_filtered.channel_names}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 6. Accessing Computed Features\n",
+    "\n",
+    "WAR objects store features in a pandas DataFrame. Use `get_result()` to retrieve features with full channel information, or `get_channel_averaged_result()` to average across channels (or channel pairs for connectivity features), producing scalar values per time window."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Get the full result DataFrame\n",
+    "result_df = war_filtered.get_result(\n",
+    "    features=['rms', 'psdband', 'cohere']\n",
+    ")\n",
+    "print(f\"Result columns: {list(result_df.columns)}\")\n",
+    "print(f\"Result shape: {result_df.shape}\")\n",
+    "print(f\"\\nRMS values (per-channel arrays):\\n{result_df['rms'].iloc[0]}\")\n",
+    "\n",
+    "# Get channel-averaged result (scalars per time window)\n",
+    "df_avg = war_filtered.get_channel_averaged_result(\n",
+    "    features=['logrms', 'logpsdband', 'zcohere']\n",
+    ")\n",
+    "print(f\"\\nChannel-averaged columns: {list(df_avg.columns)}\")\n",
+    "print(f\"\\nSample logrms value: {df_avg['logrms'].iloc[0]}\")  # single float"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 7. Metadata and Grouping Variables\n",
+    "\n",
+    "WAR objects contain metadata for grouping and analysis:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Access metadata\n",
+    "print(f\"Animal ID: {war_filtered.animal_id}\")\n",
+    "print(f\"Genotype: {war_filtered.genotype}\")\n",
+    "print(f\"Animal days: {war_filtered.animaldays}\")\n",
+    "print(f\"Channel names: {war_filtered.channel_names}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 8. Circadian Analysis (ZeitgeberAnalysisResult)\n",
+    "\n",
+    "Once your data is filtered and metadata (like genotype and timestamps) is verified, you can analyze circadian rhythms. \n",
+    "\n",
+    "The `ZeitgeberAnalysisResult` wrapper uses this metadata to:\n",
+    "1.  **Shift Timestamps**: Converts absolute timestamps to Zeitgeber Time (ZT), where ZT0 is \"Lights On\". The ZT coordinate lands in the `zt_minutes` column.\n",
+    "2.  **Define Baseline**: Subtracts a baseline period (e.g., the first 12 hours of the light phase) to normalize the data, adding `*_nobase` columns.\n",
+    "\n",
+    "Baseline subtraction only applies to numeric columns, so use `get_channel_averaged_result()`\n",
+    "rather than `get_result()` when you want the `*_nobase` columns.\n",
+    "\n",
+    "Double-plotted 48-hour actograms are produced at render time by `ZeitgeberPlotter`, not by\n",
+    "this wrapper. For plotting these results, see the **[Visualization Tutorial](visualization.ipynb)**."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Wrap the result for circadian analysis\n",
+    "zar = ZeitgeberAnalysisResult(\n",
+    "    war_filtered,\n",
+    "    baseline_hours=12,\n",
+    "    zeitgeber_shift_hours=6,\n",
+    ")\n",
+    "\n",
+    "# Channel-average so baseline subtraction has numeric columns to work on\n",
+    "df_zar = zar.get_channel_averaged_result(features=['rms'])\n",
+    "\n",
+    "timestamps = war_filtered.result['timestamp']\n",
+    "print(f\"Original Time Range: {timestamps.min()} to {timestamps.max()}\")\n",
+    "print(f\"ZT Coordinate Range: {df_zar.zt_minutes.min()} to {df_zar.zt_minutes.max()} min\")\n",
+    "print(f\"Baseline-Corrected Columns: {[c for c in df_zar.columns if '_nobase' in c]}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 9. Saving and Loading\n",
+    "\n",
+    "Save WAR objects for later analysis:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Use a temporary directory for demonstration purposes\n",
+    "with tempfile.TemporaryDirectory() as tmpdir:\n",
+    "    output_path = Path(tmpdir) / animal_id\n",
+    "    output_path.mkdir(parents=True, exist_ok=True)\n",
+    "\n",
+    "    # Save WAR as parquet + json\n",
+    "    war_filtered.save_parquet_and_json(output_path)\n",
+    "    print(f\"Saved to {output_path}\")\n",
+    "\n",
+    "    # Load WAR\n",
+    "    war_loaded = WindowAnalysisResult.load_parquet_and_json(output_path)\n",
+    "    print(f\"Loaded {len(war_loaded.result)} rows from {output_path}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Next Steps\n",
+    "\n",
+    "- **[Visualization Tutorial](visualization.ipynb)**: Plot and analyze WAR results\n",
+    "- **[Spike Analysis Tutorial](spike_analysis.ipynb)**: Detect population spikes and fold counts into a WAR"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "neurodent (3.10.8)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.10.8"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
