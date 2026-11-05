@@ -28,6 +28,7 @@ from .logging import (
     increment_memory,
 )
 from .plotting_helpers import (
+    iter_wars,
     load_wars,
     extend_plot_order_from_attr,
     create_genotype_color_scale,
@@ -54,6 +55,7 @@ __all__ = [
     "format_exclusion_summary",
     "setup_snakemake_logging",
     "increment_memory",
+    "iter_wars",
     "load_wars",
     "extend_plot_order_from_attr",
     "create_genotype_color_scale",

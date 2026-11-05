@@ -1,11 +1,99 @@
-"""WAR loading and plot-order/marker helpers for workflow figure scripts."""
+"""WAR loading helpers for workflow scripts, and plot-order/marker helpers for figure scripts."""
 
+import gc
 import logging
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from neurodent.results import WindowAnalysisResult
+
+
+def iter_wars(
+    parquet_paths: Sequence[str | Path],
+    json_paths: Sequence[str | Path] | None = None,
+) -> Iterator[tuple[Path, "WindowAnalysisResult"]]:
+    """Load WindowAnalysisResult objects one at a time from parquet/json file pairs.
+
+    The paths are paired and checked when this is called, before anything loads. The WARs
+    are then loaded lazily, in input order, each with a full ``load_parquet_and_json``, and
+    each load is logged at INFO. Only one WAR is held at a time, provided the caller lets go
+    of each one before asking for the next. A loaded WAR is many times the size of its
+    parquet file: the largest IQSEC2 WAR, about 4 GiB of parquet, peaks at about 47 GiB.
+
+    The caller must drop each WAR before asking for the next one:
+
+    - End the loop body with ``del war``. A plain for loop rebinds ``war`` only after the
+      next WAR has loaded, so without the ``del`` two WARs are alive at once.
+    - Do not wrap the iterator in ``tqdm``, which keeps the last item while it fetches the
+      next. The INFO log line takes the place of a progress bar.
+
+    Args:
+        parquet_paths: Paths to .parquet files containing WindowAnalysisResult data.
+            Legacy .pkl paths are also accepted. The loader is given the .parquet file next
+            to them and falls back to the pickle only if the parquet is missing.
+        json_paths: Optional paths to corresponding .json metadata files.
+            If None, assumes json files are in the same directory as the parquet
+            files with the same basename but .json extension.
+
+    Returns:
+        Iterator of ``(parquet_path, war)`` pairs, one per input path, in input order.
+        ``parquet_path`` is the .parquet path the WAR was loaded from.
+
+    Raises:
+        ValueError: If parquet_paths and json_paths differ in length. Raised by the call
+            itself, before any WAR loads.
+        FileNotFoundError: If a parquet or json file does not exist. Raised when that WAR
+            is reached.
+
+    Example:
+        Take one small frame from each WAR::
+
+            from neurodent.workflow import iter_wars
+
+            frames = []
+            for parquet_path, war in iter_wars(parquet_paths, json_paths):
+                frames.append(war.get_channel_averaged_result(features=["logrms"]))
+                del war  # release this WAR before the next one loads
+    """
+    from neurodent.results import WindowAnalysisResult
+
+    # If json_paths not provided, derive from parquet_paths
+    if json_paths is None:
+        json_paths = [Path(p).with_suffix(".json") for p in parquet_paths]
+
+    if len(parquet_paths) != len(json_paths):
+        raise ValueError(
+            f"parquet_paths ({len(parquet_paths)}) and json_paths ({len(json_paths)}) "
+            "must have the same length"
+        )
+
+    pairs = []
+    for parquet_path, json_path in zip(parquet_paths, json_paths):
+        parquet_path = Path(parquet_path)
+
+        # Accept legacy .pkl input by swapping the suffix
+        if parquet_path.suffix == ".pkl":
+            parquet_path = parquet_path.with_suffix(".parquet")
+
+        pairs.append((parquet_path, Path(json_path)))
+
+    return _load_each_war(WindowAnalysisResult, pairs)
+
+
+def _load_each_war(war_class, pairs):
+    """Load each (parquet_path, json_path) pair in turn. The generator behind iter_wars."""
+    for index, (parquet_path, json_path) in enumerate(pairs, start=1):
+        logging.info(f"Loading WAR {index}/{len(pairs)}: {parquet_path}")
+        # Yield the load directly, so this frame holds no reference to the WAR
+        yield parquet_path, war_class.load_parquet_and_json(
+            folder_path=parquet_path.parent,
+            parquet_name=parquet_path.name,
+            json_name=json_path.name,
+        )
+        # Runs when the caller asks for the next WAR, after it has let go of this one
+        gc.collect()
 
 
 def load_wars(
@@ -15,13 +103,14 @@ def load_wars(
     """Load multiple WindowAnalysisResult objects from parquet/json file pairs.
 
     General-purpose utility for loading WAR files. Works with any list of paths,
-    not tied to Snakemake.
+    not tied to Snakemake. Built on :func:`iter_wars`, with the same path rules, and
+    keeps every WAR. That suits flattened WARs, which are small. For WARs that are not
+    flattened, use :func:`iter_wars` and keep only what you need from each one.
 
     Args:
         parquet_paths: Paths to .parquet files containing WindowAnalysisResult data.
-            For backward compatibility, legacy .pkl paths are also accepted — the
-            loader will resolve the corresponding .parquet file next to them and
-            fall back to the pickle only if the parquet is missing.
+            Legacy .pkl paths are also accepted. The loader is given the .parquet file next
+            to them and falls back to the pickle only if the parquet is missing.
         json_paths: Optional paths to corresponding .json metadata files.
             If None, assumes json files are in the same directory as the parquet
             files with the same basename but .json extension.
@@ -30,6 +119,7 @@ def load_wars(
         List of loaded WindowAnalysisResult objects.
 
     Raises:
+        ValueError: If parquet_paths and json_paths differ in length.
         FileNotFoundError: If a parquet or json file does not exist.
         RuntimeError: If no WARs could be loaded.
 
@@ -48,33 +138,7 @@ def load_wars(
             wars = load_wars(parquet_paths=["data/animal1/war.parquet"])
             # Automatically looks for data/animal1/war.json
     """
-    from neurodent.results import WindowAnalysisResult
-
-    # If json_paths not provided, derive from parquet_paths
-    if json_paths is None:
-        json_paths = [Path(p).with_suffix(".json") for p in parquet_paths]
-
-    if len(parquet_paths) != len(json_paths):
-        raise ValueError(
-            f"parquet_paths ({len(parquet_paths)}) and json_paths ({len(json_paths)}) "
-            "must have the same length"
-        )
-
-    wars = []
-    for parquet_path, json_path in zip(parquet_paths, json_paths):
-        parquet_path = Path(parquet_path)
-        json_path = Path(json_path)
-
-        # Accept legacy .pkl input by swapping the suffix
-        if parquet_path.suffix == ".pkl":
-            parquet_path = parquet_path.with_suffix(".parquet")
-
-        war = WindowAnalysisResult.load_parquet_and_json(
-            folder_path=parquet_path.parent,
-            parquet_name=parquet_path.name,
-            json_name=json_path.name,
-        )
-        wars.append(war)
+    wars = [war for _, war in iter_wars(parquet_paths, json_paths)]
 
     if not wars:
         raise RuntimeError("No WARs were successfully loaded")
