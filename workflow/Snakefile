@@ -19,6 +19,7 @@ import glob
 
 # Import workflow utilities
 from neurodent.workflow.utils import deep_merge_dict, merge_dataset_config, expand_animals_config, format_config_value, increment_memory, load_samples_config, resolve_samples_config
+from neurodent.workflow.utils import one_war_at_a_time_mem_mb, one_war_at_a_time_time
 from neurodent.workflow.utils import format_exclusion_summary, quality_filter_outcome
 from snakemake.logging import logger
 

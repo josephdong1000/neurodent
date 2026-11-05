@@ -287,21 +287,33 @@ cluster:
     interface: null
     retries: 2
 
-  # Holds one whole WAR at a time, so one core is enough, and the memory covers the
-  # largest single WAR (about 47 GiB for IQSEC2). The retry doubles it.
+  # Holds one whole WAR at a time, so one core is enough. Memory and time are computed from
+  # the input WARs when the job is scheduled (neurodent.workflow.utils.resources): mem_mb and
+  # time are the fixed base. The rates were measured for this rule's script on all 28 IQSEC2
+  # WARs (8 channels, 1.6 million windows) and on 24 synthetic 2-channel WARs (3 million
+  # windows): the time fit reproduces both runs, and the memory rate counts the whole
+  # synthetic peak per window, so many small WARs are not under-sized.
   war_zeitgeber:
-    time: "4h"
-    mem_mb: 80_000
+    time: "30m"
+    mem_mb: 2_000
+    mem_bytes_per_window: 3_200
+    seconds_per_value: 3.4e-7
+    seconds_per_window: 8.5e-4
     nodes: 1
     threads: 1
     interface: null
     retries: 1
 
-  # Holds one whole WAR at a time, so one core is enough, and the memory covers the
-  # largest single WAR (about 47 GiB for IQSEC2). The retry doubles it.
+  # Holds one whole WAR at a time, so one core is enough. Memory and time are computed from
+  # the input WARs when the job is scheduled (neurodent.workflow.utils.resources): mem_mb and
+  # time are the fixed base. The rates were measured as for war_zeitgeber above; the plots of
+  # the banded features set this rule's peak when there are many windows.
   relfreq_plots:
-    time: "6h"
-    mem_mb: 80_000
+    time: "30m"
+    mem_mb: 2_000
+    mem_bytes_per_window: 3_500
+    seconds_per_value: 3.2e-7
+    seconds_per_window: 2.1e-3
     nodes: 1
     threads: 1
     interface: null

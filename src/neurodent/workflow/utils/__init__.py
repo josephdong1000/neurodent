@@ -27,6 +27,11 @@ from .logging import (
     setup_snakemake_logging,
     increment_memory,
 )
+from .resources import (
+    count_war_values,
+    one_war_at_a_time_mem_mb,
+    one_war_at_a_time_time,
+)
 from .plotting_helpers import (
     iter_wars,
     load_wars,
@@ -55,6 +60,9 @@ __all__ = [
     "format_exclusion_summary",
     "setup_snakemake_logging",
     "increment_memory",
+    "count_war_values",
+    "one_war_at_a_time_mem_mb",
+    "one_war_at_a_time_time",
     "iter_wars",
     "load_wars",
     "extend_plot_order_from_attr",
