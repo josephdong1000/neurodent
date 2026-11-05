@@ -15,6 +15,10 @@ non-flattened WARs before the flattening step.
 rule war_relfreq_plots:
     """
     Generate relative frequency distribution plots from channel-filtered WARs
+
+    The script loads the WARs one at a time, each once, so the rule needs one core and
+    memory for the largest single WAR, about 47 GiB for IQSEC2. It used to load 15 at a
+    time, each once per feature, and ran out of memory at 150 and then 300 GB.
     """
     input:
         war_parquet=lambda wc: get_wars_after_quality_filtered(wc, filepath_prepend="results/wars_channel_filtered_manual", filepath_append="war.parquet"),

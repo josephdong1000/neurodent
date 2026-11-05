@@ -11,7 +11,9 @@ matplotlib.use("Agg")
 import copy
 import tempfile
 import warnings
+import weakref
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Generator
 
 import numpy as np
@@ -337,5 +339,155 @@ def example_dataset(tmp_path_factory):
 
     tmp_path = tmp_path_factory.mktemp("dataset")
     return create_synthetic_dataset(tmp_path)
+
+
+# ============================================================================
+# WAR FILE FIXTURES
+# ============================================================================
+# Small WARs saved to disk for real, and a tracker that counts how many loaded
+# WARs are alive at once. For tests of workflow scripts that load whole WARs.
+# ============================================================================
+
+WAR_FILE_CHANNELS = ["LMot", "RMot", "LBar"]
+"""Channels of every WAR that create_war_files writes. All are in the default CHANNEL_MAP."""
+
+
+def _war_file_values(rng, nan_channels, *trailing):
+    """Random per-channel values of shape (channels, *trailing), NaN on nan_channels."""
+    values = rng.normal(1.0, 0.25, (len(WAR_FILE_CHANNELS), *trailing))
+    values[nan_channels] = np.nan
+    return values
+
+
+def _war_file_matrix(rng, nan_channels):
+    """A random symmetric channel-by-channel matrix, NaN in the rows and columns of nan_channels."""
+    values = rng.uniform(0.0, 1.0, (len(WAR_FILE_CHANNELS), len(WAR_FILE_CHANNELS)))
+    values = (values + values.T) / 2
+    values[nan_channels, :] = np.nan
+    values[:, nan_channels] = np.nan
+    return values.tolist()
+
+
+def _war_file_result(animal_id, genotype, sex, rng):
+    """One animal's result frame, with every feature in the form a real WAR stores it."""
+    day = "Jan-05-2026"
+    freqs = np.arange(1.0, 41.0)
+    rows = []
+    timestamps = pd.date_range("2026-01-05 06:00", periods=48, freq="30min")
+    for index, timestamp in enumerate(timestamps):
+        # Every value of window 10 is NaN, and LBar is NaN in windows 20 to 22
+        if index == 10:
+            nan_channels = list(range(len(WAR_FILE_CHANNELS)))
+        elif 20 <= index <= 22:
+            nan_channels = [2]
+        else:
+            nan_channels = []
+
+        row = {
+            "animalday": f"{animal_id} {genotype} {day}",
+            "animal": animal_id,
+            "day": day,
+            "genotype": genotype,
+            "sex": sex,
+            "duration": 5.0,
+            "endfile": None,
+            "timestamp": timestamp,
+            "isday": 6 <= timestamp.hour < 18,
+        }
+        for feature in constants.LINEAR_FEATURES:
+            row[feature] = _war_file_values(rng, nan_channels).tolist()
+        for feature in constants.LINEAR_2D_FEATURES:
+            row[feature] = _war_file_values(rng, nan_channels, 2).tolist()
+        for feature in constants.BAND_FEATURES:
+            row[feature] = {
+                band: _war_file_values(rng, nan_channels).tolist() for band in constants.BAND_NAMES
+            }
+        for feature in constants.BANDED_MATRIX_FEATURES:
+            row[feature] = {
+                band: _war_file_matrix(rng, nan_channels) for band in constants.BAND_NAMES
+            }
+        for feature in constants.SIMPLE_MATRIX_FEATURES:
+            row[feature] = _war_file_matrix(rng, nan_channels)
+        row["psd"] = (freqs.tolist(), _war_file_values(rng, nan_channels, len(freqs)).T.tolist())
+        rows.append(row)
+
+    return pd.DataFrame(rows)
+
+
+@pytest.fixture
+def create_war_files(tmp_path):
+    """
+    Factory fixture that writes small synthetic WARs to disk, one folder per animal.
+
+    Each WAR is saved for real with ``save_parquet_and_json``, so loading it goes through
+    the production loader. It has the non-feature columns a real WAR has, and every
+    feature in its stored form: per-channel lists for linear features, (channel, component)
+    pairs for psdslope, dicts of per-channel lists for band features, channel-by-channel
+    matrices on their own or in a dict of bands, and the (frequencies, power) pair for psd.
+    There are 48 windows, one every 30 minutes for 24 hours from 06:00. Every value of
+    window 10 is NaN, and LBar is NaN in windows 20 to 22, as a fragment filter leaves them.
+
+    Usage:
+        def test_something(create_war_files):
+            ((parquet_path, json_path),) = create_war_files([("a1", "A1", "WT", "Male")])
+
+    Returns:
+        Callable taking a list of ``(folder, animal_id, genotype, sex)`` and returning one
+        ``(parquet_path, json_path)`` pair per animal, in the same order.
+    """
+    from neurodent.results import WindowAnalysisResult
+
+    def _create_war_files(animals):
+        paths = []
+        for seed, (folder, animal_id, genotype, sex) in enumerate(animals):
+            result = _war_file_result(animal_id, genotype, sex, np.random.default_rng(seed))
+            war = WindowAnalysisResult(
+                result=result,
+                animal_id=animal_id,
+                genotype=genotype,
+                sex=sex,
+                channel_names=list(WAR_FILE_CHANNELS),
+                bad_channels_dict={animalday: [] for animalday in result["animalday"].unique()},
+            )
+            folder_path = tmp_path / "wars" / folder
+            folder_path.mkdir(parents=True, exist_ok=True)
+            war.save_parquet_and_json(folder_path, filename="war")
+            paths.append((folder_path / "war.parquet", folder_path / "war.json"))
+        return paths
+
+    return _create_war_files
+
+
+@pytest.fixture
+def track_war_loads(monkeypatch):
+    """
+    Record every WAR load, and how many earlier WARs were still alive when it started.
+
+    Wraps the real ``WindowAnalysisResult.load_parquet_and_json``. It keeps a weak
+    reference to each WAR it loads, so at the start of each load it can count the earlier
+    WARs still alive. For a script that holds one WAR at a time the count is always 0.
+    This checks object lifetimes, not memory, so it is deterministic, and it is what
+    catches a missing ``del war`` or a ``tqdm`` wrapper around ``iter_wars``.
+
+    Returns:
+        Namespace with ``folders`` (the folder name of each load, in order),
+        ``alive_at_load`` (earlier WARs alive at the start of each load), and
+        ``real_load`` (the untracked loader, for building expected values).
+    """
+    from neurodent.results import WindowAnalysisResult
+
+    real_load = WindowAnalysisResult.load_parquet_and_json
+    tracker = SimpleNamespace(folders=[], alive_at_load=[], real_load=real_load)
+    refs = []
+
+    def tracked_load(folder_path, *args, **kwargs):
+        tracker.alive_at_load.append(sum(ref() is not None for ref in refs))
+        war = real_load(folder_path, *args, **kwargs)
+        tracker.folders.append(Path(folder_path).name)
+        refs.append(weakref.ref(war))
+        return war
+
+    monkeypatch.setattr(WindowAnalysisResult, "load_parquet_and_json", staticmethod(tracked_load))
+    return tracker
 
 

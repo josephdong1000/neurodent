@@ -14,16 +14,19 @@ similar to the zeitgeber feature extraction pipeline.
 Input: Channel-filtered WAR pickle and JSON files from all animals
 Output: Relative frequency distribution plots (histograms) and CSV data exports
 
-Memory Optimization: Uses streaming parallel extraction - workers extract features
-from WARs and return small DataFrames, avoiding loading all WARs into memory.
+Memory: each WAR is loaded in full exactly once, one animal at a time, through
+neurodent.workflow.iter_wars, and only the per-window frame of each configured feature is
+kept from it. A loaded WAR holds every feature as nested Python lists and is many times
+larger than its parquet file. The earlier design, a pool that loaded up to `threads` WARs
+at once and loaded every WAR again for each feature, ran out of memory on large datasets,
+and a pool worker killed for using too much memory left the pool waiting until the job's
+time limit. The rule's threads setting is no longer used.
 """
 
 import gc
 import logging
 import os
 from pathlib import Path
-from multiprocessing import Pool
-from tqdm import tqdm
 
 import matplotlib
 
@@ -34,12 +37,11 @@ import numpy as np
 import pandas as pd
 import psutil
 import seaborn as sns
-from neurodent.workflow import setup_snakemake_logging, apply_samples_config
+from neurodent.workflow import setup_snakemake_logging, apply_samples_config, iter_wars
 from neurodent.core import metadata as metadata_module
 
 from neurodent.constants import OKABE_ITO_COLORS
 from neurodent import constants
-from neurodent.results import WindowAnalysisResult
 
 logger = logging.getLogger(__name__)
 
@@ -95,53 +97,49 @@ def melt_banded_feature(df, feature):
     return df_melted
 
 
-def extract_feature_from_war(args):
+def extract_features_from_war(war, features):
     """
-    Worker function: Load WAR, extract feature data, return small DataFrame only.
+    Return the per-window, channel-averaged frame of every requested feature of one WAR.
 
-    WAR is garbage collected when function returns, keeping only the extracted data.
+    Each frame is the frame the earlier one-feature-per-load extraction returned: the
+    channel-averaged result for that one feature with every non-feature column of the
+    WAR, plus 'animal' and 'genotype'. Extraction does not modify the WAR, so taking
+    every feature from a single load gives the same frames as loading the WAR once per
+    feature. The frames do not refer to the WAR, so it can be released afterwards.
+
+    This replaced extract_feature_from_war, which loaded the WAR itself, one feature per
+    load, and had a branch for not averaging channels. That branch called
+    get_windowed_result, which does not exist, and nothing used it.
 
     Args:
-        args: Tuple of (war_path_info, feature, collapse_channels)
-            war_path_info: Tuple of (war_parquet_path, war_json_path, animal_name)
-            feature: Feature name to extract
-            collapse_channels: Whether to average across channels
+        war (WindowAnalysisResult): A loaded, non-flattened WAR.
+        features (list[str]): Feature names to extract.
 
     Returns:
-        pd.DataFrame: Small DataFrame with just the extracted feature data
+        dict[str, pd.DataFrame]: Feature name to that feature's per-window frame.
     """
-    war_path_info, feature, collapse_channels = args
-    war_parquet_path, war_json_path, animal_name = war_path_info
-
     try:
-        # Load WAR
-        war = WindowAnalysisResult.load_parquet_and_json(
-            folder_path=war_parquet_path.parent,
-            parquet_name=war_parquet_path.name,
-            json_name=war_json_path.name
-        )
-        
-        # Extract just the feature data using channel averaging
-        if collapse_channels:
+        frames = {}
+        for feature in features:
+            # Extract just the feature data using channel averaging
             df = war.get_channel_averaged_result(features=[feature])
-        else:
-            df = war.get_windowed_result(features=[feature])
-        
-        # Add metadata columns
-        df['animal'] = war.animal_id
-        df['genotype'] = war.genotype
-        # Note: 'animalday' column should already exist in df from get_channel_averaged_result
-        # if it was present in war.result. No need to add it separately.
-        
-        # Ensure isday column exists
-        if 'isday' not in df.columns and hasattr(war, 'result') and 'isday' in war.result.columns:
-            df['isday'] = war.result['isday'].values[:len(df)]
-        
-        # WAR will be garbage collected after return - only small DF sent back
-        return df
-        
+
+            # Add metadata columns
+            df['animal'] = war.animal_id
+            df['genotype'] = war.genotype
+            # Note: 'animalday' column should already exist in df from get_channel_averaged_result
+            # if it was present in war.result. No need to add it separately.
+
+            # Ensure isday column exists
+            if 'isday' not in df.columns and hasattr(war, 'result') and 'isday' in war.result.columns:
+                df['isday'] = war.result['isday'].values[:len(df)]
+
+            frames[feature] = df
+
+        return frames
+
     except Exception as e:
-        logger.error(f"Failed to extract {feature} from {animal_name}: {str(e)}")
+        logger.error(f"Failed to extract {features} from {war.animal_id}: {str(e)}")
         raise
 
 
@@ -368,24 +366,6 @@ def main():
 
     logger.info(f"Processing {len(war_parquet_files)} channel-filtered WARs")
 
-    # Get number of threads for parallel extraction
-    threads = snakemake.threads
-    logger.info(f"Using {threads} threads for parallel feature extraction")
-
-    # Validate that parquet and JSON inputs match
-    if len(war_parquet_files) != len(war_json_files):
-        raise ValueError(
-            f"Mismatch between parquet files ({len(war_parquet_files)}) and JSON files ({len(war_json_files)})"
-        )
-
-    # Prepare WAR information for parallel extraction
-    war_infos = []
-    for parquet_file, json_file in zip(war_parquet_files, war_json_files):
-        parquet_path = Path(parquet_file)
-        json_path = Path(json_file)
-        animal_name = parquet_path.parent.name
-        war_infos.append((parquet_path, json_path, animal_name))
-
     # Get relfreq configuration
     relfreq_config = config["analysis"]["relfreq_plots"]
     features = relfreq_config["features"]
@@ -407,36 +387,30 @@ def main():
     }
 
     logger.info(f"Will process {len(features)} features: {features}")
-    log_memory_usage(logger, "before feature loop")
+    log_memory_usage(logger, "before extraction")
 
-    # Process each feature using streaming parallel extraction
+    # Load each WAR once, one animal at a time, in input order, and keep only the
+    # per-window frame of each feature. The per-feature lists below hold the same
+    # frames, in the same order, as the earlier per-feature extraction passes.
+    frames_by_feature = {feature: [] for feature in features}
+    for parquet_path, war in iter_wars(war_parquet_files, war_json_files):
+        frames = extract_features_from_war(war, features)
+        del war  # iter_wars loads the next WAR only after this one is released
+        for feature in features:
+            frames_by_feature[feature].append(frames[feature])
+        del frames
+        log_memory_usage(logger, f"after extracting {parquet_path.parent.name}")
+
+    # Process each feature from the extracted frames
     for feature in features:
         logger.info(f"=== Processing feature: {feature} ===")
         log_memory_usage(logger, f"start {feature}")
-        
+
         feature_label = feature_to_label.get(feature, feature)
-        
-        # Prepare extraction arguments
-        args = [(info, feature, True) for info in war_infos]  # True = collapse_channels
-        
-        # Parallel extraction - workers extract and return small DataFrames
-        dfs = []
-        if threads > 1:
-            with Pool(threads) as pool:
-                for df in tqdm(
-                    pool.imap(extract_feature_from_war, args),
-                    total=len(args),
-                    desc=f"Extracting {feature}",
-                ):
-                    if df is not None:
-                        dfs.append(df)
-        else:
-            # Single-threaded extraction
-            for arg in tqdm(args, desc=f"Extracting {feature}"):
-                df = extract_feature_from_war(arg)
-                if df is not None:
-                    dfs.append(df)
-        
+
+        # This feature's frames, one per animal; popped so they are freed after concat
+        dfs = frames_by_feature.pop(feature)
+
         if not dfs:
             logger.warning(f"No data extracted for feature {feature}, skipping")
             continue
