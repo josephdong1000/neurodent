@@ -49,7 +49,7 @@ SAMPLES_CONFIG = {
 
 
 def _shipped_zeitgeber_config():
-    with open(REPO / "config" / "config.yaml") as f:
+    with open(REPO / "config" / "config.yaml", encoding="utf-8") as f:
         return yaml.safe_load(f)["analysis"]["zeitgeber"]
 
 

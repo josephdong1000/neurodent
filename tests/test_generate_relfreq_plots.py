@@ -51,7 +51,7 @@ SAMPLES_CONFIG = {
 
 
 def _shipped_relfreq_features():
-    with open(REPO / "config" / "config.yaml") as f:
+    with open(REPO / "config" / "config.yaml", encoding="utf-8") as f:
         return yaml.safe_load(f)["analysis"]["relfreq_plots"]["features"]
 
 
@@ -77,8 +77,13 @@ def _old_extraction(load, parquet_path, feature):
     return df
 
 
-def _old_csv(relfreq, load, parquet_paths, feature):
-    """The CSV the old per-feature path wrote: one fresh load per animal, in input order."""
+def _old_csv(relfreq, load, parquet_paths, feature, path):
+    """Write the CSV the old per-feature path wrote, one fresh load per animal, and return its bytes.
+
+    It is written to a file with the script's own call, so line endings are the platform's in
+    both files. Reading a file back as text turns Windows line endings into newlines, so the
+    comparison is of bytes.
+    """
     combined = pd.concat(
         [_old_extraction(load, parquet_path, feature) for parquet_path in parquet_paths],
         ignore_index=True,
@@ -88,7 +93,9 @@ def _old_csv(relfreq, load, parquet_paths, feature):
     df_weighted = relfreq.add_animal_weights(
         relfreq.process_feature_dataframe(combined, SAMPLES_CONFIG)
     )
-    return df_weighted.to_csv(index=False)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df_weighted.to_csv(path, index=False)
+    return path.read_bytes()
 
 
 def test_one_load_gives_the_frames_of_one_load_per_feature(relfreq, create_war_files):
@@ -145,9 +152,13 @@ def test_main_loads_each_war_once_and_writes_what_the_old_path_wrote(
     assert track_war_loads.alive_at_load == [0] * len(ANIMALS), "no WAR may outlive the next load"
 
     for feature in features:
-        written = (tmp_path / "data" / f"{feature}_relfreq.csv").read_text()
+        written = (tmp_path / "data" / f"{feature}_relfreq.csv").read_bytes()
         expected = _old_csv(
-            relfreq, track_war_loads.real_load, [parquet_path for parquet_path, _ in paths], feature
+            relfreq,
+            track_war_loads.real_load,
+            [parquet_path for parquet_path, _ in paths],
+            feature,
+            tmp_path / "old_path" / f"{feature}_relfreq.csv",
         )
         assert written == expected, f"{feature}_relfreq.csv differs from the old path's"
 
