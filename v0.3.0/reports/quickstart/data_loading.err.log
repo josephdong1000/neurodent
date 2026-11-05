@@ -1,0 +1,51 @@
+Traceback (most recent call last):
+  File "/home/runner/work/neurodent/neurodent/.venv/lib/python3.10/site-packages/jupyter_cache/executors/utils.py", line 58, in single_nb_execution
+    executenb(
+  File "/home/runner/work/neurodent/neurodent/.venv/lib/python3.10/site-packages/nbclient/client.py", line 1319, in execute
+    return NotebookClient(nb=nb, resources=resources, km=km, **kwargs).execute()
+  File "/home/runner/work/neurodent/neurodent/.venv/lib/python3.10/site-packages/jupyter_core/utils/__init__.py", line 165, in wrapped
+    return loop.run_until_complete(inner)
+  File "/home/runner/work/_temp/uv-python-dir/cpython-3.10.8-linux-x86_64-gnu/lib/python3.10/asyncio/base_events.py", line 649, in run_until_complete
+    return future.result()
+  File "/home/runner/work/neurodent/neurodent/.venv/lib/python3.10/site-packages/nbclient/client.py", line 709, in async_execute
+    await self.async_execute_cell(
+  File "/home/runner/work/neurodent/neurodent/.venv/lib/python3.10/site-packages/nbclient/client.py", line 1062, in async_execute_cell
+    await self._check_raise_for_error(cell, cell_index, exec_reply)
+  File "/home/runner/work/neurodent/neurodent/.venv/lib/python3.10/site-packages/nbclient/client.py", line 918, in _check_raise_for_error
+    raise CellExecutionError.from_cell_and_msg(cell, exec_reply_content)
+nbclient.exceptions.CellExecutionError: An error occurred while executing the following cell:
+------------------
+import csv
+from pathlib import Path
+import logging
+from datetime import datetime
+
+import numpy as np
+
+from neurodent import core
+from neurodent.core.discovery import DiscoveredFile, FileDiscoverer
+
+import spikeinterface.core as si
+
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+)
+logger = logging.getLogger()
+------------------
+
+
+[0;31m---------------------------------------------------------------------------[0m
+[0;31mModuleNotFoundError[0m                       Traceback (most recent call last)
+Cell [0;32mIn[1], line 9[0m
+[1;32m      6[0m [38;5;28;01mimport[39;00m[38;5;250m [39m[38;5;21;01mnumpy[39;00m[38;5;250m [39m[38;5;28;01mas[39;00m[38;5;250m [39m[38;5;21;01mnp[39;00m
+[1;32m      8[0m [38;5;28;01mfrom[39;00m[38;5;250m [39m[38;5;21;01mneurodent[39;00m[38;5;250m [39m[38;5;28;01mimport[39;00m core
+[0;32m----> 9[0m [38;5;28;01mfrom[39;00m[38;5;250m [39m[38;5;21;01mneurodent[39;00m[38;5;21;01m.[39;00m[38;5;21;01mcore[39;00m[38;5;21;01m.[39;00m[38;5;21;01mdiscovery[39;00m[38;5;250m [39m[38;5;28;01mimport[39;00m DiscoveredFile, FileDiscoverer
+[1;32m     11[0m [38;5;28;01mimport[39;00m[38;5;250m [39m[38;5;21;01mspikeinterface[39;00m[38;5;21;01m.[39;00m[38;5;21;01mcore[39;00m[38;5;250m [39m[38;5;28;01mas[39;00m[38;5;250m [39m[38;5;21;01msi[39;00m
+[1;32m     13[0m logging[38;5;241m.[39mbasicConfig(
+[1;32m     14[0m     [38;5;28mformat[39m[38;5;241m=[39m[38;5;124m"[39m[38;5;132;01m%(asctime)s[39;00m[38;5;124m - [39m[38;5;132;01m%(levelname)s[39;00m[38;5;124m - [39m[38;5;132;01m%(message)s[39;00m[38;5;124m"[39m,
+[1;32m     15[0m     level[38;5;241m=[39mlogging[38;5;241m.[39mINFO,
+[1;32m     16[0m )
+
+[0;31mModuleNotFoundError[0m: No module named 'neurodent.core.discovery'
+
