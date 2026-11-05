@@ -20,19 +20,30 @@ from neurodent.results.zeitgeber import _extract_zeitgeber_frame
 REPO = Path(__file__).parent.parent
 SCRIPT = REPO / "workflow" / "scripts" / "extract_zeitgeber_features.py"
 
-# Folder, animal id, genotype, sex. The folders are not the ids, as on disk, where folder
-# iqsec2_80 holds IQSEC2_80, and they are not given in sorted order.
+# Folder, animal id, genotype, sex, and how each WAR departs from the default 3-channel day.
+# Together they cover the ways datasets differ: channel count, recording days, a single
+# window, features a WAR lacks, a channel dead throughout, genotypes outside the default plot
+# order, and more genotypes than the fixed palette. Input order is not sorted, and the folders
+# are not the ids, as on disk, where folder iqsec2_80 holds IQSEC2_80.
 ANIMALS = [
-    ("a2", "A2", "KO", "Female"),
-    ("a1", "A1", "WT", "Male"),
-    ("a3", "A3", "WT", "Female"),
+    ("a2", "A2", "KO", "Female", {}),
+    ("a1", "A1", "WT", "Male", {"channels": [
+        "LMot", "RMot", "LBar", "RBar", "LHip", "RHip", "LAud", "RAud", "LVis", "RVis",
+    ]}),
+    ("a3", "A3", "x/y", "Female", {"channels": ["LMot", "RMot"], "days": 3}),
+    ("a6", "A6", "HET", "Male", {"windows": 1}),
+    ("a5", "A5", "WT", "Female", {"drop": ["nspike", "lognspike", "psdslope"]}),
+    ("a4", "A4", "KO", "Male", {"dead_channel": 0}),
 ]
 
 SAMPLES_CONFIG = {
     "ANIMAL_METADATA": [
         {"id": "A1", "sex": "Male", "genotype": "WT"},
         {"id": "A2", "sex": "Female", "genotype": "KO"},
-        {"id": "A3", "sex": "Female", "genotype": "WT"},
+        {"id": "A3", "sex": "Female", "genotype": "x/y"},
+        {"id": "A4", "sex": "Male", "genotype": "KO"},
+        {"id": "A5", "sex": "Female", "genotype": "WT"},
+        {"id": "A6", "sex": "Male", "genotype": "HET"},
     ]
 }
 
@@ -76,9 +87,10 @@ def test_main_loads_each_war_once_in_sorted_order(
 ):
     result = _run_main(zeitgeber, create_war_files(ANIMALS), tmp_path / "zeitgeber_features.pkl")
 
-    assert track_war_loads.folders == ["a1", "a2", "a3"], "one load per animal, in sorted order"
-    assert track_war_loads.alive_at_load == [0, 0, 0], "no WAR may outlive the next load"
-    assert sorted(result["animal"].unique()) == ["a1", "a2", "a3"], "animals are named by folder"
+    folders = sorted(folder for folder, *_ in ANIMALS)
+    assert track_war_loads.folders == folders, "one load per animal, in sorted order"
+    assert track_war_loads.alive_at_load == [0] * len(ANIMALS), "no WAR may outlive the next load"
+    assert sorted(result["animal"].unique()) == folders, "animals are named by folder"
 
 
 @pytest.mark.mutates_constants

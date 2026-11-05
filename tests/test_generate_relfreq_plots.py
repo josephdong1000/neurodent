@@ -23,18 +23,29 @@ from neurodent.results import WindowAnalysisResult
 REPO = Path(__file__).parent.parent
 SCRIPT = REPO / "workflow" / "scripts" / "generate_relfreq_plots.py"
 
-# Folder, animal id, genotype, sex. Not in sorted order, so input order is visible.
+# Folder, animal id, genotype, sex, and how each WAR departs from the default 3-channel day.
+# Together they cover the ways datasets differ: channel count, recording days, a single
+# window, features a WAR lacks, a channel dead throughout, genotypes outside the default plot
+# order, and more genotypes than the fixed palette. Input order is not sorted.
 ANIMALS = [
-    ("a2", "A2", "KO", "Female"),
-    ("a1", "A1", "WT", "Male"),
-    ("a3", "A3", "WT", "Female"),
+    ("a2", "A2", "KO", "Female", {}),
+    ("a1", "A1", "WT", "Male", {"channels": [
+        "LMot", "RMot", "LBar", "RBar", "LHip", "RHip", "LAud", "RAud", "LVis", "RVis",
+    ]}),
+    ("a3", "A3", "x/y", "Female", {"channels": ["LMot", "RMot"], "days": 3}),
+    ("a6", "A6", "HET", "Male", {"windows": 1}),
+    ("a5", "A5", "WT", "Female", {"drop": ["nspike", "lognspike", "psdslope"]}),
+    ("a4", "A4", "KO", "Male", {"dead_channel": 0}),
 ]
 
 SAMPLES_CONFIG = {
     "ANIMAL_METADATA": [
         {"id": "A1", "sex": "Male", "genotype": "WT"},
         {"id": "A2", "sex": "Female", "genotype": "KO"},
-        {"id": "A3", "sex": "Female", "genotype": "WT"},
+        {"id": "A3", "sex": "Female", "genotype": "x/y"},
+        {"id": "A4", "sex": "Male", "genotype": "KO"},
+        {"id": "A5", "sex": "Female", "genotype": "WT"},
+        {"id": "A6", "sex": "Male", "genotype": "HET"},
     ]
 }
 
@@ -102,8 +113,7 @@ def test_one_load_gives_the_frames_of_one_load_per_feature(relfreq, create_war_f
 def test_main_loads_each_war_once_and_writes_what_the_old_path_wrote(
     relfreq, create_war_files, track_war_loads, tmp_path
 ):
-    # One feature of each kind the plots handle: linear, simple matrix, banded matrix, band
-    features = ["nspike", "pcorr", "cohere", "logpsdband"]
+    features = _shipped_relfreq_features()
     paths = create_war_files(ANIMALS)
     relfreq.snakemake = SimpleNamespace(
         input=SimpleNamespace(
@@ -120,7 +130,7 @@ def test_main_loads_each_war_once_and_writes_what_the_old_path_wrote(
                         "features": features,
                         "figure_format": "png",
                         "data_format": "csv",
-                        "dpi": 20,
+                        "dpi": 10,
                     }
                 }
             },
@@ -131,8 +141,8 @@ def test_main_loads_each_war_once_and_writes_what_the_old_path_wrote(
 
     relfreq.main()
 
-    assert track_war_loads.folders == ["a2", "a1", "a3"], "one load per animal, in input order"
-    assert track_war_loads.alive_at_load == [0, 0, 0], "no WAR may outlive the next load"
+    assert track_war_loads.folders == [folder for folder, *_ in ANIMALS], "one load per animal, in input order"
+    assert track_war_loads.alive_at_load == [0] * len(ANIMALS), "no WAR may outlive the next load"
 
     for feature in features:
         written = (tmp_path / "data" / f"{feature}_relfreq.csv").read_text()
@@ -141,11 +151,12 @@ def test_main_loads_each_war_once_and_writes_what_the_old_path_wrote(
         )
         assert written == expected, f"{feature}_relfreq.csv differs from the old path's"
 
-    bands = constants.BAND_NAMES
-    assert sorted(path.name for path in (tmp_path / "figures").iterdir()) == sorted(
-        ["nspike_relfreq.png", "pcorr_relfreq.png"]
-        + [f"cohere_relfreq_{band}.png" for band in bands]
-        + ["cohere_relfreq_byband.png"]
-        + [f"logpsdband_relfreq_{band}.png" for band in bands]
-        + ["logpsdband_relfreq_byband.png"]
-    )
+    banded = set(constants.BAND_FEATURES) | set(constants.BANDED_MATRIX_FEATURES)
+    expected_pngs = []
+    for feature in features:
+        if feature in banded:
+            expected_pngs += [f"{feature}_relfreq_{band}.png" for band in constants.BAND_NAMES]
+            expected_pngs.append(f"{feature}_relfreq_byband.png")
+        else:
+            expected_pngs.append(f"{feature}_relfreq.png")
+    assert sorted(path.name for path in (tmp_path / "figures").iterdir()) == sorted(expected_pngs)

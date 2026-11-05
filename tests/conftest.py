@@ -349,67 +349,81 @@ def example_dataset(tmp_path_factory):
 # ============================================================================
 
 WAR_FILE_CHANNELS = ["LMot", "RMot", "LBar"]
-"""Channels of every WAR that create_war_files writes. All are in the default CHANNEL_MAP."""
+"""Default channels of the WARs that create_war_files writes. All are in the default CHANNEL_MAP."""
 
 
-def _war_file_values(rng, nan_channels, *trailing):
+def _war_file_values(rng, n_channels, nan_channels, *trailing):
     """Random per-channel values of shape (channels, *trailing), NaN on nan_channels."""
-    values = rng.normal(1.0, 0.25, (len(WAR_FILE_CHANNELS), *trailing))
+    values = rng.normal(1.0, 0.25, (n_channels, *trailing))
     values[nan_channels] = np.nan
     return values
 
 
-def _war_file_matrix(rng, nan_channels):
+def _war_file_matrix(rng, n_channels, nan_channels):
     """A random symmetric channel-by-channel matrix, NaN in the rows and columns of nan_channels."""
-    values = rng.uniform(0.0, 1.0, (len(WAR_FILE_CHANNELS), len(WAR_FILE_CHANNELS)))
+    values = rng.uniform(0.0, 1.0, (n_channels, n_channels))
     values = (values + values.T) / 2
     values[nan_channels, :] = np.nan
     values[:, nan_channels] = np.nan
     return values.tolist()
 
 
-def _war_file_result(animal_id, genotype, sex, rng):
+def _war_file_result(
+    animal_id, genotype, sex, rng, channels, windows=48, days=1, drop=(), dead_channel=None
+):
     """One animal's result frame, with every feature in the form a real WAR stores it."""
-    day = "Jan-05-2026"
+    n_channels = len(channels)
     freqs = np.arange(1.0, 41.0)
     rows = []
-    timestamps = pd.date_range("2026-01-05 06:00", periods=48, freq="30min")
-    for index, timestamp in enumerate(timestamps):
-        # Every value of window 10 is NaN, and LBar is NaN in windows 20 to 22
-        if index == 10:
-            nan_channels = list(range(len(WAR_FILE_CHANNELS)))
-        elif 20 <= index <= 22:
-            nan_channels = [2]
-        else:
-            nan_channels = []
+    for day_index in range(days):
+        start = pd.Timestamp("2026-01-05 06:00") + pd.Timedelta(days=day_index)
+        day = start.strftime("%b-%d-%Y")
+        timestamps = pd.date_range(start, periods=windows, freq="30min")
+        for index, timestamp in enumerate(timestamps):
+            # Every value of window 10 is NaN, and the last channel is NaN in windows 20 to 22
+            if index == 10:
+                nan_channels = list(range(n_channels))
+            elif 20 <= index <= 22:
+                nan_channels = [n_channels - 1]
+            else:
+                nan_channels = []
+            if dead_channel is not None:
+                nan_channels = sorted(set(nan_channels) | {dead_channel})
 
-        row = {
-            "animalday": f"{animal_id} {genotype} {day}",
-            "animal": animal_id,
-            "day": day,
-            "genotype": genotype,
-            "sex": sex,
-            "duration": 5.0,
-            "endfile": None,
-            "timestamp": timestamp,
-            "isday": 6 <= timestamp.hour < 18,
-        }
-        for feature in constants.LINEAR_FEATURES:
-            row[feature] = _war_file_values(rng, nan_channels).tolist()
-        for feature in constants.LINEAR_2D_FEATURES:
-            row[feature] = _war_file_values(rng, nan_channels, 2).tolist()
-        for feature in constants.BAND_FEATURES:
-            row[feature] = {
-                band: _war_file_values(rng, nan_channels).tolist() for band in constants.BAND_NAMES
+            row = {
+                "animalday": f"{animal_id} {genotype} {day}",
+                "animal": animal_id,
+                "day": day,
+                "genotype": genotype,
+                "sex": sex,
+                "duration": 5.0,
+                "endfile": None,
+                "timestamp": timestamp,
+                "isday": 6 <= timestamp.hour < 18,
             }
-        for feature in constants.BANDED_MATRIX_FEATURES:
-            row[feature] = {
-                band: _war_file_matrix(rng, nan_channels) for band in constants.BAND_NAMES
-            }
-        for feature in constants.SIMPLE_MATRIX_FEATURES:
-            row[feature] = _war_file_matrix(rng, nan_channels)
-        row["psd"] = (freqs.tolist(), _war_file_values(rng, nan_channels, len(freqs)).T.tolist())
-        rows.append(row)
+            for feature in constants.LINEAR_FEATURES:
+                row[feature] = _war_file_values(rng, n_channels, nan_channels).tolist()
+            for feature in constants.LINEAR_2D_FEATURES:
+                row[feature] = _war_file_values(rng, n_channels, nan_channels, 2).tolist()
+            for feature in constants.BAND_FEATURES:
+                row[feature] = {
+                    band: _war_file_values(rng, n_channels, nan_channels).tolist()
+                    for band in constants.BAND_NAMES
+                }
+            for feature in constants.BANDED_MATRIX_FEATURES:
+                row[feature] = {
+                    band: _war_file_matrix(rng, n_channels, nan_channels)
+                    for band in constants.BAND_NAMES
+                }
+            for feature in constants.SIMPLE_MATRIX_FEATURES:
+                row[feature] = _war_file_matrix(rng, n_channels, nan_channels)
+            row["psd"] = (
+                freqs.tolist(),
+                _war_file_values(rng, n_channels, nan_channels, len(freqs)).T.tolist(),
+            )
+            for feature in drop:
+                del row[feature]
+            rows.append(row)
 
     return pd.DataFrame(rows)
 
@@ -424,29 +438,40 @@ def create_war_files(tmp_path):
     feature in its stored form: per-channel lists for linear features, (channel, component)
     pairs for psdslope, dicts of per-channel lists for band features, channel-by-channel
     matrices on their own or in a dict of bands, and the (frequencies, power) pair for psd.
-    There are 48 windows, one every 30 minutes for 24 hours from 06:00. Every value of
-    window 10 is NaN, and LBar is NaN in windows 20 to 22, as a fragment filter leaves them.
+    By default there are 48 windows, one every 30 minutes for 24 hours from 06:00, on the
+    channels in WAR_FILE_CHANNELS. Every value of window 10 is NaN, and the last channel is
+    NaN in windows 20 to 22, as a fragment filter leaves them.
+
+    An animal can take a fifth element, a dict of options, so a test can cover the ways
+    datasets differ: ``channels`` (channel names), ``windows`` (per day), ``days`` (one
+    animalday per day, starting on consecutive dates), ``drop`` (features the WAR lacks), and
+    ``dead_channel`` (index of a channel that is NaN in every window).
 
     Usage:
         def test_something(create_war_files):
             ((parquet_path, json_path),) = create_war_files([("a1", "A1", "WT", "Male")])
+            create_war_files([("a2", "A2", "KO", "Female", {"channels": ["LMot", "RMot"], "days": 3})])
 
     Returns:
-        Callable taking a list of ``(folder, animal_id, genotype, sex)`` and returning one
-        ``(parquet_path, json_path)`` pair per animal, in the same order.
+        Callable taking a list of ``(folder, animal_id, genotype, sex[, options])`` and
+        returning one ``(parquet_path, json_path)`` pair per animal, in the same order.
     """
     from neurodent.results import WindowAnalysisResult
 
     def _create_war_files(animals):
         paths = []
-        for seed, (folder, animal_id, genotype, sex) in enumerate(animals):
-            result = _war_file_result(animal_id, genotype, sex, np.random.default_rng(seed))
+        for seed, (folder, animal_id, genotype, sex, *rest) in enumerate(animals):
+            options = dict(rest[0]) if rest else {}
+            channels = list(options.pop("channels", WAR_FILE_CHANNELS))
+            result = _war_file_result(
+                animal_id, genotype, sex, np.random.default_rng(seed), channels, **options
+            )
             war = WindowAnalysisResult(
                 result=result,
                 animal_id=animal_id,
                 genotype=genotype,
                 sex=sex,
-                channel_names=list(WAR_FILE_CHANNELS),
+                channel_names=channels,
                 bad_channels_dict={animalday: [] for animalday in result["animalday"].unique()},
             )
             folder_path = tmp_path / "wars" / folder
