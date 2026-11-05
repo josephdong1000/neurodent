@@ -4,22 +4,26 @@ Zeitgeber Feature Extraction Script
 ===================================
 
 This script implements the pipeline-alphadelta.py functionality in the Snakemake workflow.
-It processes fragment-filtered WARs to extract features with zeitgeber time information
-and creates a single concatenated dataframe across all animals.
+It processes the manually channel-filtered WARs to extract features with zeitgeber time
+information and creates a single concatenated dataframe across all animals.
+
+Memory: each WAR is loaded in full exactly once, one animal at a time in sorted animal
+order, through neurodent.workflow.iter_wars, and only its channel-averaged frame is kept.
+This replaced a pool that loaded up to `threads` WARs at once, which on IQSEC2 peaked at
+270 of the 293 GiB the rule had. The rule's threads setting is no longer used. The order
+is sorted, so the output does not depend on the order of the inputs.
 
 Based on: notebooks/examples/pipeline-alphadelta.py
 """
 
 import logging
 from pathlib import Path
-from multiprocessing import Pool
-from tqdm import tqdm
 import pandas as pd
 
 # Import the new zeitgeber module
 from neurodent.results import get_expanded_feature_names
-from neurodent.results.zeitgeber import _load_war_for_zeitgeber
-from neurodent.workflow import setup_snakemake_logging, apply_samples_config
+from neurodent.results.zeitgeber import _extract_zeitgeber_frame
+from neurodent.workflow import setup_snakemake_logging, apply_samples_config, iter_wars
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +47,9 @@ def main():
     # Get zeitgeber processing parameters from config
     zeitgeber_params = config["analysis"]["zeitgeber"]
     features_to_extract = zeitgeber_params["features"]
-    threads = snakemake.threads
 
-    logger.info(f"Processing {len(input_war_parquets)} fragment-filtered WARs")
+    logger.info(f"Processing {len(input_war_parquets)} channel-filtered WARs")
     logger.info(f"Features to extract: {features_to_extract}")
-    logger.info(f"Using {threads} threads")
 
     # Validate that parquet and JSON inputs match
     if len(input_war_parquets) != len(input_war_jsons):
@@ -85,41 +87,30 @@ def main():
 
     logger.info(f"Validated {len(parquet_animal_set)} animals have both parquet and JSON files")
 
-    # Prepare war information for processing
-    war_infos = []
     # Configure pipeline for extraction:
     # - shift_for_48h=False: We want canonical features here, not plotting data
     # - interval_minutes: Ensure it matches what we want for aggregation
     pipeline_config = zeitgeber_params.copy()
     pipeline_config["shift_for_48h"] = False
-    
+
     # Use ANIMAL_METADATA (injected by apply_samples_config, required)
     from neurodent import constants
     pipeline_config["animal_metadata"] = constants.ANIMAL_METADATA
-    
-    for animal_name in sorted(parquet_animal_set):
-        parquet_path = parquet_animals[animal_name]
-        json_path = json_animals[animal_name]
-        war_infos.append((parquet_path, json_path, features_to_extract, animal_name, pipeline_config))
 
-    # Process WARs to extract features (parallel processing)
+    # Load each WAR once, one animal at a time, in sorted animal order, and keep only its
+    # channel-averaged frame
+    animals = sorted(parquet_animal_set)
     dfs = []
-    if threads > 1:
-        with Pool(threads) as pool:
-            # Use the new module function
-            for df in tqdm(
-                pool.imap(_load_war_for_zeitgeber, war_infos),
-                total=len(war_infos),
-                desc="Loading WARs for zeitgeber analysis",
-            ):
-                if df is not None:
-                    dfs.append(df)
-    else:
-        # Single-threaded processing
-        for war_info in tqdm(war_infos, desc="Loading WARs for zeitgeber analysis"):
-            df = _load_war_for_zeitgeber(war_info)
-            if df is not None:
-                dfs.append(df)
+    for parquet_path, war in iter_wars(
+        [parquet_animals[animal] for animal in animals],
+        [json_animals[animal] for animal in animals],
+    ):
+        dfs.append(
+            _extract_zeitgeber_frame(
+                war, parquet_path.parent.name, features_to_extract, pipeline_config
+            )
+        )
+        del war  # iter_wars loads the next WAR only after this one is released
 
     if not dfs:
         logger.error("No valid WARs were processed!")

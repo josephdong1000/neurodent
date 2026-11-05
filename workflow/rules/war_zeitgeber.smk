@@ -2,7 +2,7 @@
 WAR Zeitgeber Analysis Rules
 ============================
 
-Rules for extracting zeitgeber time features from fragment-filtered WARs.
+Rules for extracting zeitgeber time features from manually channel-filtered WARs.
 This implements the pipeline-alphadelta.py functionality to process features
 with respect to zeitgeber time rather than fragment index.
 """
@@ -15,6 +15,10 @@ rule war_zeitgeber:
     This rule used to read the fragment-filtered WARs, one step earlier, so electrodes the config
     marks as bad were in every zeitgeber figure while every other figure left them out. Channel
     averaging uses nanmean, so a rejected channel drops out of the average instead of blanking it.
+
+    The script loads the WARs one at a time, each once, so the rule needs one core and memory
+    for the largest single WAR, about 47 GiB for IQSEC2. It used to load 15 at a time and
+    peaked at 270 of its 293 GiB.
     """
     input:
         war_parquet=lambda wc: get_wars_after_quality_filtered(wc, filepath_prepend="results/wars_channel_filtered_manual", filepath_append="war.parquet"),
