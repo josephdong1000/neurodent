@@ -287,19 +287,23 @@ cluster:
     interface: null
     retries: 2
 
+  # Holds one whole WAR at a time, so one core is enough, and the memory covers the
+  # largest single WAR (about 47 GiB for IQSEC2). The retry doubles it.
   war_zeitgeber:
-    time: "2h"
-    mem_mb: 300_000
+    time: "4h"
+    mem_mb: 80_000
     nodes: 1
-    threads: 15
+    threads: 1
     interface: null
-    retries: 0
+    retries: 1
 
+  # Holds one whole WAR at a time, so one core is enough, and the memory covers the
+  # largest single WAR (about 47 GiB for IQSEC2). The retry doubles it.
   relfreq_plots:
-    time: "2h"
-    mem_mb: 150_000
+    time: "6h"
+    mem_mb: 80_000
     nodes: 1
-    threads: 15
+    threads: 1
     interface: null
     retries: 1
 

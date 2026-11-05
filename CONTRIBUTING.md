@@ -301,6 +301,7 @@ Each operation has a single canonical verb, matched to an established precedent.
 | Install a whole config dict into globals | `apply_` | Distributes one config across many globals. `apply_samples_config` completes the `load_samples_config` -> `resolve_samples_config` -> `apply_samples_config` trio. |
 | Read from disk (format-named parser) | `read_` | pandas `read_parquet`, MNE `read_raw_edf`. Use when the suffix names the format. |
 | Reconstruct a known object from its files | `load_` | joblib `load`; repo `load_wars`. Use when rebuilding a known object from its own paired files. |
+| Hand back loaded objects one at a time | `iter_` | Python `iter`, pandas `iterrows`; repo `iter_wars`. A generator, for objects too large to hold several at once. |
 | Numeric/statistical derivation (pure) | `compute_` | A real calculation (RMS, PSD, coherence, ...). |
 | Cheap accessor / lookup | `get_` | Returns a stored or trivially-derived value. |
 | Pull a sub-object out of a container | `extract_` | Reserve for "carve a piece out of a larger structure." |

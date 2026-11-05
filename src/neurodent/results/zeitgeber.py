@@ -48,43 +48,37 @@ def get_expanded_feature_names(base_features):
     return expanded_features
 
 
-def _load_war_for_zeitgeber(war_path_info):
+def _extract_zeitgeber_frame(war, animal_name, features_to_extract, pipeline_config):
     """
-    Load a fragment-filtered WAR and extract channel-averaged features for zeitgeber analysis.
+    Extract channel-averaged features for zeitgeber analysis from one loaded WAR.
+
+    This replaced ``_load_war_for_zeitgeber``, which loaded the WAR itself so that a pool
+    could run several loads at once. The caller now loads the WARs one at a time, through
+    :func:`neurodent.workflow.iter_wars`, and releases each after this returns. The
+    returned frame does not refer to the WAR. A WAR that fails to load is now reported by
+    the loader, naming the file, rather than wrapped in the RuntimeError below.
 
     Args:
-        war_path_info (tuple): Tuple containing:
-            - war_parquet_path (Path): Path to the WAR parquet file.
-            - war_json_path (Path): Path to the WAR JSON metadata file.
-            - features_to_extract (list[str]): List of features to extract.
-            - animal_name (str): Identifier for the animal.
-            - pipeline_config (dict): Configuration for the zeitgeber pipeline.
+        war (WindowAnalysisResult): A loaded, non-flattened WAR.
+        animal_name (str): Identifier for the animal, written to the 'animal' column.
+        features_to_extract (list[str]): List of features to extract.
+        pipeline_config (dict): Configuration for the zeitgeber pipeline.
 
     Returns:
         pd.DataFrame: DataFrame containing channel-averaged features and animal identifier.
                       The DataFrame will have columns for each extracted feature and an 'animal' column.
+
+    Raises:
+        RuntimeError: If extraction fails. Names the animal, with the original error as its cause.
     """
-    war_parquet_path, war_json_path, features_to_extract, animal_name, pipeline_config = war_path_info
-
     try:
-        logger.info(f"Loading {animal_name}")
+        logger.info(f"Extracting zeitgeber features for {animal_name}")
 
-        # lazy: avoids loading WAR at module import
-        from .window_analysis_result import WindowAnalysisResult
-
-        war = WindowAnalysisResult.load_parquet_and_json(
-            folder_path=war_parquet_path.parent,
-            parquet_name=war_parquet_path.name,
-            json_name=war_json_path.name,
-        )
-        
         # Wrap with ZeitgeberAnalysisResult to apply pipeline on the fly
         zar = ZeitgeberAnalysisResult(war, **pipeline_config)
 
         df = zar.get_channel_averaged_result(features=features_to_extract)
         df["animal"] = animal_name
-        del war
-        del zar
         return df
 
     except Exception as e:

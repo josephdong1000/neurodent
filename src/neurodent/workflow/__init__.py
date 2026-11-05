@@ -7,12 +7,14 @@ Utilities for Snakemake workflow scripts and general data loading.
 This module provides:
 
 - :func:`setup_snakemake_logging`: Configure logging for Snakemake scripts
+- :func:`iter_wars`: Load WindowAnalysisResult objects one at a time
 - :func:`load_wars`: Load multiple WindowAnalysisResult objects
 - :func:`expand_animals_config`: Expand unified ``animals`` list config into legacy keys
 """
 
 from .utils import (
     setup_snakemake_logging,
+    iter_wars,
     load_wars,
     apply_samples_config,
     expand_animals_config,
@@ -23,6 +25,7 @@ from .utils import (
 
 __all__ = [
     "setup_snakemake_logging",
+    "iter_wars",
     "load_wars",
     "apply_samples_config",
     "expand_animals_config",

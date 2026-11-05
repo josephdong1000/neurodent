@@ -1,13 +1,15 @@
 """Tests for neurodent.workflow utilities."""
 
+import gc
 import logging
 import tempfile
+import weakref
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from neurodent.workflow import setup_snakemake_logging, load_wars
+from neurodent.workflow import setup_snakemake_logging, iter_wars, load_wars
 from neurodent.workflow.utils import apply_path_overrides
 
 
@@ -94,6 +96,98 @@ class TestLoadWars:
         """Test that empty list raises RuntimeError."""
         with pytest.raises(RuntimeError, match="No WARs were successfully loaded"):
             load_wars([])
+
+
+class _FakeWar:
+    """Stands in for a loaded WAR in the iter_wars tests."""
+
+
+class TestIterWars:
+    """Tests for iter_wars: each WAR loaded once, in input order, one held at a time."""
+
+    def test_loads_each_war_once_in_input_order(self, tmp_path):
+        loaded = []
+
+        def load(folder_path, parquet_name, json_name):
+            loaded.append(Path(folder_path) / parquet_name)
+            return _FakeWar()
+
+        paths = [tmp_path / name / "war.parquet" for name in ["b", "a", "c"]]
+        with patch("neurodent.results.WindowAnalysisResult") as mock_war_class:
+            mock_war_class.load_parquet_and_json.side_effect = load
+            yielded = [parquet_path for parquet_path, _ in iter_wars(paths)]
+
+        assert yielded == paths
+        assert loaded == paths
+
+    def test_nothing_loads_until_the_first_war_is_asked_for(self, tmp_path):
+        paths = [tmp_path / "a" / "war.parquet", tmp_path / "b" / "war.parquet"]
+        with patch("neurodent.results.WindowAnalysisResult") as mock_war_class:
+            wars = iter_wars(paths)
+            assert mock_war_class.load_parquet_and_json.call_count == 0
+            next(wars)
+            assert mock_war_class.load_parquet_and_json.call_count == 1
+
+    def test_mismatched_lengths_raise_before_any_load(self, tmp_path):
+        parquet_paths = [tmp_path / "war1.parquet", tmp_path / "war2.parquet"]
+        json_paths = [tmp_path / "war1.json"]
+
+        with patch("neurodent.results.WindowAnalysisResult") as mock_war_class:
+            with pytest.raises(ValueError, match="must have the same length"):
+                iter_wars(parquet_paths, json_paths)
+            mock_war_class.load_parquet_and_json.assert_not_called()
+
+    def test_pkl_path_loads_the_parquet_beside_it(self, tmp_path):
+        with patch("neurodent.results.WindowAnalysisResult") as mock_war_class:
+            ((parquet_path, _),) = list(iter_wars([tmp_path / "a1" / "war.pkl"]))
+            call = mock_war_class.load_parquet_and_json.call_args
+
+        assert parquet_path == tmp_path / "a1" / "war.parquet"
+        assert call.kwargs == {
+            "folder_path": tmp_path / "a1",
+            "parquet_name": "war.parquet",
+            "json_name": "war.json",
+        }
+
+    def test_a_failed_load_raises_when_its_war_is_reached(self, tmp_path):
+        paths = [tmp_path / "a" / "war.parquet", tmp_path / "b" / "war.parquet"]
+        with patch("neurodent.results.WindowAnalysisResult") as mock_war_class:
+            mock_war_class.load_parquet_and_json.side_effect = [
+                _FakeWar(),
+                FileNotFoundError("b/war.parquet"),
+            ]
+            wars = iter_wars(paths)
+            next(wars)
+            with pytest.raises(FileNotFoundError, match="b/war.parquet"):
+                next(wars)
+
+    def test_previous_war_is_released_before_the_next_load(self, tmp_path):
+        """Each WAR here sits in a reference cycle, which only the garbage collector frees.
+
+        Automatic collection is switched off, so an earlier WAR is gone by the next load
+        only because iter_wars collects before loading it.
+        """
+        alive_at_each_load = []
+        refs = []
+
+        def load(folder_path, parquet_name, json_name):
+            alive_at_each_load.append(sum(ref() is not None for ref in refs))
+            war = _FakeWar()
+            war.cycle = war
+            refs.append(weakref.ref(war))
+            return war
+
+        paths = [tmp_path / name / "war.parquet" for name in ["a", "b", "c"]]
+        gc.disable()
+        try:
+            with patch("neurodent.results.WindowAnalysisResult") as mock_war_class:
+                mock_war_class.load_parquet_and_json.side_effect = load
+                for _, war in iter_wars(paths):
+                    del war
+        finally:
+            gc.enable()
+
+        assert alive_at_each_load == [0, 0, 0]
 
 
 class TestApplyPathOverrides:
