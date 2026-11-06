@@ -1,4 +1,4 @@
-"""Tests for neurodent.results.scoring: ground truth and detector scoring (issue #208).
+"""Tests for neurodent.results.scoring: ground truth and detector scoring.
 
 These numbers decide which detector wins, so the failures worth testing for are not crashes but a
 score computed over a truth set that silently shrank, or over a mask whose polarity was inverted.
@@ -66,14 +66,14 @@ def test_event_is_kept_but_tagged(tmp_path):
 
 def test_majority_vote_and_all_unsure_drops_out(tmp_path):
     ps = {}
-    for i, tok in enumerate(["bad", "bad", "clean"]):              # 2-1 -> bad
+    for i, tok in enumerate(["bad", "bad", "clean"]):              # 2 to 1: bad
         ps[f"r{i}"] = str(tmp_path / f"r{i}.csv")
         _write_labels(ps[f"r{i}"], "A", {(0, "ch0"): tok, (0, "ch1"): "unsure"})
     long = ingest(ps)
     cons = consensus(long)
 
     assert cons[(cons.window == 0) & (cons.channel == "ch0")].iloc[0].y_true == 1
-    assert cons[(cons.window == 0) & (cons.channel == "ch1")].empty     # nobody knew -> not guessed at
+    assert cons[(cons.window == 0) & (cons.channel == "ch1")].empty     # every rater abstained: not guessed at
     assert interrater(long)["metric"] == "fleiss"
 
 
@@ -160,7 +160,7 @@ def test_unknown_channels_are_refused():
 def test_score_mask_matches_by_absolute_time():
     """With grid_times, a labelled cell is matched to the detector row whose start time equals its
     t_start_s -- not by integer index."""
-    truth = {(2, "ch1"): 1}                              # cell at window 2 -> t_start_s = 10.0
+    truth = {(2, "ch1"): 1}                              # cell at window 2 has t_start_s = 10.0
     cons = _cons(truth, n_win=4)                          # windows 0..3 at t = 0,5,10,15
     grid = np.zeros((4, len(CHS)), dtype=bool)
     grid[2, CHS.index("ch1")] = True
@@ -175,9 +175,9 @@ def test_time_match_is_robust_to_a_renumbered_grid_where_index_would_misalign():
     truth = {(2, "ch1"): 1}                              # cell at t = 10
     cons = _cons(truth, n_win=4)                          # windows 0..3 at t = 0,5,10,15
     grid = np.zeros((4, len(CHS)), dtype=bool)
-    grid[1, CHS.index("ch1")] = True                     # rows in REVERSE time order -> t=10 is row 1
+    grid[1, CHS.index("ch1")] = True                     # rows in reverse time order: t=10 is row 1
     assert score_mask(grid, CHS, cons, "A", grid_times=[15.0, 10.0, 5.0, 0.0])["f1"] == 1.0
-    # integer-index fallback maps window 2 -> row 2 (t=5, clean) -> wrong
+    # the integer-index fallback maps window 2 to row 2 (t=5, clean), which is wrong
     assert score_mask(grid, CHS, cons, "A")["f1"] < 1.0
 
 
@@ -191,8 +191,8 @@ def test_time_match_with_no_fragment_in_tolerance_is_uncovered():
 # --------------------------------------------------------------------------- the polarity footgun
 
 def test_keep_mask_and_reject_grid_are_inverses():
-    """FILTER_REGISTRY masks are True=KEEP; score_mask wants True=REJECT. No runtime check can tell
-    them apart, so the inversion must be right."""
+    """FILTER_REGISTRY masks mean keep where True; score_mask takes True as reject. No runtime check can
+    tell them apart, so the inversion must be right."""
     truth = {(1, "ch2"): 1}
     reject = np.zeros((4, 4), dtype=bool)
     reject[1, 2] = True
@@ -234,7 +234,7 @@ def test_scores_a_real_registered_filter():
         n_windows=n_win,
     )
     assert keep.shape == (n_win, len(CHS))
-    assert not keep[1, 2] and keep[0, 0]                 # registry convention: True = KEEP
+    assert not keep[1, 2] and keep[0, 0]                 # registry convention: True means keep
 
     truth = {(1, "ch2"): 1}
     assert score_keep_mask(keep, CHS, _cons(truth), "A")["f1"] == 1.0

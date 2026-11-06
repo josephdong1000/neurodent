@@ -4,10 +4,9 @@ Two layers:
 
 * Fast, pure-function tests for the channel blinding (``render_context.blind_channels`` /
   ``neutral_labels``) and de-scramble (``scoring.unblind``).
-* Integration tests that drive the real ``config/datasets/mini_real.yaml`` committed dataset through
-  ``load_animal_recordings`` -> ``render_lro`` -> ``build`` -- the first coverage of the
-  AnimalOrganizer -> LRO -> render path on real data (previously only a synthetic in-memory LRO was
-  tested). Marked ``integration`` + ``slow`` since they load recordings via SpikeInterface.
+* Integration tests that drive the committed ``config/datasets/mini_real.yaml`` dataset through
+  ``load_animal_recordings``, ``render_lro`` and ``build``, covering the AnimalOrganizer to LRO to render
+  path on real data. Marked ``integration`` and ``slow`` since they load recordings via SpikeInterface.
 """
 import csv
 import json
@@ -74,10 +73,12 @@ def test_unblind_round_trip_and_missing_raises():
 
 
 def test_mixed_bundle_union_columns_and_unblind(tmp_path):
-    """One mixed bundle holding an 8-channel and a 10-channel recording, PER-WINDOW blinded: the manifest
-    shares a UNION of neutral slots, geometry stays per-recording (neutral), each window scrambles
-    independently, and ingest -> unblind (keyed on recording, window, slot) drops the blank padding while
-    recovering true channels (and still raises on a LABELLED unmapped cell)."""
+    """One mixed bundle holding an 8-channel and a 10-channel recording, blinded per window.
+
+    The manifest shares the union of neutral slots, geometry stays per recording (neutral), each window is
+    scrambled independently, and ingest then unblind (keyed on recording, window, slot) drops the blank
+    padding while recovering true channels, and still raises on a labeled unmapped cell.
+    """
     fs = 250
     N = 200 * fs                                   # long enough for mid-recording windows + context flanks
     rng = np.random.RandomState(0)
@@ -86,14 +87,14 @@ def test_mixed_bundle_union_columns_and_unblind(tmp_path):
     true8 = ["T8_" + c for c in "ABCDEFGH"]
     true10 = ["T10_" + c for c in "ABCDEFGHIJ"]
 
-    # 8-channel then 10-channel, PER-WINDOW blinded, appended into ONE manifest sharing the 10-slot union.
+    # 8-channel then 10-channel, blinded per window, appended into one manifest sharing the 10-slot union.
     _, km8 = R.render_windows((50e-6 * rng.randn(8, N)).astype("float32"), fs, true8,
                               tmp_path, wins, "rec8", dpi=50, all_channels=union, append=False, blind_seed=1)
     _, km10 = R.render_windows((50e-6 * rng.randn(10, N)).astype("float32"), fs, true10,
                                tmp_path, wins, "rec10", dpi=50, all_channels=union, append=True, blind_seed=1)
     km = pd.DataFrame(km8 + km10)                  # columns: recording, window, slot, channel
 
-    # Manifest header is the union; geometry lists each recording's NEUTRAL slots (no true names).
+    # The manifest header is the union; geometry lists each recording's neutral slots (no true names).
     with open(tmp_path / "manifest.csv") as fh:
         header = next(csv.reader(fh))
     assert [c[len("label_"):] for c in header if c.startswith("label_")] == union
@@ -101,11 +102,11 @@ def test_mixed_bundle_union_columns_and_unblind(tmp_path):
     assert [r["channel"] for r in geom["rec8"]["rows"]] == R.neutral_labels(8)
     assert [r["channel"] for r in geom["rec10"]["rows"]] == union
 
-    # PER-WINDOW: rec10's two windows must have DIFFERENT slot->true maps.
+    # Per window: rec10's two windows have different slot to channel maps.
     m = {(k["window"], k["slot"]): k["channel"] for k in km10}
     assert any(m[(wins[0], s)] != m[(wins[1], s)] for s in union), "windows must scramble independently"
 
-    # build() -> one zip that opens, bakes the union, and leaks no true channel name.
+    # build() gives one zip that opens, bakes the union, and leaks no true channel name.
     zpath = B.build(tmp_path, name="mixed")
     with zipfile.ZipFile(zpath) as zf:
         blob = b"".join(zf.read(n) for n in zf.namelist())
@@ -113,7 +114,7 @@ def test_mixed_bundle_union_columns_and_unblind(tmp_path):
     for t in true8 + true10:
         assert t.encode() not in blob, f"true channel {t!r} leaked into the bundle"
 
-    # Simulate a rater: label each recording's REAL slots, blank the padding (as the HTML export does).
+    # Simulate a rater: label each recording's real slots, blank the padding (as the HTML export does).
     filled = pd.read_csv(tmp_path / "manifest.csv", dtype=str).fillna("")
     for i, r in filled.iterrows():
         real = set(R.neutral_labels(8) if r["recording"] == "rec8" else union)
@@ -128,7 +129,7 @@ def test_mixed_bundle_union_columns_and_unblind(tmp_path):
     assert set(out.loc[out["recording"] == "rec8", "channel"]) == set(true8)     # padding dropped, true recovered
     assert set(out.loc[out["recording"] == "rec10", "channel"]) == set(true10)
 
-    # A LABELLED cell in a padding slot the recording lacks is a real mismatch -> must raise.
+    # A labeled cell in a padding slot the recording lacks is a real mismatch and raises.
     bad = long_df.copy()
     bad.loc[(bad["recording"] == "rec8") & (bad["channel"] == "Ch I"), "y"] = 1
     with pytest.raises(ValueError, match="keymap entry"):
@@ -163,11 +164,11 @@ def test_load_animal_recordings_mini_real(_at_repo_root):
 @pytest.mark.slow
 @pytest.mark.mutates_constants
 def test_animalday_single_source_mini_real(_at_repo_root):
-    """The animalday is a SINGLE SOURCE OF TRUTH: ``from_lros`` stamps ``lro.animalday`` and the WAR reads
-    it, so ``ao.animaldays == war.result['animalday']`` exactly. Previously the WAR re-derived it from the
-    raw folder session while the AO used the parsed date — they diverged for any dataset whose folder
-    session isn't a date (e.g. sox5's "062921" vs "Jul-01-2021"), silently dropping those sessions from
-    LOF filtering and from detector scoring. Guards against that regressing."""
+    """The animalday has one source: ``from_lros`` stamps ``lro.animalday`` and the WAR reads it, so
+    ``ao.animaldays == war.result['animalday']`` exactly. When the WAR derived it from the raw folder session
+    while the AO used the parsed date, the two diverged for any dataset whose folder session is not a date
+    (for example sox5's "062921" against "Jul-01-2021"), dropping those sessions from LOF filtering and
+    detector scoring."""
     pytest.importorskip("spikeinterface")
     from neurodent.analysis import AnimalAnalyzer
 
@@ -180,7 +181,7 @@ def test_animalday_single_source_mini_real(_at_repo_root):
         war = AnimalAnalyzer(ao).compute_windowed_analysis(
             ["rms"], window_s=5, apply_notch_filter=True, multiprocess_mode="serial")
         assert set(ao.animaldays) == set(war.result["animalday"].unique()), \
-            "the WAR animalday column must equal ao.animaldays so every AO<->WAR join lines up"
+            "the WAR animalday column must equal ao.animaldays so every join between AO and WAR lines up"
 
 
 @pytest.mark.integration
@@ -190,15 +191,15 @@ def test_build_cohort_blinded_bundle_mini_real(_at_repo_root, tmp_path):
     """End-to-end: build a blinded cohort bundle, prove blinding holds, and round-trip the labels.
 
     mini_real recordings are 120 s (only one window survives the context-flank margins), so one window
-    per animal is drawn -- enough to exercise cross-animal append (A10 + F22 -> one 10-ch bundle),
-    the keymap, blinding integrity, and ingest -> unblind.
+    per animal is drawn. That is enough to exercise cross-animal append (A10 and F22 into one 10-channel
+    bundle), the keymap, blinding integrity, and ingest then unblind.
     """
     pytest.importorskip("spikeinterface")
 
     rc = C.build_cohort(["mini_real"], tmp_path, n_per_animal=1, seed=0, blind_seed=1)
     assert rc == 0, "no animal should have failed"
 
-    # Keymap lives OUTSIDE any bundle dir and maps neutral slots to canonical channels.
+    # The keymap lives outside any bundle directory and maps neutral slots to canonical channels.
     keymap_csv = tmp_path / "_unblind" / "keymap.csv"
     km = pd.read_csv(keymap_csv)
     assert not km.empty
@@ -225,7 +226,7 @@ def test_build_cohort_blinded_bundle_mini_real(_at_repo_root, tmp_path):
         for true_name in set(km["channel"]):
             assert true_name.encode() not in blob, f"true channel {true_name!r} leaked into {z.name}"
 
-    # Round-trip: a rater labels every neutral slot; ingest -> unblind recovers the true channels.
+    # Round trip: a rater labels every neutral slot; ingest then unblind recovers the true channels.
     filled = pd.read_csv(manifest)
     for c in [c for c in filled.columns if c.startswith("label_")]:
         filled[c] = "clean"
@@ -246,11 +247,12 @@ def test_build_cohort_blinded_bundle_mini_real(_at_repo_root, tmp_path):
 @pytest.mark.slow
 @pytest.mark.mutates_constants
 def test_score_detectors_mini_real(_at_repo_root, tmp_path):
-    """End-to-end DETECTOR scoring on real (tiny) data, proving no drift between the bundle builder and
-    the scorer: build the blinded bundle, fake a rater, then score the fragment detectors via the SHARED
-    ``load_cohort_animal`` seam + the WAR feature path. The key assertion is ``n_uncovered == 0`` -- every
-    labelled window matched a 5 s detector fragment, i.e. the scorer's ``window_s=FRAG_S`` re-extraction
-    lines up 1:1 with what the rater labelled.
+    """End-to-end detector scoring on real (tiny) data, with no drift between bundle builder and scorer.
+
+    Build the blinded bundle, fake a rater, then score the fragment detectors through the shared
+    ``load_cohort_animal`` seam and the WAR feature path. The key assertion is ``n_uncovered == 0``: every
+    labeled window matched a 5 s detector fragment, so the scorer's ``window_s=FRAG_S`` extraction lines up
+    one to one with what the rater labeled.
     """
     pytest.importorskip("spikeinterface")
     from neurodent.analysis import AnimalAnalyzer
@@ -271,7 +273,7 @@ def test_score_detectors_mini_real(_at_repo_root, tmp_path):
     cons = SD.build_consensus({"r1": rater_csv}, keymap_csv, "majority")
     assert not cons.empty
 
-    # Score every labelled animal through the SHARED loader + WAR-gen feature path (window_s=FRAG_S).
+    # Score every labeled animal through the shared loader and the WAR feature path (window_s=FRAG_S).
     config, samples_config = C._prepare("mini_real")
     animals = {r.rsplit("__", 1)[0] for r in cons["recording"].unique()}
     rows, ar_rows = [], []
