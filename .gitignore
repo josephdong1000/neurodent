@@ -44,6 +44,8 @@ notebooks/tests/test_all_functions_Yong.ipynb
 .DS_Store
 *.dat
 !config/labeling/keymap.csv
+!config/labeling/july_n_fragments.csv
+!config/labeling/recording_map.csv
 # committed rater label CSVs (raw ground truth + dev/test splits)
 !scripts/labeling/labels/*.csv
 
