@@ -489,6 +489,9 @@ def _fit_configs(
     unknown = [n for n in configs if n not in _CONFIGS]
     if unknown:
         raise ValueError(f"unknown config(s): {unknown}. Available: {CONFIG_NAMES}")
+    if C < 2 and any(_CONFIGS[n][3] is not None for n in configs):
+        # The reconstruction from zero other channels is all NaN, which would silently disable the search.
+        raise ValueError(f"common-mode (+CMR) configurations need at least 2 channels, got {C}")
 
     spectral = dict(
         representation=representation, fmin=fmin, fmax=fmax, n_frequencies=n_frequencies, n_averages=n_averages
@@ -572,7 +575,8 @@ def fit_configs(
         ``{config: DetectorFit}``.
 
     Raises:
-        ValueError: On an unknown configuration, or input that is not 3-D or holds NaN or inf.
+        ValueError: On an unknown configuration, a common-mode configuration with fewer than 2 channels, or
+            input that is not 3-D or holds NaN or inf.
     """
     return _fit_configs(
         _validated(X),
