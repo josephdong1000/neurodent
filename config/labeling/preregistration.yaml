@@ -1,0 +1,136 @@
+# Pre-registration of the autoreject evaluation on the cohort4strains labels.
+#
+# Everything below is fixed before any detector is scored against the labels. Edit it only while
+# status is "draft". Lock it by setting status to "locked" with the date and committing, before the
+# first cluster run. After that, a change is a new pre-registration with its own date, and results
+# under the old one stay reported.
+
+version: 1
+drafted: 2026-11-05
+status: draft            # set to "locked" and fill locked_on before the first run
+locked_on: null
+
+labels:
+  bundle: cohort4strains           # 500 windows, 4 datasets x 5 animals x 25 windows, 4500 channel cells
+  raters: [JD, JL, Yong]
+  dev_files:
+    JD: scripts/labeling/labels/labels_cohort4strains_JD_dev.csv
+    JL: scripts/labeling/labels/labels_cohort4strains_JL_dev.csv
+    Yong: scripts/labeling/labels/labels_cohort4strains_Yong_dev.csv
+  test_files:
+    JD: scripts/labeling/labels/labels_cohort4strains_JD_test.csv
+    JL: scripts/labeling/labels/labels_cohort4strains_JL_test.csv
+    Yong: scripts/labeling/labels/labels_cohort4strains_Yong_test.csv
+  split: config/labeling/split.json          # 14 dev and 6 test animals, locked 2026-07-24
+  keymap: config/labeling/keymap.csv
+  recording_map: config/labeling/recording_map.csv   # written by the sample-hash check; required
+
+sample_check:
+  # Labels point at windows the July loader produced. Before any score, the hash check must show where
+  # each labeled (recording, window, channel) lands under the current code.
+  scripts: [july_fragment_counts.py, hash_labeled_windows.py, compare_window_hashes.py]
+  usable: >-
+    A labeled recording is mapped only when every one of its cells is classified identical or remapped,
+    all of them point to one current recording, and the July-tree run's fragment count is one of the
+    lengths that reproduce the July window draw (config/labeling/july_n_fragments.csv).
+  other_recordings: >-
+    A recording with any cell classified channel_moved, numeric_only, different, missing or july_missing,
+    with cells spread over several current recordings, or failing the fragment-count check, stays
+    unmapped. Unmapped recordings are left out of every score (extract_dev_features.py --allow-unmapped)
+    and listed with their reasons.
+  temp_directory: >-
+    The current-code hash run uses a fresh temp directory, and every scoring run loads from that same
+    directory (--temp-dir), so scoring reads the intermediates the check validated.
+
+ground_truth:
+  vote: "bad = 1; clean and event = 0; unsure and blank abstain"
+  rules: [majority, any, unanimous]
+  primary: majority                  # at least half of the voting raters say bad; a tie counts as reject
+  reported_alongside: [any, unanimous]
+
+metrics:
+  primary: F1 of reject against the consensus, pooled over cells
+  also: [precision, recall, cohen_kappa, tp, fp, fn, tn, flag_rate]
+
+detectors:
+  filters: [high_rms, low_rms, logrms_range, high_beta, lof]    # one threshold each, tuned on dev labels
+  autoreject: >-
+    adr.grid_config_names() at the locked commit: 38 configurations, 2 peak-to-peak and 36 Welch
+    spectral (n_frequencies 20, 40, 80; n_averages 50, 100, 200; median or mean baseline; with or
+    without the common-mode comparison). Flagging rules as written in July; no labels used.
+  fit_pool_cap: 5000                 # adr.MAX_FIT_FRAGMENTS, labeled windows always in the pool
+  fit_seed: 0
+  fragment_s: 5
+  notch_60hz: per fragment
+  reference_only:
+    - config bad_channels where a dataset config lists them (reported, not selectable)
+
+groups:
+  cv_group: >-
+    Animals that share a config "group" (joint recordings split from the same files) form one group;
+    every other animal is its own group. Dev has 12 groups, test 5.
+
+selection:
+  data: dev split only
+  score: leave-one-group-out F1; a filter's threshold is refit without the held-out group
+  rule: >-
+    Highest leave-one-group-out F1 to 4 decimals. Ties go to the earlier detector in the fixed order:
+    high_rms, low_rms, logrms_range, high_beta, lof, then the grid order.
+  deployed_threshold: a filter's threshold tuned on all dev cells
+
+intervals:
+  level: 0.95
+  method: bootstrap over cv_groups, BCa with percentile fallback
+  resamples: 2000
+  seed: 0
+
+selection_effect:
+  nested_leave_one_group_out: the whole selection repeated inside each outer training part
+  nested_leave_one_dataset_out: the same with datasets as outer folds
+  per_detector_leave_one_dataset_out: each filter's threshold tuned on the other datasets
+
+test:
+  script: score_test.py
+  runs: once                          # it refuses a second run and any test parquet built differently
+  reported: [pooled metrics with interval, per dataset, per group, per animal, event-cell patterns,
+             rater agreement on test cells]
+
+ceiling:
+  rater_agreement: pairwise Cohen's kappa of bad against keep, overall and per dataset; dev in
+    select_detectors.py, test in score_test.py
+
+event_cells:
+  script: report_event_cells.py
+  dev: every detector, with deployed thresholds
+  test: the frozen pick only, inside score_test.py
+
+label_free:
+  # Run after the selection is frozen. No labels are read.
+  animals: >-
+    Two animals per labeled dataset and two iqsec2 animals, drawn with seed 0 from the active animals
+    that are not labeled and that the pipeline's quality filter keeps (genotype not exactly "Unknown",
+    not listed in bad_folder_animalday); one draw, recorded in the run's provenance file.
+  configurations: the frozen pick (if it is an autoreject configuration) and the 6 named ones
+  rejection_rates:
+    script: rejection_rates.py
+    by: [animalday, day_or_night, genotype, channel]
+  injection:
+    script: inject_artifacts.py
+    kinds: [clip, flatline, step, broadband, line60, drift]
+    amplitudes_x_channel_rms: [2, 5, 10, 20]
+    cells_per_kind_and_amplitude: 0.05
+    seed: 0
+
+already_exposed:
+  # Label facts seen before this pre-registration. No choice above may rest on them.
+  - >-
+    Handoff note (2026-11-05): two-rater agreement overall, per category, per dataset and per split;
+    positive counts under each rule; where dev and test positives concentrate; how many positives carry
+    an event vote; how dev positives cluster in all-channel windows; and config bad_channels scored on
+    the four labeled ArxRosa animals.
+  - >-
+    Planning session (2026-11-05): Yong's category counts; pairwise agreement of Yong with JD and with
+    JL, overall and per dataset, over all 500 windows including test; three-rater vote counts.
+  - >-
+    Code review (2026-11-05): positive-window counts in the three joint-recording pairs, and event-cell
+    counts by dataset and split.
