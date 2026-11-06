@@ -8,7 +8,7 @@ The two invariants the handoff insists on carrying forward:
 * **Objective equivalence** — the vectorised running-sum kept-means equal a brute-force per-candidate
   recomputation, including tie-heavy inputs.
 
-Plus a smoke test that all six configs produce a ``(F, C)`` reject mask (exercises the LPSD path serially).
+Plus a smoke test that all six configs produce a ``(F, C)`` reject mask (exercises the Welch spectral path serially).
 """
 import numpy as np
 import pytest
@@ -70,7 +70,7 @@ def test_objective_equals_bruteforce():
 
 
 def test_compute_masks_six_configs_smoke():
-    """All six configs run end-to-end (incl. the LPSD spectral path) and return (F, C) reject masks."""
+    """All six configs run end-to-end (incl. the Welch spectral path) and return (F, C) reject masks."""
     fs, frag = 250, 5
     F, C, T = 40, 4, fs * frag
     rng = np.random.RandomState(2)
@@ -115,7 +115,7 @@ def test_fit_pool_indices_always_includes_labelled_and_caps():
 
 def test_psd_batch_parallel_matches_serial():
     """The dask-parallel psd_batch (one delayed task per fragment) must return the exact spectra the serial
-    fallback returns, for both representations. Every other test calls psd_batch with parallel=False, so this
+    fallback returns. Every other test calls psd_batch with parallel=False, so this
     is the only coverage of the ``_dask.compute(delayed(...))`` branch the real run uses. It runs on dask's
     default scheduler (no cluster needed), so it is deterministic and cheap; we keep the fragment count tiny
     since it is a correctness check, not a benchmark."""
@@ -124,7 +124,7 @@ def test_psd_batch_parallel_matches_serial():
     F, C, T = 6, 3, fs * frag
     X = (50e-6 * np.random.RandomState(7).randn(F, C, T)).astype(float)
 
-    for rep in ("lpsd", "welch"):
+    for rep in ("welch",):
         f_par, p_par = adr.psd_batch(X, fs, representation=rep, parallel=True)    # delayed on the default scheduler
         f_ser, p_ser = adr.psd_batch(X, fs, representation=rep, parallel=False)
         np.testing.assert_allclose(f_par, f_ser, rtol=1e-10, err_msg=f"{rep} freqs differ (parallel vs serial)")

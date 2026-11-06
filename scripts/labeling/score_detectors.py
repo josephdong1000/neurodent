@@ -168,7 +168,7 @@ def main(argv=None):
     ap.add_argument("--lof-threshold", type=float, default=2.5)
     ap.add_argument("--autoreject", action="store_true",
                     help="also score the 6 adapted-autoreject arms (amp/v2/v3 x +/-CMR); builds raw epochs "
-                         "per recording + LPSD (slower)")
+                         "per recording (slower)")
     ap.add_argument("--ar-fit-max-fragments", type=int, default=5000,
                     help="cap on the autoreject fit pool per recording (labelled fragments always included; "
                          "0/negative -> fit on the whole recording)")

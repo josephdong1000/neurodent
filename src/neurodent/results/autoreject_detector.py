@@ -13,8 +13,8 @@ Six configs are auditioned = 3 arms × {self, +CMR}:
 arm                  feature                                   per-fold baseline
 ===================  ========================================  ======================
 ``autoreject``       peak-to-peak amplitude                    none (baseline-free)
-``v2``               RMS-dB deviation of the LPSD log-spectrum  training **median** spectrum
-``v3``               RMS-dB deviation of the LPSD log-spectrum  training **mean** spectrum
+``v2``               RMS-dB deviation of the Welch log-spectrum training **median** spectrum
+``v3``               RMS-dB deviation of the Welch log-spectrum training **mean** spectrum
 ===================  ========================================  ======================
 
 ``+CMR`` appends each channel's all-but-one median reconstruction (a spatial common-mode reference) to that
@@ -37,9 +37,8 @@ Output of :func:`compute_masks`: ``{config_name: (F, C) bool}`` with **True = RE
 :func:`neurodent.results.scoring.score_mask` (``True = REJECT``), or ``score_keep_mask(~mask)`` for the
 ``FILTER_REGISTRY`` ``True = KEEP`` convention.
 
-Verified by ``tests/test_autoreject_detector.py`` (leak invariant + objective == brute force). LPSD uses the
-reference ``lpsd`` package (a hand-rolled estimator invented a spurious ~110 Hz bump); ~19 log bins in
-[1, 200] Hz on a 5 s fragment.
+Verified by ``tests/test_autoreject_detector.py`` (leak invariant + objective == brute force). Spectra use
+scipy's Welch estimator in [1, 200] Hz.
 """
 from __future__ import annotations
 
@@ -50,16 +49,14 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import ShuffleSplit, StratifiedShuffleSplit
 
-import lpsd as _lpsd
-
 try:  # dask is a core dependency, but keep the module importable without a cluster
     import dask as _dask
 except ImportError:  # pragma: no cover
     _dask = None
 
-# LPSD band + resolution, and CV shape — the handoff's reference values.
+# Spectral band + resolution, and CV shape.
 FMIN, FMAX = 1.0, 200.0
-N_FREQ_DES, N_AVG_DES = 40, 100          # a 5 s fragment supports ~19 log bins in [1, 200] Hz
+N_FREQ_DES, N_AVG_DES = 40, 100
 N_FOLDS, N_CAND = 5, 30
 
 
@@ -75,28 +72,14 @@ def spec_feat(sig: np.ndarray, base: np.ndarray) -> np.ndarray:
     return np.sqrt(np.mean((sig - base) ** 2, axis=1))
 
 
-# --------------------------------------------------------------------------- LPSD
-
-def _lpsd_inband(sig: np.ndarray, fs: float, n_frequencies: int, n_averages: int,
-                 fmin: float, fmax: float):
-    """One channel-fragment → (freqs, psd) sliced to [fmin, fmax] via the reference ``lpsd`` estimator."""
-    idx = np.arange(sig.shape[-1]) / fs
-    r = _lpsd.lpsd(pd.Series(sig, index=idx), sample_rate=fs, n_frequencies=n_frequencies,
-                   n_averages=n_averages, detrending_order=0)
-    rf = r.index.to_numpy()
-    band = (rf >= fmin) & (rf <= fmax)
-    return rf[band], np.real(r["psd"].to_numpy())[band]
-
-
 def _welch_inband(sig: np.ndarray, fs: float, n_frequencies: int, n_averages: int,
                   fmin: float, fmax: float):
     """One channel-fragment → (freqs, psd) sliced to [fmin, fmax] via ``scipy.signal.welch``.
 
-    LPSD's ``(n_frequencies, n_averages)`` have no exact Welch analogue, so they are mapped *monotonically*
-    onto Welch's ``(nperseg, noverlap)``: ``nperseg`` is chosen so ~``n_frequencies`` *linear* bins land
-    in-band, and ``noverlap`` so ~``n_averages`` segments are averaged, inverting ``K = (N - noverlap) /
-    (nperseg - noverlap)``, both clamped to what a short (5 s) fragment supports. The two estimators' knobs
-    therefore mean different things, so the grid explores the ``(n_freq, n_avg)`` optimum per-representation.
+    The grid's ``(n_frequencies, n_averages)`` are mapped onto Welch's ``(nperseg, noverlap)``: ``nperseg``
+    is chosen so about ``n_frequencies`` linear bins land in-band, and ``noverlap`` so about ``n_averages``
+    segments are averaged, inverting ``K = (N - noverlap) / (nperseg - noverlap)``, both clamped to what a
+    short (5 s) fragment supports.
     """
     from scipy.signal import welch
 
@@ -109,9 +92,9 @@ def _welch_inband(sig: np.ndarray, fs: float, n_frequencies: int, n_averages: in
     return f[band], np.real(p)[band]
 
 
-def psd_batch(X: np.ndarray, fs: float, *, representation="lpsd", fmin=FMIN, fmax=FMAX,
+def psd_batch(X: np.ndarray, fs: float, *, representation="welch", fmin=FMIN, fmax=FMAX,
               n_frequencies=N_FREQ_DES, n_averages=N_AVG_DES, parallel=True):
-    """``(F, C, T)`` volts → ``(freqs (P,), psd (F, C, P))`` in V²/Hz via ``representation`` ∈ {lpsd, welch}.
+    """``(F, C, T)`` volts → ``(freqs (P,), psd (F, C, P))`` in V²/Hz via ``representation`` (only ``welch``).
 
     The per-fragment spectral estimate is the cost of the spectral arms, so the per-fragment work is fanned
     across dask (one delayed task per fragment computes all its channels) when dask is available and
@@ -121,9 +104,9 @@ def psd_batch(X: np.ndarray, fs: float, *, representation="lpsd", fmin=FMIN, fma
     resume-less grid run. Falls back to a serial loop otherwise. The amplitude arm never calls this.
     """
     Fn, Cn, _ = X.shape
-    inband = {"lpsd": _lpsd_inband, "welch": _welch_inband}.get(representation)
+    inband = {"welch": _welch_inband}.get(representation)
     if inband is None:
-        raise ValueError(f"unknown representation {representation!r}; use 'lpsd' or 'welch'")
+        raise ValueError(f"unknown representation {representation!r}; use 'welch'")
 
     def _frag(xf):  # xf: (C, T) -> (freqs, (C, P))
         rows = [inband(xf[c], fs, n_frequencies, n_averages, fmin, fmax) for c in range(xf.shape[0])]
@@ -313,11 +296,11 @@ def _cmr_wave(X: np.ndarray, c: int) -> np.ndarray:
     return np.median(np.delete(X, c, axis=1), axis=1)
 
 
-def compute_masks(X: np.ndarray, fs: float, *, configs=CONFIG_NAMES, representation="lpsd", n_folds=N_FOLDS,
+def compute_masks(X: np.ndarray, fs: float, *, configs=CONFIG_NAMES, representation="welch", n_folds=N_FOLDS,
                   n_cand=N_CAND, seed=0, fmin=FMIN, fmax=FMAX, n_frequencies=N_FREQ_DES,
                   n_averages=N_AVG_DES, parallel=True) -> dict[str, np.ndarray]:
-    """Run the requested configs on ``X`` ``(F, C, T)`` float **volts**, using spectral ``representation`` ∈
-    {lpsd, welch} for the spectral arms (ignored by the amplitude arm).
+    """Run the requested configs on ``X`` ``(F, C, T)`` float **volts**, using spectral ``representation``
+    (only ``welch``) for the spectral arms (ignored by the amplitude arm).
 
     Returns ``{config_name: (F, C) bool}`` with True = REJECT. The spectra (and their all-but-one CMR
     reconstructions) are computed once, only if a spectral config is requested. Each config runs an
@@ -361,7 +344,7 @@ def compute_masks(X: np.ndarray, fs: float, *, configs=CONFIG_NAMES, representat
 # representation × (n_freq, n_avg); baseline (v2=median, v3=mean) and CMR are already the 4 _SPEC_CONFIGS.
 # To add an autoreject arm to the leaderboard, extend a tuple below (a new representation / n_freq / n_avg) —
 # grid_config_names + compute_masks_grid pick it up, and select_detectors auto-discovers the new mask columns.
-GRID_REPRESENTATIONS = ("lpsd", "welch")
+GRID_REPRESENTATIONS = ("welch",)
 GRID_NFREQ = (20, 40, 80)
 GRID_NAVG = (50, 100, 200)
 _AMP_CONFIGS = ["autoreject/self", "autoreject/self+CMR"]           # representation-free
