@@ -20,7 +20,9 @@ parquet is read only by ``score_test.py``. Nothing derived from label values is 
 Recordings are matched to label keys through ``config/labeling/recording_map.csv`` (see
 ``score_detectors.RecordingMap``). Every run starts from scratch and writes ``--out`` once at the end, only
 after every wanted animal succeeded, so a crash leaves no partial parquet. A ``<out>.provenance.json`` is
-written beside it. The grid is the slow phase; give the job cores and wall time, for example::
+written beside it. Pass the sample-hash check's current-code ``--temp-dir`` as ``--temp-dir`` so MNE-loaded
+recordings read the intermediates that check validated. The grid is the slow phase; give the job cores and wall
+time, for example::
 
     uv run python scripts/labeling/extract_dev_features.py --which dev \\
         --out results/labeling/dev_features.parquet \\
@@ -58,6 +60,7 @@ from score_detectors import (  # noqa: E402  (one consensus, split guard, record
     provenance,
 )
 from neurodent.analysis import AnimalAnalyzer  # noqa: E402
+from neurodent.core.utils.paths import set_temp_directory  # noqa: E402
 from neurodent.results import autoreject_detector as adr  # noqa: E402
 from neurodent.results.feature_utils import extract_linear_array  # noqa: E402
 from neurodent.results.scoring import RATER_CATEGORY_PREFIX  # noqa: E402
@@ -205,6 +208,9 @@ def main(argv=None):
                     help="seed of the fit-pool subsample and cohort iteration; equal seeds and caps give "
                          "score_detectors.py identical fragments")
     ap.add_argument("--workers", type=int, default=None)
+    ap.add_argument("--temp-dir", type=Path, default=None,
+                    help="load intermediates from this directory instead of the config's temp_directory (use the "
+                         "sample-hash check's current-code --temp-dir)")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO)
 
@@ -234,6 +240,8 @@ def main(argv=None):
             if animal_id not in animals_wanted:
                 continue
             cv_group = samples_config.get("_animal_groups", {}).get(animal_id, animal_id)
+            if args.temp_dir is not None:
+                set_temp_directory(args.temp_dir)  # after _prepare, which set the config's directory
             ao = C.load_cohort_animal(samples_config, config, animal_id)
             az = AnimalAnalyzer(ao)
             az.compute_bad_channels(lof_threshold=1.0, lof_chunk_duration_s=args.lof_chunk_duration_s)  # scores only
@@ -303,7 +311,8 @@ def main(argv=None):
     prov = provenance(inputs, script="extract_dev_features", which=args.which, rule=args.rule,
                       raters=sorted(manifests), positional_recordings=args.positional_recordings,
                       ar_max_fit_fragments=args.ar_max_fit_fragments, seed=args.seed,
-                      configs=ar_cols, datasets=list(args.datasets), dropped_recordings=unmatched)
+                      configs=ar_cols, datasets=list(args.datasets), dropped_recordings=unmatched,
+                      temp_dir=None if args.temp_dir is None else str(args.temp_dir))
     Path(str(args.out) + ".provenance.json").write_text(json.dumps(prov, indent=2))
     tmp.rename(args.out)  # --out appears only on full success
     print(f"wrote {len(df)} cells over {df['animal'].nunique()} animals, {df['recording'].nunique()} recordings, "

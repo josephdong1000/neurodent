@@ -23,10 +23,14 @@ scored once, by ``score_test.py``.
 
 Feature extraction over whole recordings is heavy; run it on the cluster::
 
-    uv run python scripts/labeling/score_detectors.py --all \
-        JD=scripts/labeling/labels/labels_cohort4strains_JD_dev.csv \
-        JL=scripts/labeling/labels/labels_cohort4strains_JL_dev.csv \
+    uv run python scripts/labeling/score_detectors.py --all --temp-dir <port hash run temp dir> \\
+        JD=scripts/labeling/labels/labels_cohort4strains_JD_dev.csv \\
+        JL=scripts/labeling/labels/labels_cohort4strains_JL_dev.csv \\
         Yong=scripts/labeling/labels/labels_cohort4strains_Yong_dev.csv
+
+MNE-loaded datasets read converted intermediates from the temp directory, which may hold files written by
+older code. ``--temp-dir`` points loading at the directory the sample-hash check's current-code run filled,
+so scoring reads the intermediates that check validated.
 """
 
 import argparse
@@ -49,6 +53,7 @@ import render_context as R  # noqa: E402  (FRAG_S, the one definition of the win
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "src"))
 from neurodent.analysis import AnimalAnalyzer  # noqa: E402
+from neurodent.core.utils.paths import set_temp_directory  # noqa: E402
 from neurodent.results import autoreject_detector as adr  # noqa: E402
 from neurodent.results.scoring import consensus, ingest, score_keep_mask, score_mask, unblind  # noqa: E402
 
@@ -66,6 +71,7 @@ CODE_FILES = [
     REPO / "scripts/labeling/extract_dev_features.py",
     REPO / "scripts/labeling/select_detectors.py",
     REPO / "scripts/labeling/build_cohort_bundle.py",
+    REPO / "scripts/labeling/render_context.py",
 ]
 
 # Fragment detectors at their config/config.yaml fragment_filter_config settings: name: (WAR keep-mask
@@ -348,6 +354,9 @@ def main(argv=None):
                          "job); extraction over whole recordings is the cost")
     ap.add_argument("--chunk-duration-s", type=float, default=3600,
                     help="seconds of data buffered per chunk during dask extraction (matches the pipeline)")
+    ap.add_argument("--temp-dir", type=Path, default=None,
+                    help="load intermediates from this directory instead of the config's temp_directory (use the "
+                         "sample-hash check's current-code --temp-dir)")
     ap.add_argument("--out", type=Path, default=None,
                     help="write per (recording, detector) rows to this CSV, with a .provenance.json beside it")
     args = ap.parse_args(argv)
@@ -391,6 +400,8 @@ def main(argv=None):
         ):
             if animal_id not in animals_wanted:
                 continue
+            if args.temp_dir is not None:
+                set_temp_directory(args.temp_dir)  # after _prepare, which set the config's directory
             try:
                 ao = C.load_cohort_animal(samples_config, config, animal_id)
                 az = AnimalAnalyzer(ao)
@@ -431,7 +442,8 @@ def main(argv=None):
         prov = provenance(inputs, script="score_detectors", rule=args.rule, raters=sorted(manifests),
                           positional_recordings=args.positional_recordings, lof=args.lof,
                           lof_threshold=args.lof_threshold, autoreject=args.autoreject,
-                          ar_fit_max_fragments=args.ar_fit_max_fragments, seed=args.seed)
+                          ar_fit_max_fragments=args.ar_fit_max_fragments, seed=args.seed,
+                          temp_dir=None if args.temp_dir is None else str(args.temp_dir))
         Path(str(args.out) + ".provenance.json").write_text(json.dumps(prov, indent=2))
         print(f"wrote per-recording rows to {args.out}")
 
