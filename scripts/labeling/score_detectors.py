@@ -176,7 +176,7 @@ def main(argv=None):
     ap.add_argument("--autoreject", action="store_true",
                     help="also score the 6 adapted-autoreject arms (amp/v2/v3 x +/-CMR); builds raw epochs "
                          "per recording (slower)")
-    ap.add_argument("--ar-fit-max-fragments", type=int, default=5000,
+    ap.add_argument("--ar-fit-max-fragments", type=int, default=adr.MAX_FIT_FRAGMENTS,
                     help="cap on the autoreject fit pool per recording (labelled fragments always included; "
                          "0/negative -> fit on the whole recording)")
     ap.add_argument("--limit-per-dataset", type=int, default=None,

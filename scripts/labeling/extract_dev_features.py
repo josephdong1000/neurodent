@@ -142,7 +142,7 @@ def main():
     ap.add_argument("--rule", default="majority", choices=["majority", "unanimous", "any"])
     ap.add_argument("--lof-chunk-duration-s", type=float, default=60)
     ap.add_argument("--chunk-duration-s", type=float, default=3600)
-    ap.add_argument("--ar-max-fit-fragments", type=int, default=2000,
+    ap.add_argument("--ar-max-fit-fragments", type=int, default=adr.MAX_FIT_FRAGMENTS,
                     help="cap on the autoreject fit pool per recording (labelled fragments always included; "
                          "0 -> fit on the whole recording). Smaller = faster; scored cells are unaffected.")
     ap.add_argument("--seed", type=int, default=0,
