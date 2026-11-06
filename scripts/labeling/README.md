@@ -27,7 +27,8 @@ output would flatter it), and tuning and testing are split by animal.
 
 ## Evaluation order
 
-The evaluation is pre-registered in `config/labeling/preregistration.yaml`; lock it before step 2.
+The evaluation is pre-registered in `config/labeling/preregistration.yaml` (locked 2026-11-06); later changes
+go under its `amendments`, dated.
 `CLUSTER_RUNBOOK.md` has the commands.
 
 1. Sample check: `hash_labeled_windows.py` under the July code and the current code, each with its own empty

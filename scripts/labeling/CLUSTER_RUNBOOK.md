@@ -77,12 +77,13 @@ runs load all recordings of 20 animals, about 4 CPUs, 32 GB and 6 h each, as for
 `$TMP/hash_port` now holds the current code's validated intermediates. Every later step passes it as
 `--temp-dir`.
 
-## 3. Lock the pre-registration
+## 3. Commit the recording map
 
-Review `config/labeling/preregistration.yaml`, adjust while it is a draft, then set `status: locked` and
-`locked_on`, and commit it together with `config/labeling/recording_map.csv`. Nothing below runs before this
-commit. If some recordings are unmapped, the pre-registration says they are left out; steps 4 and 6 then
-need `--allow-unmapped`.
+`config/labeling/preregistration.yaml` was locked on 2026-11-06. Commit `config/labeling/recording_map.csv`
+from step 2; nothing below runs before that commit. If some recordings are unmapped, the pre-registration
+says they are left out, and steps 4 and 6 need `--allow-unmapped`. If the hash results call for a change to
+that rule, add a dated entry under `amendments` with its reason before step 4, rather than editing the
+locked text.
 
 ## 4. Dev features
 

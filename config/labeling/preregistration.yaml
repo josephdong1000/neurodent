@@ -7,8 +7,9 @@
 
 version: 1
 drafted: 2026-11-05
-status: draft            # set to "locked" and fill locked_on before the first run
-locked_on: null
+status: locked
+locked_on: 2026-11-06
+amendments: []           # dated changes after locking, each with its reason; earlier results stay reported
 
 labels:
   bundle: cohort4strains           # 500 windows, 4 datasets x 5 animals x 25 windows, 4500 channel cells
