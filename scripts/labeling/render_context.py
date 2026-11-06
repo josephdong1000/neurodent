@@ -1,16 +1,16 @@
 """Render context figures for an artifact-labeling round.
 
-One figure per WINDOW showing ALL channels. Each channel gets its own subplot row with its own FIXED
-y-scale (held constant across windows, and printed on the row, so raters calibrate "normal" amplitude
-and artifacts clip visibly), sharing a time axis, with the target window shaded straight down the
-column and +/- CONTEXT_S of surrounding context, plus a PSD panel of the target beside each trace.
+Each figure shows one window across all channels. Every channel gets its own subplot row on a shared time
+axis, with its own y-scale (printed on the row; computed per window from the visible context unless fixed
+scales are passed), the target window shaded straight down the column, +/- CONTEXT_S of surrounding
+context, and a PSD panel of the target beside each trace.
 
-Above them sits one compact all-channel overview strip spanning +/- OVERVIEW_S (set OVERVIEW_S = None
-to drop it). The zoom panels show morphology; the strip shows whether an event is evolving, which is
-the only reason context exists at all.
+Above the rows sits one compact all-channel overview strip spanning +/- OVERVIEW_S (set OVERVIEW_S to None
+to drop it). The zoom panels show morphology; the strip shows whether an event evolves over time, which is
+what the context is for.
 
-The rater labels each channel for that window (clean / bad / event / unsure), so one image and one
-manifest row cover all channels.
+The rater labels each channel in the window (clean, bad, event or unsure), so one image and one manifest
+row cover all channels.
 
 Call render_windows once per recording with append=True to accumulate many animals into one bundle.
 """
@@ -36,7 +36,7 @@ OVERVIEW_S = 60.0       # flank for the compact all-channel overview strip; None
 FMIN, FMAX = 1.0, 200.0
 YLIM_FLOOR_UV = 10.0        # so a dead channel gets a panel, not a zero-height axis
 PSD_DYNAMIC_RANGE_DB = 80   # so a dead channel cannot stretch the shared axis into uselessness
-AMP_FLAG_MULT = 4.0         # flag a channel (red label) when its scale exceeds this x the median channel
+AMP_FLAG_MULT = 4.0         # flag a channel (red label) when its scale exceeds this multiple of the median
 
 MANIFEST = "manifest.csv"
 GEOMETRY = "geometry.json"      # where each channel's row landed, so the rater page can put that
@@ -44,28 +44,42 @@ GEOMETRY = "geometry.json"      # where each channel's row landed, so the rater 
 
 
 def slug(s):
-    """Filesystem-safe recording id, used to keep image names unique ACROSS recordings."""
+    """Return a filesystem-safe recording id, which keeps image names unique across recordings."""
     return re.sub(r"[^A-Za-z0-9]+", "-", str(s)).strip("-")
 
 
 def trace_ylim(data):
-    """(C,) fixed per-channel uV half-scale for the trace rows.
+    """Return the per-channel half-scale in uV for the trace rows.
 
-    Floored, because a dead channel's p99.5 is 0 and would otherwise get a zero-height axis. It is a
-    `bad` category the rater must be able to see, so it has to render as a flat line, not degenerate.
+    Floored at YLIM_FLOOR_UV, because a dead channel's 99.5th percentile is 0 and would otherwise get a
+    zero-height axis. A flatline is a ``bad`` case the rater has to see, so it renders as a flat line.
+
+    Args:
+        data (np.ndarray): ``(C, N)`` signal in volts.
+
+    Returns:
+        np.ndarray: ``(C,)`` half-scales in uV.
     """
     return np.maximum(1.2 * np.percentile(np.abs(data), 99.5, axis=1) * 1e6, YLIM_FLOOR_UV)
 
 
 def psd_limits(data, fs, win):
-    """(lo, hi) dB for the one shared PSD axis across all channels.
+    """Return the dB limits of the PSD axis shared by all channels.
 
-    Shared because the per-channel time scales necessarily hide the ~20x differences in channel
-    baseline, so this is the only place a uniformly-huge channel is visible.
+    The axis is shared because the per-channel time scales hide the roughly 20x differences in channel
+    baseline, so the PSD panel is the only place a uniformly large channel shows.
 
-    Limits come from the LIVE channels, with the dynamic range capped: a dead channel sits at -200 dB
-    and a naive min()..max() would squash the live ones into a few percent of the axis, ruining the
-    panel for every window. A dead channel instead clips off the bottom, which is the right signal.
+    Limits come from the live channels, with the dynamic range capped at PSD_DYNAMIC_RANGE_DB: a dead
+    channel sits at -200 dB, and a naive min()..max() would squash the live channels into a few percent
+    of the axis in every window. A dead channel instead clips off the bottom.
+
+    Args:
+        data (np.ndarray): ``(C, N)`` signal in volts.
+        fs (float): Sampling rate in Hz.
+        win (int): Window length in samples; Welch segments are ``min(win, 2000)`` samples long.
+
+    Returns:
+        tuple[float, float]: ``(lo, hi)`` in dB, padded by 10 dB on each side.
     """
     f, p = welch(data, fs=fs, nperseg=min(win, 2000), axis=1)
     m = (f >= FMIN) & (f <= FMAX)
@@ -78,6 +92,16 @@ def psd_limits(data, fs, win):
 
 
 def load_fif(fif, crop_s=7200, notch=60.0):
+    """Load the first ``crop_s`` seconds of a .fif recording and notch filter it.
+
+    Args:
+        fif (str | Path): Path to the .fif file.
+        crop_s (float, optional): Seconds to keep from the start. Defaults to 7200.
+        notch (float, optional): Notch frequency in Hz; a falsy value skips the filter. Defaults to 60.0.
+
+    Returns:
+        mne.io.Raw: The loaded recording.
+    """
     raw = mne.io.read_raw_fif(fif, preload=False, verbose=False)
     raw.crop(0, min(crop_s, raw.times[-1])).load_data(verbose=False)
     if notch:
@@ -86,11 +110,22 @@ def load_fif(fif, crop_s=7200, notch=60.0):
 
 
 def select_random(n_windows, n_select, seed=0):
-    """Random, detector-independent, distinct single windows drawn across the whole recording.
+    """Draw distinct windows at random across the whole recording, independent of any detector.
 
-    Adjacent 5 s windows are autocorrelated, so contiguous stretches oversample a few moments;
-    independent draws across the full span give a representative ground-truth sample. A context-flank
-    margin is reserved at both ends so every drawn window keeps its full +/- context on screen.
+    Adjacent 5 s windows are autocorrelated, so contiguous stretches oversample a few moments; independent
+    draws across the full span give a representative ground-truth sample. A margin as wide as the widest
+    context flank is reserved at both ends, so every drawn window keeps its full context on screen.
+
+    Args:
+        n_windows (int): Number of windows in the recording.
+        n_select (int): Number of windows to draw.
+        seed (int, optional): Random seed. Defaults to 0.
+
+    Returns:
+        list[int]: Sorted window indices.
+
+    Raises:
+        ValueError: If fewer than ``n_select`` windows lie outside the margins.
     """
     rng = np.random.RandomState(seed)
     flank = int(np.ceil(max(CONTEXT_S, OVERVIEW_S or 0) / FRAG_S))   # widest context reaches this far
@@ -105,30 +140,49 @@ def select_random(n_windows, n_select, seed=0):
 
 def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=False,
                    sample0=0, ylim=None, psd_lim=None, all_channels=None, blind_seed=None):
-    """data: (C, n_samples) volts for ONE recording, in TRUE channel order. windows: flat list.
+    """Render one figure per window of one recording and write the windows to the manifest.
 
-    Writes one PNG per window into out/images/ and appends rows to out/manifest.csv.
-    Image names are prefixed with the recording slug so multiple recordings never collide.
+    Writes one PNG per window, plus a shared-scale twin (``*__shared.png``), into ``out/images/``, writes
+    rows to ``out/manifest.csv``, and records where each channel's row landed in ``out/geometry.json``.
+    Image names are prefixed with the recording slug, so recordings never collide.
 
     Args:
-        sample0: absolute sample index of ``data[:, 0]``, non-zero when ``data`` is only a span of the
-            recording. Window numbers stay absolute: the number a rater sees and the scorer keys on
-            must be the true one, not an index into whatever slice was loaded.
-        ylim, psd_lim: OPTIONAL fixed scales. When omitted (the default) the amplitude scale is computed
-            PER WINDOW from that window's visible +/- CONTEXT_S zoom context, so a blow-out ELSEWHERE in
-            the recording cannot crush an otherwise-normal window. Pass explicit scales only to force one
-            fixed scale across windows.
-        all_channels: the manifest label-column set (a superset of this recording's display channels).
-            Lets ONE mixed bundle hold recordings with DIFFERENT channel counts; a shorter recording
-            leaves the extra slots blank. Defaults to this recording's own display channels.
-        blind_seed: when not None, EACH window is INDEPENDENTLY channel-blinded — its traces are permuted
-            by a seed derived from ``(blind_seed, recording, window)``, rows are shown under neutral slots
-            (``Ch A`` ...), and a per-``(recording, window, slot)`` keymap is returned. ``ch_names`` is
-            then the TRUE channel names. When None, channels render in order (no keymap).
+        data (np.ndarray): ``(C, n_samples)`` signal in volts for one recording, in true channel order.
+        fs (float): Sampling rate in Hz.
+        ch_names (list[str]): Channel names in ``data`` order; the true names when blinding.
+        out (str | Path): Output directory.
+        windows (list[int]): Absolute window indices to render.
+        recording (str): Recording id written to the manifest and keymap.
+        dpi (int, optional): Image resolution. Defaults to 110.
+        append (bool, optional): Append to an existing manifest and geometry file instead of overwriting
+            them. Defaults to False.
+        sample0 (int, optional): Absolute sample index of ``data[:, 0]``, non-zero when ``data`` is only a
+            span of the recording. Window numbers stay absolute: the number a rater sees and the scorer
+            keys on has to be the true one, not an index into the loaded span. Defaults to 0.
+        ylim (array-like, optional): Fixed per-channel half-scales in uV. When omitted, each window's
+            amplitude scale is computed from its visible +/- CONTEXT_S zoom context, so a blow-out
+            elsewhere in the recording cannot crush an otherwise normal window. Pass it only to force one
+            scale across windows.
+        psd_lim (tuple[float, float], optional): Fixed PSD axis limits in dB. When omitted, computed per
+            window like ``ylim``.
+        all_channels (list[str], optional): Manifest label columns, a superset of this recording's display
+            channels, so one mixed bundle can hold recordings with different channel counts; a shorter
+            recording leaves the extra slots blank. Defaults to this recording's display channels.
+        blind_seed (int, optional): When not None, each window is blinded independently: its traces are
+            permuted by a seed derived from ``(blind_seed, recording, window)``, rows are shown under
+            neutral slots (``Ch A`` ...), and a per-``(recording, window, slot)`` keymap is returned. When
+            None, channels render in order and no keymap is returned. Defaults to None.
 
     Returns:
         tuple[list[dict], list[dict]]: ``(manifest_rows, keymap)``. ``keymap`` is empty unless blinding;
         each entry is ``{"recording", "window", "slot", "channel"}``.
+
+    Raises:
+        ValueError: If a display channel is missing from ``all_channels``, or appending would change the
+            manifest's columns.
+        IndexError: If a window lies outside the loaded span.
+        AssertionError: If channel rows move between windows of the recording, which would put the rater's
+            buttons on the wrong traces.
     """
     out = Path(out)
     img_dir = out / "images"
@@ -137,17 +191,17 @@ def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=
     win = int(FRAG_S * fs)
     rec = slug(recording)
 
-    # Identity vs display: when blinding, the passed ``ch_names`` are the TRUE channels and rows are
-    # shown under neutral slots; the true<->slot mapping is recorded PER WINDOW in the keymap.
+    # Identity and display: when blinding, ch_names are the true channels and rows are shown under neutral
+    # slots; which slot shows which true channel is recorded per window in the keymap.
     blinding = blind_seed is not None
     true_names = list(ch_names)
     display = neutral_labels(C) if blinding else list(ch_names)
     fixed_ylim = None if ylim is None else np.asarray(ylim)
     fixed_psd = None if psd_lim is None else tuple(psd_lim)
 
-    # Manifest label columns use the DISPLAY names. `all_channels` (a superset) lets a mixed bundle share
-    # ONE column set across recordings with different channel counts; a shorter recording leaves the
-    # extra slots blank. Defaults to this recording's own display channels.
+    # Manifest label columns use the display names. all_channels, a superset, lets a mixed bundle share one
+    # column set across recordings with different channel counts; a shorter recording leaves the extra
+    # slots blank. Defaults to this recording's own display channels.
     label_channels = list(all_channels) if all_channels is not None else list(display)
     missing = [c for c in display if c not in label_channels]
     if missing:
@@ -178,23 +232,23 @@ def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=
                 f"[{sample0}, {sample0 + data.shape[1]}). Load a span that covers it.")
         c0 = max(0, t0 - int(CONTEXT_S * fs))
         c1 = min(data.shape[1], t1 + int(CONTEXT_S * fs))
-        ts0, ts1 = (t0 + sample0) / fs, (t1 + sample0) / fs   # absolute bounds -> the manifest only
-        # The x-axis is RELATIVE to the window start (0 = window start), so a rater never sees the
-        # absolute time-of-day (which could bias) and the figure stays blind. Identity lives in the CSV.
+        ts0, ts1 = (t0 + sample0) / fs, (t1 + sample0) / fs   # absolute bounds, for the manifest only
+        # The x-axis is relative to the window start (0 = window start), so a rater never sees the
+        # absolute time of day, which could bias them, and the figure stays blind. Identity lives in the CSV.
         tt = (np.arange(c0, c1) + sample0) / fs - ts0
         wlo, whi = 0.0, ts1 - ts0                             # the labelled window, in relative seconds
 
-        # Per-WINDOW channel blinding: a fresh permutation per (recording, window), so no display slot
-        # can be learned to a true channel across a recording's windows. Row i shows true_names[perm[i]].
+        # Per-window channel blinding: a new permutation per (recording, window), so no display slot can
+        # be learned to a true channel across a recording's windows. Row i shows true_names[perm[i]].
         perm = _channel_perm(f"{blind_seed}:{recording}:{w}", C) if blinding else np.arange(C)
         wdata = data[perm]                                    # (C, N): row i is channel perm[i]
         if blinding:
             keymap += [{"recording": recording, "window": int(w), "slot": display[i],
                         "channel": true_names[int(perm[i])]} for i in range(C)]
 
-        # Per-window amplitude scale from the VISIBLE +/- CONTEXT_S zoom context (not the whole
-        # recording), reordered to the blinded rows: a distant blow-out no longer crushes this window,
-        # while an in-window hot channel still scales high and still trips the red flag below.
+        # Per-window amplitude scale from the visible +/- CONTEXT_S zoom context, not the whole recording,
+        # reordered to the blinded rows: a distant blow-out does not crush this window, while a hot channel
+        # in the window still scales high and still trips the red flag below.
         ylim = (fixed_ylim if fixed_ylim is not None else trace_ylim(data[:, c0:c1]))[perm]
         psd_lim = fixed_psd if fixed_psd is not None else psd_limits(data[:, c0:c1], fs, win)
 
@@ -206,7 +260,7 @@ def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=
                               height_ratios=[2.5] * n_extra + [1] * C)
 
         if OVERVIEW_S:
-            # Evolution strip: per-channel smoothed ENVELOPE, not the raw trace. At this time scale a
+            # Evolution strip: per-channel smoothed envelope, not the raw trace. At this time scale a
             # raw trace is an unreadable smear; the envelope shows whether something builds up,
             # sustains and stops (an event) or is a one-off spike (an artifact). Morphology and
             # rhythmicity are the zoom panels' job below.
@@ -248,7 +302,7 @@ def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=
             f, p = welch(wdata[ci, t0:t1], fs=fs, nperseg=min(win, 2000))
             m = (f >= FMIN) & (f <= FMAX)
             a1.semilogx(f[m], 10 * np.log10(p[m] + 1e-20), lw=0.9, color="C0")
-            a1.set_ylim(*psd_lim)                     # SHARED across channels: height = absolute power
+            a1.set_ylim(*psd_lim)                     # shared across channels, so height is absolute power
             a1.tick_params(labelsize=7, pad=1)
             if ci < C - 1:
                 a1.set_xticklabels([])
@@ -258,7 +312,7 @@ def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=
                 a0.set_xlabel("s", fontsize=8)
                 a1.set_xlabel("Hz", fontsize=8)
 
-        # No recording / window / absolute time in the title: raters label blind (identity is in the CSV).
+        # No recording, window or absolute time in the title: raters label blind; identity is in the CSV.
         fig.suptitle("shaded = the window to label   •   time scales are PER-CHANNEL; the PSD axis is "
                      "shared   •   a red channel label is unusually high-amplitude", fontsize=10)
         fig.tight_layout(rect=[0, 0, 1, 0.975], h_pad=0.15)
@@ -312,7 +366,10 @@ def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=
 
 
 def _contiguous_runs(windows):
-    """[1,2,3, 9,10] -> [[1,2,3], [9,10]]. Each run is loaded as one span."""
+    """Group window indices into runs of consecutive indices; each run is loaded as one span.
+
+    For example ``[1, 2, 3, 9, 10]`` gives ``[[1, 2, 3], [9, 10]]``. Duplicates are dropped.
+    """
     runs = []
     for w in sorted(set(int(x) for x in windows)):
         if runs and w == runs[-1][-1] + 1:
@@ -323,10 +380,17 @@ def _contiguous_runs(windows):
 
 
 def lro_scales(lan, n_probe=24):
-    """Per-channel y-scale and shared PSD axis, estimated across the whole recording.
+    """Estimate a fixed per-channel y-scale and shared PSD axis across the whole recording.
 
-    Estimated once, not per span: the fixed scale only works as a calibration aid if it does not shift
+    Estimated once, not per span: a fixed scale only works as a calibration aid if it does not shift
     between stretches.
+
+    Args:
+        lan (LongRecordingAnalyzer): Analyzer over the recording.
+        n_probe (int, optional): Number of evenly spaced fragments to sample. Defaults to 24.
+
+    Returns:
+        tuple[np.ndarray, tuple[float, float]]: ``(ylim, psd_lim)``, as :func:`render_windows` accepts them.
     """
     idxs = np.unique(np.linspace(0, lan.n_fragments - 1, n_probe).astype(int))
     probe = np.concatenate([lan.get_fragment_np(int(i)) for i in idxs], axis=0).T * 1e-6  # (C, N) volts
@@ -335,11 +399,17 @@ def lro_scales(lan, n_probe=24):
 
 
 def neutral_labels(n):
-    """Neutral channel display names (``Ch A``, ``Ch B``, ...), which blind anatomy.
+    """Return neutral channel display names (``Ch A``, ``Ch B``, ...) that hide anatomy.
 
-    Raters must not be able to read a channel's anatomy off its label (a montage
-    aid becomes a bias), so trace rows are named by opaque slot. Falls back to
-    two-letter slots (``Ch AA``) past 26 channels.
+    A rater who can read a channel's anatomy off its label is biased by it (a montage aid becomes a bias),
+    so trace rows are named by opaque slot. Past 26 channels the names continue with two letters
+    (``Ch AA``).
+
+    Args:
+        n (int): Number of names.
+
+    Returns:
+        list[str]: The names, in slot order.
     """
     out = []
     for i in range(n):
@@ -354,11 +424,10 @@ def neutral_labels(n):
 
 
 def _channel_perm(seed_key, n):
-    """Deterministic permutation of ``n`` channel rows from a hashed ``seed_key``.
+    """Return a deterministic permutation of ``n`` channel rows, seeded by a hash of ``seed_key``.
 
-    Used both for the (legacy) per-recording :func:`blind_channels` and — keyed on
-    ``f"{blind_seed}:{recording}:{window}"`` — for the per-WINDOW blinding in
-    :func:`render_windows`, so no display slot can be learned to a true channel across a
+    Used by :func:`blind_channels` and, keyed on ``f"{blind_seed}:{recording}:{window}"``, by the per-window
+    blinding in :func:`render_windows`, so no display slot can be learned to a true channel across a
     recording's windows.
     """
     digest = hashlib.sha256(str(seed_key).encode()).digest()
@@ -367,21 +436,21 @@ def _channel_perm(seed_key, n):
 
 
 def blind_channels(channel_names, seed_key):
-    """Deterministic channel blinding for a single ``seed_key`` (one permutation).
+    """Blind channels with one deterministic permutation for ``seed_key``.
 
-    Draws a permutation of the channel axis from a seed derived from ``seed_key`` and names the
-    permuted slots with :func:`neutral_labels`. (The cohort bundler now blinds per WINDOW inside
-    :func:`render_windows`; this remains the single-permutation primitive/utility.)
+    Draws a permutation of the channel axis from a seed derived from ``seed_key`` and names the permuted
+    slots with :func:`neutral_labels`. The cohort bundler blinds each window separately inside
+    :func:`render_windows`; this is the single-permutation version.
 
     Args:
         channel_names (list[str]): True channel names, in recording order.
         seed_key: Any value; hashed to seed the permutation deterministically.
 
     Returns:
-        tuple[np.ndarray, list[str], list[dict]]: ``(perm, display_names, keymap)``
-        where ``perm`` reorders the channel axis (row ``i`` shows ``channel_names[perm[i]]``),
-        ``display_names`` are the neutral labels, and ``keymap`` is the de-scramble record —
-        one ``{"slot": <neutral>, "channel": <true name>}`` per slot.
+        tuple[np.ndarray, list[str], list[dict]]: ``(perm, display_names, keymap)``, where ``perm``
+        reorders the channel axis (row ``i`` shows ``channel_names[perm[i]]``), ``display_names`` are the
+        neutral labels, and ``keymap`` is the unblinding record, one
+        ``{"slot": <neutral>, "channel": <true name>}`` per slot.
     """
     n = len(channel_names)
     perm = _channel_perm(seed_key, n)
@@ -392,24 +461,43 @@ def blind_channels(channel_names, seed_key):
 
 def render_lro(lrec, out, windows=None, recording=None, append=False, dpi=110, notch=True,
                n_select=None, seed=0, blind_seed=None, all_channels=None, true_names=None):
-    """Render from a LongRecording, i.e. any format the loader reads (rhd/EDF/NWB/bin).
+    """Render windows from a LongRecordingOrganizer, so from any format the loader reads (rhd, EDF, NWB, bin).
 
     The loader knows each format's import parameters, so this is how a real campaign renders; nothing
-    needs converting to fif. Pass explicit `windows` (e.g. a cross-animal draw) or let it draw random
-    windows across this recording.
+    needs converting to fif. Pass explicit ``windows`` (for example a cross-animal draw), or ``n_select`` to
+    draw random windows across this recording.
 
-    Units: get_fragment_np gives (n_samples, n_channels) in uV, render_windows wants
-    (n_channels, n_samples) in volts. Notch is applied per fragment by LongRecordingAnalyzer, so the
-    rater and the detector see the same signal as the WAR features.
+    ``get_fragment_np`` gives ``(n_samples, n_channels)`` in uV, and :func:`render_windows` takes
+    ``(n_channels, n_samples)`` in volts. LongRecordingAnalyzer applies the notch filter per fragment, so
+    the rater and the detectors see the same signal as the WAR features. The amplitude scale is computed
+    per window over its visible +/- CONTEXT_S context.
 
-    Channel blinding: pass ``blind_seed`` to blind each window INDEPENDENTLY (see
-    :func:`render_windows`) — traces permuted per ``(recording, window)``, rows shown under neutral
-    slots so anatomy cannot bias the rater, and a per-``(recording, window, slot)`` keymap returned for
-    the caller to unblind the labels. Default ``None`` renders true channels in order. Amplitude scale is
-    computed per window over its visible +/- CONTEXT_S context.
+    Args:
+        lrec (LongRecordingOrganizer): Recording to render.
+        out (str | Path): Output directory.
+        windows (list[int], optional): Window indices to render. Defaults to a random draw of ``n_select``.
+        recording (str, optional): Recording id used in the manifest, image names and keymap.
+        append (bool, optional): Append to an existing manifest. Defaults to False.
+        dpi (int, optional): Image resolution. Defaults to 110.
+        notch (bool, optional): Apply the notch filter per fragment. Defaults to True.
+        n_select (int, optional): Number of random windows to draw when ``windows`` is not given.
+        seed (int, optional): Seed for the random draw. Defaults to 0.
+        blind_seed (int, optional): When not None, blinds each window independently (see
+            :func:`render_windows`): traces are permuted per ``(recording, window)``, rows are shown under
+            neutral slots so anatomy cannot bias the rater, and a per-``(recording, window, slot)`` keymap
+            is returned for unblinding the labels. None renders true channels in order. Defaults to None.
+        all_channels (list[str], optional): Manifest label columns; see :func:`render_windows`.
+        true_names (list[str], optional): True channel names for the keymap, one per recording channel.
+            Defaults to the recording's own channel names.
 
     Returns:
-        tuple[list[dict], list[dict]]: ``(manifest_rows, keymap)`` (keymap empty when not blinding).
+        tuple[list[dict], list[dict]]: ``(manifest_rows, keymap)``; ``keymap`` is empty when not blinding.
+
+    Raises:
+        ValueError: If neither ``windows`` nor ``n_select`` is given, ``n_select`` distinct windows cannot be
+            drawn, ``true_names`` does not have one entry per channel, a display channel is missing from
+            ``all_channels``, or appending would change the manifest's columns.
+        IndexError: If a window lies outside the loaded span.
     """
     from neurodent.analysis.long_recording_analyzer import LongRecordingAnalyzer
 
@@ -420,8 +508,8 @@ def render_lro(lrec, out, windows=None, recording=None, append=False, dpi=110, n
     win = int(FRAG_S * fs)
     if windows is None:
         windows = select_random(lan.n_fragments, n_select, seed=seed)
-    # TRUE channel names for the keymap/labels. Callers pass canonical abbrevs (resolve_channels) so the
-    # de-scramble key stores anatomy, not raw ids; default to the recording's own channel names.
+    # True channel names for the keymap. Callers pass canonical abbreviations (resolve_channels), so the
+    # unblinding key stores anatomy rather than raw ids; defaults to the recording's own channel names.
     ch_names = list(true_names) if true_names is not None else list(lan.channel_names)
     if len(ch_names) != len(lan.channel_names):
         raise ValueError(f"true_names has {len(ch_names)} entries, recording has {len(lan.channel_names)} channels")
@@ -434,7 +522,7 @@ def render_lro(lrec, out, windows=None, recording=None, append=False, dpi=110, n
         f0 = max(0, run[0] - flank_frags)
         f1 = min(lan.n_fragments, run[-1] + 1 + flank_frags)
         span = np.concatenate([lan.get_fragment_np(int(i)) for i in range(f0, f1)], axis=0)
-        data = span.T * 1e-6                                    # (C, N) µV -> volts, TRUE channel order
+        data = span.T * 1e-6                                    # (C, N) in volts, true channel order
         r, k = render_windows(data, fs, ch_names, out, run, recording,
                               dpi=dpi, append=append or bool(rows), sample0=f0 * win,
                               all_channels=all_channels, blind_seed=blind_seed)
@@ -445,7 +533,28 @@ def render_lro(lrec, out, windows=None, recording=None, append=False, dpi=110, n
 
 def render_fif(fif, out, windows=None, n_select=None,
                crop_s=7200, seed=0, append=False, recording=None):
-    """Render one .fif. Pass explicit `windows` (your own selection) or `n_select` to draw at random."""
+    """Render windows from one .fif file.
+
+    Args:
+        fif (str | Path): Path to the .fif file.
+        out (str | Path): Output directory.
+        windows (list[int], optional): Window indices to render, your own selection. Defaults to a random
+            draw of ``n_select``.
+        n_select (int, optional): Number of random windows to draw when ``windows`` is not given.
+        crop_s (float, optional): Seconds to load from the start of the file. Defaults to 7200.
+        seed (int, optional): Seed for the random draw. Defaults to 0.
+        append (bool, optional): Append to an existing manifest. Defaults to False.
+        recording (str, optional): Recording id. Defaults to the file stem.
+
+    Returns:
+        list[dict]: Manifest rows.
+
+    Raises:
+        ValueError: If neither ``windows`` nor ``n_select`` is given, ``n_select`` distinct windows cannot be
+            drawn, a display channel is missing from ``all_channels``, or appending would change the
+            manifest's columns.
+        IndexError: If a window lies outside the loaded span.
+    """
     if windows is None and n_select is None:
         raise ValueError("pass windows=[...] or n_select=<how many windows to draw at random>")
     raw = load_fif(fif, crop_s=crop_s)

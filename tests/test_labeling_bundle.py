@@ -1,4 +1,4 @@
-"""Tests for the labeling tooling: rendering, geometry, and the rater bundle (issue #208).
+"""Tests for the labeling tooling: rendering, geometry, and the rater bundle.
 
 The scorer these feed is tested in tests/test_scoring.py.
 
@@ -29,6 +29,7 @@ CHS = ["ch0", "ch1", "ch2", "ch3"]
 
 
 def synth(n_ch=4, secs=200, seed=0):
+    """Return ``(n_ch, secs * FS)`` Gaussian noise in volts with a 50 uV standard deviation."""
     return np.random.RandomState(seed).randn(n_ch, secs * FS) * 50e-6
 
 
@@ -44,7 +45,7 @@ def test_geometry_is_stable_across_windows(tmp_path):
 
 
 def test_geometry_drift_is_caught(tmp_path, monkeypatch):
-    """The guard must actually fire -- otherwise it is decoration."""
+    """The drift guard has to fire when a window lays out differently; otherwise it is decoration."""
     d = synth()
     calls = {"n": 0}
     real = R.plt.figure
@@ -90,9 +91,9 @@ def test_geometry_rows_land_on_the_right_channel_in_pixels(tmp_path):
 # --------------------------------------------------------------------------- dead channel
 
 def _live_axis_occupancy(psd_lim, data, fs, win):
-    """What fraction of the shared PSD axis the LIVE channels actually occupy, given limits.
+    """Return the fraction of the shared PSD axis that the live channels occupy under ``psd_lim``.
 
-    Deliberately NOT a copy of psd_limits' internals -- it measures the limits the code returns, so a
+    Deliberately not a copy of psd_limits' internals: it measures the limits the code returns, so a
     regression to a naive min()..max() makes this shrink and the test fail.
     """
     from scipy.signal import welch
@@ -105,8 +106,11 @@ def _live_axis_occupancy(psd_lim, data, fs, win):
 
 
 def test_dead_channel_still_renders_and_does_not_wreck_the_shared_psd_axis(tmp_path):
-    """Flatline is a `bad` category, so it will appear. Read naively it is -200 dB and stretches the
-    shared PSD axis until the live channels occupy a few percent of it, ruining every PSD panel."""
+    """A flatline channel still renders and does not wreck the shared PSD axis.
+
+    Flatline is a ``bad`` case, so it will appear. Read naively it is -200 dB and stretches the shared PSD
+    axis until the live channels occupy a few percent of it, ruining every PSD panel.
+    """
     d = synth()
     d[2] = 0.0                                       # disconnected electrode
     win = int(R.FRAG_S * FS)
@@ -134,8 +138,11 @@ def test_dead_channel_still_renders_and_does_not_wreck_the_shared_psd_axis(tmp_p
 # --------------------------------------------------------------------------- cross-animal append
 
 def test_append_with_different_channels_is_refused(tmp_path):
-    """The multi-animal path. Silently writing animal 2's labels under animal 1's channel names would
-    corrupt the ground truth across the whole campaign."""
+    """Appending a recording with different channels to an existing manifest raises.
+
+    This is the multi-animal path. Silently writing animal 2's labels under animal 1's channel names would
+    corrupt the ground truth across the whole campaign.
+    """
     R.render_windows(synth(4), FS, ["a", "b", "c", "d"], tmp_path, [5], "R1", dpi=60)
     with pytest.raises(ValueError, match="do not match the existing manifest"):
         R.render_windows(synth(3), FS, ["x", "y", "z"], tmp_path, [5], "R2", append=True, dpi=60)
@@ -154,18 +161,18 @@ def test_append_with_same_channels_accumulates(tmp_path):
 
 @pytest.fixture(scope="session")
 def chromium():
-    """Playwright's ``sync_api`` for the browser round-trip tests, SKIPPING when no chromium is launchable.
+    """Return Playwright's ``sync_api`` for the browser tests, skipping them when chromium cannot launch.
 
     ``importorskip`` alone is not enough: the ``playwright`` package can be installed without a browser
-    binary (``playwright install`` never run), and then ``launch()`` raises 'Executable doesn't exist'. We
-    probe a launch once per session and skip (not fail) if it is unavailable — so a plain ``uv run pytest``
-    on a machine without the browser shows SKIPs.
+    binary (``playwright install`` never run), and then ``launch()`` raises "Executable doesn't exist". The
+    fixture probes one launch per session and skips rather than fails when it is unavailable, so a plain
+    ``uv run pytest`` on a machine without the browser reports skips.
     """
     pw = pytest.importorskip("playwright.sync_api")
     try:
         with pw.sync_playwright() as p:
             p.chromium.launch().close()
-    except Exception as e:  # no browser binary, sandbox issue, etc. -> skip, don't fail
+    except Exception as e:  # no browser binary, a sandbox issue, and so on: skip, do not fail
         pytest.skip(f"playwright chromium unavailable ({type(e).__name__}); run `playwright install chromium`")
     return pw
 
@@ -173,12 +180,12 @@ def chromium():
 @pytest.mark.slow
 @pytest.mark.browser
 def test_end_to_end_known_artifacts_survive_the_round_trip(tmp_path, chromium):
-    """Inject artifacts at known (window, channel) cells, render, bundle, drive the real page, click
-    exactly those cells, export, ingest, score.
+    """Labels clicked on known (window, channel) cells come back on those cells after the round trip.
 
-    Raters see windows in a per-rater shuffled order, so this is what proves cell identity survives
-    image -> manifest -> bundle -> shuffled display -> CSV -> consensus -> score. A perfect detector
-    must come back at F1 = 1.0; less means the plumbing moved a label.
+    Injects artifacts at known cells, renders, bundles, drives the real page, clicks exactly those cells,
+    exports, ingests and scores. Raters see windows in a per-rater shuffled order, so this is what shows
+    that cell identity survives the image, manifest, bundle, shuffled display, CSV, consensus and score. A
+    perfect detector has to come back at F1 = 1.0; less means the plumbing moved a label.
     """
     pw = chromium
 
@@ -205,7 +212,7 @@ def test_end_to_end_known_artifacts_survive_the_round_trip(tmp_path, chromium):
         page.goto(f"file://{(work / 'index.html').resolve()}")
         page.wait_for_selector(".rowctl")
 
-        # Walk every window IN THE ORDER THE RATER SEES IT (shuffled), clicking `bad` on the cells we
+        # Walk every window in the order the rater sees it (shuffled), clicking `bad` on the cells we
         # injected. We locate the window by what the page reports, never by display position.
         seen = set()
         for _ in range(len(windows)):
@@ -249,9 +256,12 @@ def test_end_to_end_known_artifacts_survive_the_round_trip(tmp_path, chromium):
 @pytest.mark.slow
 @pytest.mark.browser
 def test_seen_tracking_and_portable_resume(tmp_path, chromium):
-    """The CSV is a complete record and the rater never loses their place: every window is exported
-    with a `seen` flag (unseen rows blank, so 'judged clean' != 'never seen'); importing on a fresh
-    machine restores labels and resumes at the first unseen window."""
+    """The exported CSV is a complete record, and importing it resumes at the first unseen window.
+
+    Every window is exported with a ``seen`` flag and unseen rows are blank, so judged clean and never seen
+    stay distinct. Importing on a fresh machine restores the labels and resumes at the first unseen window,
+    so the rater never loses their place.
+    """
     import csv as _csv
     pw = chromium
 
@@ -290,7 +300,7 @@ def test_seen_tracking_and_portable_resume(tmp_path, chromium):
         assert len(seen_rows) == 3 and len(unseen_rows) == n - 3
         assert all(all(r[c] == "" for c in label_cols) for r in unseen_rows), "unseen rows must be blank"
 
-        ctx2 = br.new_context()                               # FRESH machine: empty localStorage
+        ctx2 = br.new_context()                               # fresh machine: empty localStorage
         pg2 = ctx2.new_page()
         pg2.on("dialog", lambda dl: dl.accept("rater1"))
         pg2.goto(url); pg2.wait_for_selector(".rowctl")
@@ -314,9 +324,11 @@ def test_seen_tracking_and_portable_resume(tmp_path, chromium):
 @pytest.mark.slow
 @pytest.mark.browser
 def test_export_import_export_is_idempotent(tmp_path, chromium):
-    """Import must not fabricate a judgment. The airtightness fuzz caught that rendering the resume
-    window marked it seen + all-clean, so export->import->export drifted (an unreviewed window became
-    a 'clean' reviewed one, polluting ground truth). A window is 'seen' only when the rater ENGAGES it.
+    """Export, import and export again is a fixed point: import does not fabricate a judgment.
+
+    Rendering the resume window after an import must not mark it seen and all clean, or an unreviewed
+    window becomes a reviewed clean one and pollutes the ground truth. A window is seen only when the rater
+    engages it.
     """
     import csv as _csv
     pw = chromium
@@ -350,7 +362,7 @@ def test_export_import_export_is_idempotent(tmp_path, chromium):
     with pw.sync_playwright() as p:
         br = p.chromium.launch()
         rows1, csv1 = export_from(br, label_some, "csv1.csv")
-        # fresh context: import csv1, DO NOT engage anything, re-export
+        # fresh context: import csv1, engage nothing, export again
         rows2, _ = export_from(br, lambda pg: (pg.set_input_files("#impFile", str(csv1)), pg.wait_for_timeout(200)), "csv2.csv")
         br.close()
 
@@ -360,14 +372,17 @@ def test_export_import_export_is_idempotent(tmp_path, chromium):
     seen1 = {w for w, (s, _) in k1.items() if s == "1"}
     seen2 = {w for w, (s, _) in k2.items() if s == "1"}
     assert seen2 == seen1, f"import fabricated seen windows: {seen2 - seen1}"
-    assert k2 == k1, "export -> import -> export is not a fixed point (labels/seen drifted)"
+    assert k2 == k1, "export, import, export is not a fixed point (labels or seen flags drifted)"
 
 
 # --------------------------------------------------------------------------- window selection
 
 def test_select_random_spans_recording_no_dupes_margins_respected():
-    """Ground truth is only representative if windows are drawn across the whole recording, not from a
-    couple of autocorrelated stretches. The margin keeps every window's context on screen."""
+    """Random windows are distinct, span the whole recording, respect the margins, and follow the seed.
+
+    Ground truth is only representative if windows are drawn across the whole recording, not from a couple
+    of autocorrelated stretches. The margin keeps every window's context on screen.
+    """
     n_win = 1440                                             # 7200 s / 5 s
     flank = int(np.ceil(max(R.CONTEXT_S, R.OVERVIEW_S or 0) / R.FRAG_S))
     sel = R.select_random(n_win, 50, seed=0)
@@ -381,8 +396,10 @@ def test_select_random_spans_recording_no_dupes_margins_respected():
 
 
 def test_select_random_refuses_an_impossible_draw():
-    """Asking for more distinct windows than the margin leaves must raise, not silently return fewer:
-    a short bundle is a biased bundle."""
+    """Asking for more distinct windows than the margins leave raises rather than returning fewer.
+
+    A short bundle is a biased bundle.
+    """
     with pytest.raises(ValueError, match="cannot draw"):
         R.select_random(30, 50)
 
@@ -390,7 +407,9 @@ def test_select_random_refuses_an_impossible_draw():
 # --------------------------------------------------------------------------- render via the loader
 
 def test_render_lro_uses_absolute_windows_and_correct_units(tmp_path):
-    """Two traps render_lro must not fall into:
+    """render_lro keeps window numbers absolute and converts uV to volts.
+
+    Two traps render_lro must not fall into:
 
     - get_fragment_np gives (n_samples, n_channels) in uV; render_windows wants (n_channels,
       n_samples) in volts. A missed transpose or 1e-6 makes every y-scale nonsense.
@@ -424,7 +443,7 @@ def test_render_lro_uses_absolute_windows_and_correct_units(tmp_path):
     assert got_t == [pytest.approx(w * R.FRAG_S) for w in windows], (
         f"window times are span-relative, not absolute: {got_t}")
 
-    # The y-scale must reflect a ~100 µV signal. If the µV->V conversion were skipped the scale would
+    # The y-scale must reflect a ~100 µV signal. If the µV to V conversion were skipped the scale would
     # be ~1e6 times larger; if applied twice, ~1e6 times smaller.
     from neurodent.analysis.long_recording_analyzer import LongRecordingAnalyzer
 

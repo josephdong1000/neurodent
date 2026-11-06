@@ -1,22 +1,25 @@
 #!/usr/bin/env python
-"""Verify the committed animal-level train(dev)/test split against the live cohort — it does NOT re-draw.
+"""Verify the committed animal-level dev/test split against the live cohort, without redrawing it.
 
-The split was LOCKED once by a seed-0 draw stratified by STRAIN (recording modality/montage — metadata
-fixed before any labels): each strain contributes >=1 test animal, the two extra go to two seeded-random
-strains; NO label/prevalence peeking, NO re-rolls. That draw is frozen in ``config/labeling/split.json``.
+The split was drawn once with seed 0, stratified by strain (recording modality and montage, metadata fixed
+before any labels): each strain contributes at least one test animal, and the two remaining test animals go
+to two strains picked by the seeded draw, with no look at labels or prevalence and no redraws. That draw is
+stored in ``config/labeling/split.json``.
 
-**Why this script no longer draws.** The original draw did ``rng.sample(animals_of_strain, k)``, so the
-*within-strain ordering* of the animal list was load-bearing — it, together with seed 0, fixed exactly which
-animals are sealed. That order was hand-listed and is NOT recoverable from any canonical sort of the cohort
-(the canonical ``iter_cohort_animals`` enumeration orders animals differently), so re-deriving the list and
-re-drawing would silently change the test set. The lock is therefore a committed artifact; this script only
-checks it stays consistent, deriving the cohort from canonical sources (no hardcoded animal list):
+The script does not redraw because the draw used ``rng.sample(animals_of_strain, k)``: the order of the
+animals within each strain, together with seed 0, decided which animals went to test. That order was listed
+by hand and does not match any canonical sort of the cohort (``iter_cohort_animals`` orders animals
+differently), so rebuilding the list and redrawing would change the test set. The split is therefore a
+committed file, and this script checks that it stays consistent with the cohort, which it derives from
+canonical sources rather than a hardcoded animal list:
 
-  * the labelled animals   <- the committed keymap (``config/labeling/keymap.csv``)
-  * each animal's strain    <- ``build_cohort_bundle.iter_cohort_animals`` (dataset == strain)
+* the labelled animals, from the committed keymap (``config/labeling/keymap.csv``)
+* each animal's strain, from ``build_cohort_bundle.iter_cohort_animals`` (the dataset is the strain)
 
-    uv run python scripts/labeling/make_split.py            # verify; exits non-zero on drift
-    uv run python scripts/labeling/make_split.py --skip-strain   # fast: partition check only (no cohort load)
+Usage::
+
+    uv run python scripts/labeling/make_split.py                 # verify; exits non-zero on drift
+    uv run python scripts/labeling/make_split.py --skip-strain   # partition check only, no cohort load
 """
 import argparse
 import csv
@@ -35,13 +38,26 @@ N_TEST = 6
 
 
 def labelled_cohort():
-    """The animals actually in the shipped bundle -> the committed keymap (canonical; no hardcoding)."""
+    """Return the animals in the shipped bundle, read from the committed keymap.
+
+    Returns:
+        set[str]: Animal ids.
+    """
     with open(KEYMAP, newline="") as f:
         return {r["recording"].rsplit("__", 1)[0] for r in csv.DictReader(f)}
 
 
 def strain_of(animals):
-    """animal -> strain (dataset) via the blessed cohort seam the bundle/scorer share (no drift)."""
+    """Map animals to their strain (dataset) through the cohort iterator the bundle and scorers share.
+
+    Disables info logging for the rest of the process.
+
+    Args:
+        animals (set[str]): Animal ids to look up.
+
+    Returns:
+        dict[str, str]: Strain per animal, for the animals found in the cohort.
+    """
     import build_cohort_bundle as C  # heavy (pulls the loader stack); only imported when the strain check runs
     logging.disable(logging.INFO)
     m = {}
@@ -52,6 +68,12 @@ def strain_of(animals):
 
 
 def main():
+    """Check the committed split against the labelled cohort and print the partition.
+
+    Raises:
+        SystemExit: With status 1 if the test and dev sets overlap, do not partition the labelled cohort,
+            the test set has the wrong size, or a strain has no test animal.
+    """
     ap = argparse.ArgumentParser(description="Verify the committed dev/test split against the live cohort.")
     ap.add_argument("--skip-strain", action="store_true",
                     help="skip the canonical strain-coverage check (avoids loading the cohort seam)")
@@ -61,21 +83,21 @@ def main():
     split = json.loads(SPLIT.read_text())
     test, dev = set(split["test"]), set(split["dev"])
 
-    # ---- core integrity: the committed lock partitions EXACTLY the labelled cohort ----
+    # ---- core integrity: the committed split partitions exactly the labelled cohort ----
     errs = []
     if test & dev:
-        errs.append(f"test/dev overlap: {sorted(test & dev)}")
+        errs.append(f"test and dev overlap: {sorted(test & dev)}")
     if test | dev != cohort:
-        errs.append(f"partition != labelled cohort; missing={sorted(cohort - (test | dev))} "
-                    f"extra={sorted((test | dev) - cohort)}")
+        errs.append(f"test and dev do not partition the labelled cohort; missing {sorted(cohort - (test | dev))}, "
+                    f"extra {sorted((test | dev) - cohort)}")
     if len(test) != N_TEST:
-        errs.append(f"|test|={len(test)} != {N_TEST}")
+        errs.append(f"test has {len(test)} animals, expected {N_TEST}")
 
     print(f"labelled cohort: {len(cohort)} animals (from keymap)")
-    print(f"TEST ({len(test)}): {sorted(test)}")
-    print(f"DEV  ({len(dev)}): {sorted(dev)}")
+    print(f"test ({len(test)}): {sorted(test)}")
+    print(f"dev  ({len(dev)}): {sorted(dev)}")
 
-    # ---- strain coverage: derive each animal's strain canonically, check every strain has >=1 test ----
+    # ---- strain coverage: derive each animal's strain canonically; every strain needs a test animal ----
     if not args.skip_strain:
         try:
             smap = strain_of(cohort)
@@ -96,11 +118,11 @@ def main():
             print(f"note: strain check skipped ({type(e).__name__}: {e})")
 
     if errs:
-        print("\nLOCK INVALID:")
+        print("\nsplit invalid:")
         for e in errs:
             print("  -", e)
         raise SystemExit(1)
-    print("\nlock OK: committed split is a valid strain-covering partition of the labelled cohort ✓")
+    print("\nsplit OK: no errors in the checks above")
 
 
 if __name__ == "__main__":

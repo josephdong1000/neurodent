@@ -1,10 +1,12 @@
 #!/usr/bin/env python
-"""Physically partition rater label CSV(s) into <name>_dev.csv / <name>_test.csv by animal, per split.json.
+"""Split rater label CSVs into ``<name>_dev.csv`` and ``<name>_test.csv`` by animal, per ``split.json``.
 
-Structural leak prevention: dev/selection work only ever loads the _dev file, so a test animal cannot be
-scored by accident. Re-run on each new rater's CSV as it arrives (the split.json animal list never changes).
+Development and selection work loads only the ``_dev`` files, so a test animal cannot be scored by
+accident. Run it on each new rater's CSV as it arrives; the animal lists in ``split.json`` do not change.
 
-    uv run python scripts/labeling/partition_labels.py scripts/labeling/labels/labels_cohort4strains_JD*.csv
+Usage::
+
+    uv run python scripts/labeling/partition_labels.py scripts/labeling/labels/labels_cohort4strains_JD.csv
 """
 import csv
 import json
@@ -17,6 +19,7 @@ TEST = set(SPLIT["test"])
 
 
 def animal_of(recording):
+    """Return the animal id of a ``"{animal}__{i}"`` recording name."""
     return recording.rsplit("__", 1)[0]
 
 
@@ -44,4 +47,4 @@ for path in paths:
             w.writeheader()
             w.writerows(rr)
         n_animals = len({animal_of(r["recording"]) for r in rr})
-        print(f"  -> {out.name}: {len(rr)} rows, {n_animals} animals")
+        print(f"  wrote {out.name}: {len(rr)} rows, {n_animals} animals")

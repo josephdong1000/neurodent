@@ -1,14 +1,15 @@
 """Build a self-contained HTML rating bundle from a rendered window set.
 
-Input : a directory produced by render_context.py  (images/ + manifest.csv)
-Output: rating_bundle_<name>.zip  =  index.html + images/ + README.txt
+The input is a directory written by render_context.py (``images/``, ``manifest.csv`` and
+``geometry.json``). The output is ``rating_bundle_<name>.zip``, holding ``index.html``, ``images/`` and
+``README.txt``.
 
-The rater unzips it, double-clicks index.html, labels, clicks Export, and sends back one CSV.
-No install, no server, works offline and behind a firewall.
+The rater unzips it, double-clicks index.html, labels, clicks Export CSV, and sends back one CSV. It needs
+no install or server, and it works offline and behind a firewall.
 
-The window list is BAKED INTO the HTML as a JS array rather than fetched: a page opened from file://
-cannot fetch a sibling CSV (browsers block it as cross-origin), so fetching would silently show a
-blank page on the rater's machine.
+The window list is embedded in the HTML as a JS array rather than fetched: a page opened from file://
+cannot fetch a sibling CSV (browsers block it as cross-origin), so fetching would show a blank page on the
+rater's machine.
 """
 import csv
 import json
@@ -457,6 +458,23 @@ render();
 
 
 def build(rendered_dir, out_zip=None, name=None):
+    """Package a rendered window set into a rater zip.
+
+    Args:
+        rendered_dir (str | Path): Directory written by render_context.py, holding ``manifest.csv``,
+            ``images/`` and ``geometry.json``.
+        out_zip (str | Path, optional): Output zip path. Defaults to
+            ``<rendered_dir>/rating_bundle_<name>.zip``.
+        name (str, optional): Bundle name, used in the zip name, the page's browser storage key and the
+            exported CSV name. Defaults to the directory name.
+
+    Returns:
+        Path: The written zip.
+
+    Raises:
+        SystemExit: If the manifest is missing or empty, a manifest image is missing, image names repeat,
+            or ``geometry.json`` is missing or lacks a recording.
+    """
     rendered_dir = Path(rendered_dir)
     manifest = rendered_dir / "manifest.csv"
     img_dir = rendered_dir / "images"
@@ -477,7 +495,7 @@ def build(rendered_dir, out_zip=None, name=None):
     if len({w["image"] for w in windows}) != len(windows):
         raise SystemExit("duplicate image filenames in manifest (recording prefix collision)")
 
-    # Shared-scale twin per window (for the rater's Space toggle). Present iff every window has one.
+    # Shared-scale twin per window, for the rater's Space toggle; used only when every window has one.
     shared_name = lambda img: img.replace(".png", "__shared.png")
     has_shared = all((img_dir / shared_name(w["image"])).exists() for w in windows)
 
