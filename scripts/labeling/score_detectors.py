@@ -48,6 +48,13 @@ from neurodent.analysis import AnimalAnalyzer  # noqa: E402
 from neurodent.results import autoreject_detector as adr  # noqa: E402  (hosts build_fit_epochs now)
 from neurodent.results.scoring import consensus, ingest, score_keep_mask, score_mask, unblind  # noqa: E402
 
+
+def available_cpus() -> int:
+    """Return the CPUs this process may use: the affinity mask on Linux, the machine's count elsewhere."""
+    if hasattr(os, "sched_getaffinity"):
+        return len(os.sched_getaffinity(0))
+    return os.cpu_count() or 1
+
 CONFIG_KEYMAP = Path(__file__).resolve().parents[2] / "config/labeling/keymap.csv"  # committed + permanent (results/ is disposable)
 
 log = logging.getLogger("score_detectors")
@@ -214,7 +221,7 @@ def main(argv=None):
     # Feature extraction over full recordings is the cost (a big recording is O(10k) fragments). Serial is
     # hopelessly slow (~1.6 s/fragment -> hours per animal); the pipeline parallelizes with dask, so we do
     # the same. Dashboard is off: we care that the analysis RUNS, not about scheduler introspection.
-    n_workers = args.workers or len(os.sched_getaffinity(0))
+    n_workers = args.workers or available_cpus()
     log.info(f"starting dask LocalCluster with {n_workers} process workers (dashboard off)")
 
     all_rows = []

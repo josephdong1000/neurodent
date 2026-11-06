@@ -41,12 +41,11 @@ sys.path.insert(0, str(REPO / "src"))
 from dask.distributed import Client, LocalCluster  # noqa: E402
 import build_cohort_bundle as C  # noqa: E402
 import render_context as R  # noqa: E402
-from score_detectors import build_consensus, FEATURES  # noqa: E402 (reuse the exact consensus + feature set)
+from score_detectors import FEATURES, available_cpus, build_consensus  # noqa: E402 (same consensus + features)
 from neurodent.analysis import AnimalAnalyzer  # noqa: E402
 from neurodent.results import autoreject_detector as adr  # noqa: E402
 from neurodent.results.feature_utils import extract_linear_array  # noqa: E402
 
-logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("extract_dev_features")
 
 # One row per labelled (recording, window, channel) cell = align_cells keys + animal; the full autoreject grid
@@ -151,6 +150,7 @@ def main():
                          "score_detectors' --seed for byte-identical epochs/masks (both default 0)")
     ap.add_argument("--workers", type=int, default=None)
     args = ap.parse_args()
+    logging.basicConfig(level=logging.INFO)
 
     manifests = {}
     for spec in args.raters:
@@ -171,7 +171,7 @@ def main():
     print(f"gate ok: {len(animals_wanted)} labelled animals within split['{args.which}'] ({len(allowed)})")
 
     ar_cols = adr.grid_config_names()            # the full 74-config grid, always scored, apples-to-apples
-    n_workers = args.workers or len(os.sched_getaffinity(0))
+    n_workers = args.workers or available_cpus()
     rows, done = [], set()                       # accumulate every cell in memory (~3k rows), one atomic write
 
     # No per-animal try/except, no resume: any failure propagates and the run dies before writing --out, so a
