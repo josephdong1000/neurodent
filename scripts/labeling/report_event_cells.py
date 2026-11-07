@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-"""Report how often each detector rejects cells, grouped by what the raters called them (dev split).
+"""Report how often each combination and detector rejects cells, grouped by what the raters called them (dev).
 
 Epileptiform events can look like artifacts in a 5 s window, and the consensus counts an event vote as keep.
-This report shows each detector's rejection rate per rater-category pattern: the sorted categories of all
-raters on the cell (for example ``artifact+artifact+event``), plus a coarse class:
+This report shows each rejection rate per rater-category pattern: the sorted categories of all raters on the
+cell (for example ``artifact+artifact+event``), plus a coarse class:
 
 - ``all_bad``: every voting rater said bad;
 - ``bad_and_event``: at least one bad and at least one event vote;
@@ -12,8 +12,13 @@ raters on the cell (for example ``artifact+artifact+event``), plus a coarse clas
 - ``all_clean``: only clean votes;
 - ``no_votes``: every rater unsure or blank (normally absent, since consensus drops such cells).
 
-Filters use the deployable tau from the dev selection; autoreject configurations use their masks. The test
-split's version of this report is produced only inside ``score_test.py``, for the frozen pick.
+Rows come first for the combinations of ``select_detectors.py`` with the selection's autoreject configuration
+k and settings: today, replace, add, autoreject_alone, filters_alone and config_lists_alone (the last only on
+cells with a config list). M reads the config list entries of the dev features' provenance the selection
+recorded, so ``--features`` must be the parquet the selection was made on; the run refuses another. Then the
+single detectors of the diagnostic ranking: filters with their deployable tau, autoreject configurations with
+their masks. The test split's version of this report is produced only inside ``score_test.py``, for the
+combinations.
 
     uv run python scripts/labeling/report_event_cells.py --features results/labeling/dev_features.parquet \\
         --selection results/labeling/dev_selection.json --out results/labeling/dev_event_cells.csv
@@ -51,11 +56,21 @@ def coarse_class(categories):
     return "all_clean"
 
 
-def patterns(df):
-    """Return ``(pattern, coarse class)`` series for the cells of ``df`` from its ``cat_<rater>`` columns."""
+def category_columns(df):
+    """Return the ``cat_<rater>`` columns of ``df``, sorted.
+
+    Raises:
+        SystemExit: If there is none.
+    """
     cat_cols = sorted(c for c in df.columns if c.startswith(RATER_CATEGORY_PREFIX))
     if not cat_cols:
         raise SystemExit("the features hold no rater category columns (cat_<rater>)")
+    return cat_cols
+
+
+def patterns(df):
+    """Return ``(pattern, coarse class)`` series for the cells of ``df`` from its ``cat_<rater>`` columns."""
+    cat_cols = category_columns(df)
     cats = df[cat_cols].fillna("unlabeled").astype(str).to_numpy()
     pattern = pd.Series(["+".join(sorted(row)) for row in cats], index=df.index)
     coarse = pd.Series([coarse_class(row) for row in cats], index=df.index)
@@ -71,26 +86,48 @@ def detector_predictions(df, name, entry):
     return SD.mask_pred(df, name)
 
 
-def event_table(df, preds):
+def combination_predictions(df, selection):
+    """Return the combinations' 0/1 rejections and scored cells with the selection's k and settings.
+
+    Args:
+        df: Cells with the member columns.
+        selection: The dev selection JSON from ``select_detectors.py``; M reads the config list entries of the
+            features provenance it recorded.
+
+    Returns:
+        ``({combination: 0/1 per cell}, {combination: bool per cell})``.
+    """
+    SD.require_member_columns(df)
+    unknown = ((selection.get("features") or {}).get("provenance") or {}).get("config_list_unknown_channels")
+    members, _ = SD.member_masks(df, selection["settings"], unknown)
+    preds = SD.combination_preds(members, SD.mask_pred(df, selection["pick"]["autoreject_config"]))
+    return preds, SD.combination_cells(df)
+
+
+def event_table(df, preds, cells=None):
     """Return rejection counts per detector, coarse class and pattern.
 
     Args:
         df: Cells with ``cat_<rater>`` columns.
-        preds: ``{detector: 0/1 predictions aligned to df}``.
+        preds: ``{detector or combination: 0/1 predictions aligned to df}``.
+        cells: Optional ``{name: bool per cell}``; a name listed here is counted only on those cells.
 
     Returns:
         DataFrame with detector, coarse_class, pattern, n_cells, n_rejected, rejection_rate.
     """
     pattern, coarse = patterns(df)
+    cells = cells or {}
     rows = []
     for name, yhat in preds.items():
-        yhat = np.asarray(yhat, int)
-        frame = pd.DataFrame({"coarse_class": coarse, "pattern": pattern, "rejected": yhat})
+        frame = pd.DataFrame({"coarse_class": coarse, "pattern": pattern, "rejected": np.asarray(yhat, int)})
+        if name in cells:
+            frame = frame[np.asarray(cells[name], bool)]
         for (cc, pat), sub in frame.groupby(["coarse_class", "pattern"], sort=True):
             rows.append({"detector": name, "coarse_class": cc, "pattern": pat, "n_cells": int(len(sub)),
                          "n_rejected": int(sub["rejected"].sum()),
                          "rejection_rate": float(sub["rejected"].mean())})
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows, columns=["detector", "coarse_class", "pattern", "n_cells", "n_rejected",
+                                       "rejection_rate"])
 
 
 def main(argv=None):
@@ -98,24 +135,35 @@ def main(argv=None):
     ap.add_argument("--features", type=Path, required=True)
     ap.add_argument("--selection", type=Path, required=True, help="dev selection JSON from select_detectors.py")
     ap.add_argument("--split", type=Path, default=REPO / "config/labeling/split.json")
-    ap.add_argument("--detectors", nargs="+", default=None, help="default: every detector, in selection order")
+    ap.add_argument("--detectors", nargs="+", default=None,
+                    help="single detectors to add after the combinations (default: every detector, in the "
+                         "diagnostic order)")
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args(argv)
 
     from score_detectors import check_split
 
+    selection = json.loads(args.selection.read_text())
+    if not args.features.exists():
+        raise SystemExit(f"{args.features} not found; pass the parquet the selection was made on")
+    actual, selected_on = SD._sha256(args.features), (selection.get("features") or {}).get("sha256")
+    if actual != selected_on:
+        raise SystemExit(f"{args.features} is not the parquet the selection was made on (sha256 {actual}, "
+                         f"selection {selected_on!r}); refusing")
     df = pd.read_parquet(args.features)
     check_split(set(df["animal"]), args.split, "dev")
-    selection = json.loads(args.selection.read_text())
-    names = args.detectors or selection["order"]
-    unknown = [n for n in names if n not in selection["leaderboard"]]
+    board = selection["diagnostic"]["leaderboard"]
+    names = args.detectors or selection["diagnostic"]["order"]
+    unknown = [n for n in names if n not in board]
     if unknown:
         raise SystemExit(f"detectors not in the selection: {unknown}")
-    preds = {n: detector_predictions(df, n, selection["leaderboard"][n]) for n in names}
-    table = event_table(df, preds)
+    preds, cells = combination_predictions(df, selection)
+    preds.update({n: detector_predictions(df, n, board[n]) for n in names})
+    table = event_table(df, preds, cells)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     table.to_csv(args.out, index=False)
-    print(f"wrote {len(table)} rows for {len(names)} detectors to {args.out}")
+    print(f"wrote {len(table)} rows for {len(SD.COMBINATIONS)} combinations (k = "
+          f"{selection['pick']['autoreject_config']}) and {len(names)} detectors to {args.out}")
 
 
 if __name__ == "__main__":

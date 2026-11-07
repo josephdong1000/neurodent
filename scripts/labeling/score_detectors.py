@@ -63,15 +63,23 @@ CONFIG_KEYMAP = REPO / "config/labeling/keymap.csv"
 CONFIG_SPLIT = REPO / "config/labeling/split.json"
 CONFIG_RECORDING_MAP = REPO / "config/labeling/recording_map.csv"
 
-# Files whose content decides every score; their hashes go into each output's provenance.
-CODE_FILES = [
+# Files whose content decides every extracted score; their hashes go into each output's provenance. Besides
+# the labeling scripts the extraction runs, these are every Python file of the package (loading, features,
+# LOF and the detector all live there) and uv.lock, which pins the readers and numerical libraries. The
+# scoring scripts that read the features are not among them: select_detectors.SCORING_CODE records those, so
+# editing one does not invalidate an extraction.
+_NAMED_CODE_FILES = [
     REPO / "src/neurodent/results/autoreject_detector.py",
     REPO / "src/neurodent/results/scoring.py",
     REPO / "scripts/labeling/score_detectors.py",
     REPO / "scripts/labeling/extract_dev_features.py",
-    REPO / "scripts/labeling/select_detectors.py",
     REPO / "scripts/labeling/build_cohort_bundle.py",
     REPO / "scripts/labeling/render_context.py",
+]
+CODE_FILES = [
+    *_NAMED_CODE_FILES,
+    *(p for p in sorted((REPO / "src/neurodent").rglob("*.py")) if p not in _NAMED_CODE_FILES),
+    REPO / "uv.lock",
 ]
 
 # Fragment detectors at their config/config.yaml fragment_filter_config settings: name: (WAR keep-mask
@@ -93,6 +101,20 @@ def available_cpus() -> int:
     if hasattr(os, "sched_getaffinity"):
         return len(os.sched_getaffinity(0))
     return os.cpu_count() or 1
+
+
+def require_repo_cwd():
+    """Exit unless the working directory is the repository root.
+
+    The loader reads config/ and the datasets' extract_func paths relative to the working directory, while the
+    provenance hashes the repository's files, so the two agree only there.
+
+    Raises:
+        SystemExit: If the working directory is not :data:`REPO`.
+    """
+    if Path.cwd().resolve() != REPO:
+        raise SystemExit(f"run from the repository root {REPO}: dataset configs and extract_func paths resolve "
+                         "against the working directory")
 
 
 def check_split(animals, split_path, which):
@@ -124,9 +146,10 @@ class RecordingMap:
     """Translate a loaded recording to the label key ``"{animal}__{i}"`` the raters' files use.
 
     With a map file, a recording is identified by its animalday, falling back to (animal, current
-    position) when the map row has no animalday; recordings missing from the map are not scored. Without a
-    map (``positional``), the current position is assumed to equal the labeled one, which holds only for
-    bundles rendered by this code.
+    position) only when the map row has no animalday; recordings missing from the map are not scored. When
+    the map has a ``status`` column, only rows whose status is ``mapped`` map anything. Other columns are
+    ignored. Without a map (``positional``), the current position is assumed to equal the labeled one, which
+    holds only for bundles rendered by this code.
 
     Args:
         path: ``recording_map.csv`` with columns july_recording, animal, animalday and port_position, or
@@ -139,7 +162,7 @@ class RecordingMap:
 
     def __init__(self, path=None, positional=False):
         self.positional = positional
-        self.by_animalday, self.by_position = {}, {}
+        self.by_animalday, self.by_position, self.rows = {}, {}, {}
         if positional:
             return
         if path is None or not Path(path).exists():
@@ -148,15 +171,21 @@ class RecordingMap:
                 "compare_window_hashes.py) to write it, or pass --positional-recordings for a bundle "
                 "rendered by this code."
             )
-        rmap = pd.read_csv(path)
+        rmap = pd.read_csv(path, dtype=str, keep_default_na=False)  # ids such as "032" stay text
         missing = {"july_recording", "animal", "animalday", "port_position"} - set(rmap.columns)
         if missing:
             raise SystemExit(f"{path}: missing columns {sorted(missing)}")
-        for r in rmap.itertuples(index=False):
-            if isinstance(r.animalday, str) and r.animalday:
-                self.by_animalday[(str(r.animal), r.animalday)] = r.july_recording
-            if not pd.isna(r.port_position):
-                self.by_position[(str(r.animal), int(r.port_position))] = r.july_recording
+        has_status = "status" in rmap.columns
+        for r in rmap.to_dict("records"):
+            label, animal = r["july_recording"], r["animal"]
+            status = r["status"] if has_status else "mapped"
+            self.rows[label] = {"status": status, "reason": r.get("reason", "")}
+            if status != "mapped":
+                continue
+            if r["animalday"]:
+                self.by_animalday[(animal, r["animalday"])] = label
+            elif r["port_position"]:
+                self.by_position[(animal, int(float(r["port_position"])))] = label
 
     def label(self, animal_id, position, animalday=None):
         """Return the label key of the recording at ``position`` with ``animalday``, or None if unmapped."""
@@ -165,6 +194,33 @@ class RecordingMap:
         if animalday is not None and (animal_id, animalday) in self.by_animalday:
             return self.by_animalday[(animal_id, animalday)]
         return self.by_position.get((animal_id, int(position)))
+
+    def unmapped(self, recordings):
+        """Return the labeled recordings the map does not tie to a current recording, with the map's reason.
+
+        Args:
+            recordings: Label keys ``"{animal}__{i}"``.
+
+        Returns:
+            One ``{"recording", "animal", "status", "reason"}`` per unmapped recording, in the given order;
+            empty with ``positional``.
+        """
+        if self.positional:
+            return []
+        mapped = set(self.by_animalday.values()) | set(self.by_position.values())
+        out = []
+        for rec in recordings:
+            if rec in mapped:
+                continue
+            row = self.rows.get(rec)
+            if row is None:
+                status, reason = "absent", "not in the recording map"
+            elif row["status"] == "mapped":
+                status, reason = "mapped", "the map row names no animalday and no port position"
+            else:
+                status, reason = row["status"], row["reason"]
+            out.append({"recording": rec, "animal": rec.rsplit("__", 1)[0], "status": status, "reason": reason})
+        return out
 
 
 def _sha256(path) -> str:
@@ -175,30 +231,74 @@ def _sha256(path) -> str:
     return h.hexdigest()
 
 
-def provenance(inputs, **params):
-    """Describe what produced an output: inputs and code by sha256, the git commit, and run parameters.
+def _git(*args):
+    """Return the stripped output of a git command run in the repository, or None if git fails."""
+    try:
+        return subprocess.run(["git", "-C", str(REPO), *args], capture_output=True, text=True,
+                              check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def src_state() -> dict:
+    """Return ``{"src_tree", "src_dirty"}``: the git tree of ``src`` at HEAD and whether ``src`` has local changes.
+
+    ``src_dirty`` counts untracked files too; either value is None when git is unavailable.
+    """
+    status = _git("status", "--porcelain", "--", "src")
+    return {"src_tree": _git("rev-parse", "HEAD:src"), "src_dirty": None if status is None else bool(status)}
+
+
+def code_hashes() -> dict:
+    """Return ``{repo-relative path: sha256}`` of every existing file in :data:`CODE_FILES`."""
+    return {str(p.relative_to(REPO)): _sha256(p) for p in CODE_FILES if p.exists()}
+
+
+def config_files(datasets) -> dict:
+    """Return the config files ``load_dataset_config`` reads for ``datasets``, keyed by repo-relative path.
+
+    These are config/config.yaml, config/config.local.yaml when present, each dataset's
+    config/datasets/<name>.yaml, and the samples file of a dataset that keeps its samples in one. The loader
+    reads them relative to the working directory, so callers first check :func:`require_repo_cwd`.
 
     Args:
-        inputs: ``{name: path}`` of input files (rater CSVs, keymap, split, recording map, features).
+        datasets: Dataset names.
+
+    Returns:
+        ``{path: Path}``.
+    """
+    files = {"config/config.yaml": REPO / "config/config.yaml"}
+    if (REPO / "config/config.local.yaml").exists():
+        files["config/config.local.yaml"] = REPO / "config/config.local.yaml"
+    for ds in datasets:
+        files[f"config/datasets/{ds}.yaml"] = REPO / f"config/datasets/{ds}.yaml"
+        config = C.load_dataset_config(ds)
+        samples_file = config.get("samples", {}).get("samples_file") if config.get("samples_data") is None else None
+        if samples_file:
+            path = (REPO / samples_file).resolve()
+            files[str(path.relative_to(REPO)) if path.is_relative_to(REPO) else str(path)] = path
+    return files
+
+
+def provenance(inputs, **params):
+    """Describe what produced an output: inputs and code by sha256, the git state, and run parameters.
+
+    Args:
+        inputs: ``{name: path}`` of input files (rater CSVs, keymap, split, recording map, features, and
+            the configs from :func:`config_files`).
         **params: Run parameters to record (rule, raters, seeds, caps, flags).
 
     Returns:
-        A JSON-serializable dict.
+        A JSON-serializable dict with ``git_commit``, ``git_dirty``, ``src_tree``, ``src_dirty``, ``inputs``,
+        ``code`` and ``params``.
     """
-    def git(*args):
-        try:
-            return subprocess.run(["git", "-C", str(REPO), *args], capture_output=True, text=True,
-                                  check=True).stdout.strip()
-        except (OSError, subprocess.CalledProcessError):
-            return None
-
-    commit = git("rev-parse", "HEAD")
-    status = git("status", "--porcelain", "--untracked-files=no")
+    status = _git("status", "--porcelain", "--untracked-files=no")
     return {
-        "git_commit": commit,
+        "git_commit": _git("rev-parse", "HEAD"),
         "git_dirty": None if status is None else bool(status),
+        **src_state(),
         "inputs": {name: {"path": str(p), "sha256": _sha256(p)} for name, p in inputs.items() if p is not None},
-        "code": {str(p.relative_to(REPO)): _sha256(p) for p in CODE_FILES if p.exists()},
+        "code": code_hashes(),
         "params": params,
     }
 
@@ -362,7 +462,7 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    C._require_repo_root()
+    require_repo_cwd()
 
     datasets = list(C.REAL_STRAINS) if args.all else args.dataset
     if not datasets:
@@ -439,6 +539,7 @@ def main(argv=None):
         inputs = {f"labels_{r}": p for r, p in manifests.items()}
         inputs.update(keymap=args.keymap, split=args.split,
                       recording_map=None if args.positional_recordings else args.recording_map)
+        inputs.update(config_files(datasets))
         prov = provenance(inputs, script="score_detectors", rule=args.rule, raters=sorted(manifests),
                           positional_recordings=args.positional_recordings, lof=args.lof,
                           lof_threshold=args.lof_threshold, autoreject=args.autoreject,
