@@ -3,13 +3,18 @@
 ``hash_labeled_windows.py`` runs twice on the committed mini_real recordings (A10 and F22) with a synthetic
 keymap and manifest, into separate outputs and temp directories; the two outputs must agree hash for hash,
 and ``compare_window_hashes.py`` must call every cell identical, classify perturbed copies of the port
-output, and leave a recording unmapped when its July-tree length does not reproduce the July draw. Those
-tests load recordings through SpikeInterface and are marked integration and slow. The other tests run on
-synthetic tables and draws: classification edge cases, the recording map, its July-tree length check and
-the exit code, the map's reader in ``score_detectors.py``, and the recovery of July fragment counts by
-``july_fragment_counts.py``. Fake recordings stand in for the loader to test read_error rows (and that
-``compare_window_hashes.py`` counts them as not hashed), the output written one animal at a time to
-``<out>.partial``, and ``first_file`` for intermediates in the temp directory.
+output, and leave a recording unmapped when its July-tree length does not reproduce the July draw. A third
+run scans both animals (``--all-windows``), and a July table whose F22 windows sit three windows later than
+the port's must come out shifted by -3 with that scan. Those tests load recordings through SpikeInterface and
+are marked integration and slow. The other tests run on synthetic tables and draws: classification edge
+cases, shifted cells found through a port scan (used only for animals where it holds the port hashes'
+samples, and never written to the committed map), the recording map, its July-tree length check, the commit
+and date columns that explain an unmapped recording, the exit code, the map's reader in
+``score_detectors.py``, and the recovery of July fragment counts by ``july_fragment_counts.py``. Fake
+recordings stand in for the loader to test read_error rows (and that ``compare_window_hashes.py`` counts them
+as not hashed), scan rows, the output written one animal at a time to ``<out>.partial``, ``first_file`` for
+intermediates in the temp directory, and that a run records the commit of the tree in its working directory.
+A throwaway git repository, with a linked worktree and plain copies inside it, tests how a commit is read.
 """
 
 import csv
@@ -234,6 +239,93 @@ def test_compare_moved_recording(mini_hashes, tmp_path):
     assert rmap.loc["F22__0", "n_remapped"] == 9
 
 
+def _git(*args):
+    return subprocess.run(["git", "-C", str(REPO), *args], capture_output=True, text=True, check=True).stdout.strip()
+
+
+@pytest.fixture(scope="module")
+def mini_scan(mini_hashes):
+    """Scan every window of A10 and F22 (``--all-windows``) in a third run, with its own temp directory."""
+    d = mini_hashes["dir"]
+    out = d / "scan_port.csv"
+    env = dict(os.environ, PYTHONPATH=str(REPO / "src"))
+    cmd = [sys.executable, str(LABELING / "hash_labeled_windows.py"), "--tree", "port", "--all-windows",
+           "--animal", "A10", "F22", "--keymap", str(mini_hashes["keymap"]),
+           "--manifest", str(d / "cohort_manifest.json"), "--july-n-fragments", str(mini_hashes["july_n"]),
+           "--out", str(out), "--temp-dir", str(d / "tmp_scan")]
+    res = subprocess.run(cmd, cwd=REPO, env=env, capture_output=True, text=True)
+    assert res.returncode == 0, res.stderr[-4000:]
+    return out
+
+
+@pytest.mark.integration
+@pytest.mark.slow
+def test_runs_record_their_commit(mini_hashes, tmp_path):
+    """Each run writes the tree's commit and src state in every row, and the map carries them for both trees."""
+    commit, dirty = _git("rev-parse", "HEAD"), str(bool(_git("status", "--porcelain", "--", "src")))
+    for tree in ("july", "port"):
+        rows = pd.read_csv(mini_hashes[tree], dtype=str)
+        assert set(rows["git_commit"]) == {commit} and set(rows["src_dirty"]) == {dirty}, tree
+    _, _, rmap = _compare(mini_hashes, mini_hashes["port"], tmp_path)
+    assert set(rmap["july_commit"]) == set(rmap["port_commit"]) == {commit}
+    assert set(rmap["july_src_dirty"].astype(str)) == set(rmap["port_src_dirty"].astype(str)) == {dirty}
+    assert rmap.loc["F22__0", "july_n_files"] == 1 and rmap.loc["F22__0", "july_date_string"] == "May-10-2025"
+    assert str(rmap.loc["F22__0", "port_positions_on_date"]) == "0"
+    assert rmap.loc["F22__0", "port_n_fragments_on_date"] == 94
+
+
+@pytest.mark.integration
+@pytest.mark.slow
+def test_scan_finds_a_shifted_recording(mini_hashes, mini_scan, tmp_path):
+    """A scan hashes every window and column; with it, F22 labeled three windows late comes out shifted by -3."""
+    scan = pd.read_csv(mini_scan, dtype=str)
+    assert set(scan["status"]) == {"scan"} and scan["view_sha256"].isna().all()
+    assert scan.groupby("animal").size().to_dict() == {"A10": 25 * 10, "F22": 94 * 10}
+    assert not scan.duplicated(KEY).any() and scan["raw_sha256"].nunique() == len(scan)
+    port = pd.read_csv(mini_hashes["port"], dtype=str)
+    both = port.merge(scan, on=KEY, suffixes=("_p", "_s"))
+    assert len(both) == len(port)
+    for col in ["raw_sha256", "raw_rms", "raw_head_3", "column", "n_samples", "git_commit"]:
+        assert (both[f"{col}_p"] == both[f"{col}_s"]).all(), col
+    checked = CW.read_scan(mini_scan, port=CW.read_hashes(mini_hashes["port"]))
+    assert dict(checked["shared"]) == {"A10": 9, "F22": 9} and not checked["disagreements"]
+    assert CW.scan_usable(checked, "A10") and CW.scan_usable(checked, "F22")
+
+    # A July table whose F22 cell at window w holds the port's samples of window w - 3.
+    fields, july = _read_rows(mini_hashes["july"])
+    at = {(r["animal"], r["window"], r["channel"]): r for r in _read_rows(mini_scan)[1]}
+    values = ["raw_sha256", "raw_rms", "raw_mean", "raw_ptp"] + [f"raw_head_{k}" for k in range(4)]
+    for r in july:
+        if r["animal"] == "F22":
+            r.update({k: at[("F22", str(int(r["window"]) - 3), r["channel"])][k] for k in values})
+    shifted = tmp_path / "hashes_july_shifted.csv"
+    _write_rows(shifted, fields, july)
+    run = dict(mini_hashes, july=shifted)
+
+    rc, cells, rmap = _compare(run, mini_hashes["port"], tmp_path / "plain")
+    assert rc == 1 and set(cells.loc[cells["animal"] == "F22", "class"]) == {"different"}
+
+    (tmp_path / "scan").mkdir()
+    cells_out, map_out = tmp_path / "scan" / "cells.csv", tmp_path / "scan" / "recording_map.csv"
+    rc = CW.main(["--july", str(shifted), "--port", str(mini_hashes["port"]), "--keymap", str(mini_hashes["keymap"]),
+                  "--july-n-fragments", str(mini_hashes["july_n"]), "--port-scan", str(mini_scan),
+                  "--out", str(cells_out), "--recording-map", str(map_out)])
+    assert rc == 1
+    cells, rmap = pd.read_csv(cells_out), pd.read_csv(map_out).set_index("july_recording")
+    f22 = cells[cells["animal"] == "F22"]
+    assert (f22["class"] == "shifted").all() and (f22["window_offset"] == -3).all()
+    assert (f22["port_window"] == f22["window"] - 3).all() and (f22["port_channel"] == f22["channel"]).all()
+    assert (f22["n_scan_matches"] == 1).all() and (f22["port_position"] == 0).all()
+    assert (cells.loc[cells["animal"] == "A10", "class"] == "identical").all()
+    assert rmap.loc["A10__0", "status"] == "mapped"
+    assert rmap.loc["F22__0", "status"] == "unmapped" and pd.isna(rmap.loc["F22__0", "port_position"])
+    assert rmap.loc["F22__0", "reason"] == ("cells neither identical nor remapped: shifted 9; shifted by window "
+                                            "offset -3 at port position 0: 9 cells")
+
+    with pytest.raises(ValueError, match="--port-scan"):
+        _compare(mini_hashes, mini_scan, tmp_path / "scan_as_port")
+
+
 # --------------------------------------------------------------------------- synthetic tables
 
 def _hash_row(animal, position, window, channel, sha, rms=1.0, head=(1.0, 2.0, 3.0, 4.0), n=100):
@@ -254,7 +346,7 @@ def _lengths(*labels, n=100):
     return {label: [n] for label in labels}
 
 
-def _run_main(d, cells, july_rows, port_rows, lengths):
+def _run_main(d, cells, july_rows, port_rows, lengths, scan_rows=None):
     """Write synthetic inputs, run compare_window_hashes.main, and return (exit code, map rows by label).
 
     Args:
@@ -264,6 +356,8 @@ def _run_main(d, cells, july_rows, port_rows, lengths):
         port_rows (list[dict]): Port hash rows from :func:`_hash_row`.
         lengths (dict[str, str] | None): July recording label to its July draw lengths as the table writes
             them, or None to leave the table out.
+        scan_rows (list[dict] | None, optional): Port scan rows from :func:`_scan_row`, passed with
+            ``--port-scan``; None passes no scan. Defaults to None.
     """
     d.mkdir(parents=True)
     keymap = d / "keymap.csv"
@@ -277,8 +371,13 @@ def _run_main(d, cells, july_rows, port_rows, lengths):
     if lengths is not None:
         _write_rows(table, ["recording", "matches"], [{"recording": k, "matches": v} for k, v in lengths.items()])
     rmap = d / "recording_map.csv"
+    scan = []
+    if scan_rows is not None:
+        _write_rows(d / "scan.csv", list(scan_rows[0]), scan_rows)
+        scan = ["--port-scan", str(d / "scan.csv")]
     rc = CW.main(["--july", str(hashes["july"]), "--port", str(hashes["port"]), "--keymap", str(keymap),
-                  "--july-n-fragments", str(table), "--out", str(d / "cells.csv"), "--recording-map", str(rmap)])
+                  "--july-n-fragments", str(table), "--out", str(d / "cells.csv"), "--recording-map", str(rmap),
+                  *scan])
     _, rows = _read_rows(rmap)
     return rc, {r["july_recording"]: r for r in rows}
 
@@ -409,6 +508,281 @@ def test_check_length():
     assert CW.check_length("9000", []) == ("unchecked", "no July draw length to check the July-tree n_fragments "
                                                         "9000 against")
     assert CW.check_length("", [17222]) == ("unchecked", "the July output has no fragment count at the July position")
+
+
+# --------------------------------------------------------------------------- port scans and unmapped recordings
+
+def _scan_row(animal, position, window, channel, sha, rms=1.0, status="scan", date="day0", n_files=1, n=100):
+    """A row of a port scan (``hash_labeled_windows.py --all-windows``) with the columns the comparison reads."""
+    return {"tree": "port", "animal": animal, "position": str(position), "window": str(window), "channel": channel,
+            "status": status, "raw_sha256": sha, "raw_rms": repr(rms), "date_string": date, "n_files": str(n_files),
+            "n_fragments": str(n), "git_commit": "", "src_dirty": ""}
+
+
+def test_port_scan_classifies_shifted_cells(tmp_path):
+    """A different or missing cell whose July samples the scan holds at another window is shifted, and says where.
+
+    X has one cell found three windows later in its own recording and one found two windows earlier in
+    another recording under another channel; Y's cell is found at two places, which are listed, not resolved;
+    Z's cells are not at another window in the scan (one is at its own window), which could not read one of
+    Z's rows; V is not scanned; W is sound. Each scanned animal's scan holds the port hashes' samples.
+    """
+    cells = [("X__0", "X", 0, 20, "A"), ("X__0", "X", 0, 30, "B"), ("Y__0", "Y", 0, 5, "A"),
+             ("Z__0", "Z", 0, 7, "A"), ("Z__0", "Z", 0, 8, "A"), ("V__0", "V", 0, 3, "A"), ("W__0", "W", 0, 4, "A")]
+    july = [_hash_row("X", 0, 20, "A", "s1"), _hash_row("X", 0, 30, "B", "s2"), _hash_row("Y", 0, 5, "A", "s3"),
+            _hash_row("Z", 0, 7, "A", "s4"), _hash_row("Z", 0, 8, "A", "s5"), _hash_row("V", 0, 3, "A", "s6"),
+            _hash_row("W", 0, 4, "A", "w")]
+    port = [_hash_row("X", 0, 20, "A", "p1", rms=9.0), _hash_row("Y", 0, 5, "A", "p3", rms=9.0),
+            _hash_row("Z", 0, 7, "A", "p4", rms=9.0), _hash_row("V", 0, 3, "A", "p6", rms=9.0),
+            _hash_row("W", 0, 4, "A", "w")]
+    scan = [_scan_row("X", 0, 23, "A", "s1"), _scan_row("X", 1, 28, "C", "s2", rms=2.0),
+            _scan_row("X", 0, 20, "A", "p1"), _scan_row("Y", 2, 9, "A", "s3"), _scan_row("Y", 0, 9, "A", "s3"),
+            _scan_row("Y", 0, 5, "A", "p3"), _scan_row("Z", 0, 8, "A", "s5"), _scan_row("Z", 0, 7, "A", "p4"),
+            _scan_row("Z", 1, 0, "A", "", status="scan_read_error")]
+    lengths = {label: "100" for label in ("X__0", "Y__0", "Z__0", "V__0", "W__0")}
+
+    rc, rmap = _run_main(tmp_path / "plain", cells, july, port, lengths)
+    _, plain = _read_rows(tmp_path / "plain" / "cells.csv")
+    assert rc == 1 and "shifted" not in {c["class"] for c in plain}
+
+    rc, rmap = _run_main(tmp_path / "scan", cells, july, port, lengths, scan_rows=scan)
+    assert rc == 1
+    _, rows = _read_rows(tmp_path / "scan" / "cells.csv")
+    got = {(c["july_recording"], c["window"]): c for c in rows}
+    where = ["class", "port_position", "port_window", "port_channel", "window_offset", "n_scan_matches"]
+    assert [got[("X__0", "20")][k] for k in where] == ["shifted", "0", "23", "A", "3", "1"]
+    assert [got[("X__0", "30")][k] for k in where] == ["shifted", "1", "28", "C", "-2", "1"]
+    assert [got[("Y__0", "5")][k] for k in where] == ["shifted", "0;2", "9;9", "A;A", "4;4", "2"]
+    assert got[("X__0", "30")]["port_raw_sha256"] == "s2" and got[("X__0", "30")]["port_rms"] == "2.0"
+    assert got[("X__0", "20")]["port_view_sha256"] == got[("X__0", "20")]["view_match"] == ""
+    assert {k: got[k]["class"] for k in [("Z__0", "7"), ("Z__0", "8"), ("V__0", "3"), ("W__0", "4")]} == {
+        ("Z__0", "7"): "different", ("Z__0", "8"): "missing", ("V__0", "3"): "different", ("W__0", "4"): "identical"}
+    assert got[("Z__0", "7")]["port_window"] == got[("Z__0", "7")]["n_scan_matches"] == ""
+
+    assert rmap["X__0"]["status"] == "unmapped" and rmap["X__0"]["port_position"] == ""
+    assert rmap["X__0"]["reason"] == ("cells neither identical nor remapped: shifted 2; shifted by window offset +3 "
+                                      "at port position 0: 1 cell; shifted by window offset -2 at port position 1: "
+                                      "1 cell")
+    assert rmap["Y__0"]["reason"] == ("cells neither identical nor remapped: shifted 1; shifted with several matches "
+                                      "each: 1 cell, among them offset +4 at port position 0, offset +4 at port "
+                                      "position 2")
+    assert rmap["Z__0"]["reason"] == ("cells neither identical nor remapped: different 1, missing 1; not found at "
+                                      "another window in the port scan, which could not read 1 row of this animal: "
+                                      "different 1, missing 1")
+    assert rmap["V__0"]["reason"] == "cells neither identical nor remapped: different 1"
+    assert rmap["W__0"]["status"] == "mapped"
+
+
+def test_shifted_cell_lists_a_bounded_number_of_matches():
+    """A cell found at many windows lists the first MAX_LISTED matches, its own recording first, and counts all."""
+    rec = {"class": "different", "july_raw_sha256": "flat", "animal": "X", "july_position": 1, "window": 50,
+           "port_position": 1, "port_channel": "A", "port_raw_sha256": "p", "port_view_sha256": "vp",
+           "port_rms": "9.0", "view_match": False}
+    hits = [(0, w, "A", "0.0") for w in range(12)] + [(1, 60, "A", "0.0"), (1, 50, "A", "0.0"), (1, 50, "B", "0.0")]
+    shared = {"X": 1}       # the scan holds the port hashes' samples of X (scan_usable)
+    unshifted = dict(rec)
+    CW.find_shifts([unshifted], {"matches": {("X", "flat"): hits}})
+    assert unshifted == rec, "a scan never compared with the port hashes classifies nothing"
+    CW.find_shifts([rec], {"matches": {("X", "flat"): hits}, "shared": shared})
+    assert rec["class"] == "shifted" and rec["n_scan_matches"] == 13, "a match at the cell's own window is no shift"
+    assert rec["port_position"].split(";") == ["1"] + ["0"] * (CW.MAX_LISTED - 1)
+    assert rec["window_offset"].split(";")[:3] == ["10", "-50", "-49"]
+
+    missing = {"class": "july_missing", "july_raw_sha256": "", "animal": "X", "july_position": 0, "window": 1}
+    CW.find_shifts([missing], {"matches": {("X", ""): [(0, 2, "A", "0.0")]}, "shared": shared})
+    assert missing["class"] == "july_missing"
+
+
+def test_scan_rows_and_hash_rows_are_not_interchangeable(tmp_path):
+    """A scan passed as a hash output is refused, and so is a hash output passed as a scan."""
+    scan, hashes = tmp_path / "scan.csv", tmp_path / "hashes.csv"
+    _write_rows(scan, list(_scan_row("X", 0, 1, "A", "s")), [_scan_row("X", 0, 1, "A", "s")])
+    _write_rows(hashes, ["status", *_hash_row("X", 0, 1, "A", "s")],
+                [dict(_hash_row("X", 0, 1, "A", "s"), status="ok")])
+    with pytest.raises(ValueError, match="pass a scan with --port-scan"):
+        CW.read_hashes(scan)
+    with pytest.raises(ValueError, match="not a scan row"):
+        CW.read_scan(hashes)
+    assert set(CW.read_hashes(hashes)) == {("X", 0, 1, "A")}
+    assert CW.read_scan(scan)["matches"] == {("X", "s"): [(0, 1, "A", "1.0")]}
+
+
+def _stamped(row, status="ok", commit="", dirty=""):
+    """A hash row with the status and code columns, so that rows of every status share one header."""
+    return dict(row, status=status, git_commit=commit, src_dirty=dirty)
+
+
+def test_a_shift_may_keep_the_window_index_in_another_recording(tmp_path):
+    """Only the cell's own July position and window is passed over: the same window elsewhere is a shift.
+
+    X's July samples are in another recording at the same window, under a channel no labeled cell names; Y's
+    are where the port hash run could not read them; W's are at W's own window under another channel, which is
+    no shift.
+    """
+    cells = [("X__0", "X", 0, 20, "A"), ("Y__0", "Y", 0, 20, "A"), ("W__0", "W", 0, 20, "A")]
+    july = [_hash_row("X", 0, 20, "A", "s1"), _hash_row("Y", 0, 20, "A", "t1"), _hash_row("W", 0, 20, "A", "w1")]
+    port = [_stamped(_hash_row("X", 0, 20, "A", "p1", rms=9.0)), _stamped(_hash_row("Y", 0, 20, "A", "q1", rms=9.0)),
+            _stamped(dict(_hash_row("Y", 1, 20, "A", ""), view_sha256=""), status="read_error"),
+            _stamped(_hash_row("W", 0, 20, "A", "pw", rms=9.0))]
+    scan = [_scan_row("X", 0, 20, "A", "p1"), _scan_row("X", 1, 20, "C", "s1"),
+            _scan_row("Y", 0, 20, "A", "q1"), _scan_row("Y", 1, 20, "A", "t1"),
+            _scan_row("W", 0, 20, "A", "pw"), _scan_row("W", 0, 20, "B", "w1")]
+    lengths = {label: "100" for label in ("X__0", "Y__0", "W__0")}
+
+    rc, rmap = _run_main(tmp_path / "plain", cells, july, port, lengths)
+    _, plain = _read_rows(tmp_path / "plain" / "cells.csv")
+    assert rc == 1 and {c["class"] for c in plain} == {"different"}
+
+    rc, rmap = _run_main(tmp_path / "scan", cells, july, port, lengths, scan_rows=scan)
+    _, rows = _read_rows(tmp_path / "scan" / "cells.csv")
+    got = {c["july_recording"]: c for c in rows}
+    where = ["class", "port_position", "port_window", "port_channel", "window_offset", "n_scan_matches"]
+    assert [got["X__0"][k] for k in where] == ["shifted", "1", "20", "C", "0", "1"]
+    assert [got["Y__0"][k] for k in where] == ["shifted", "1", "20", "A", "0", "1"]
+    assert [got["W__0"][k] for k in where] == ["different", "0", "", "A", "", ""]
+    assert rmap["X__0"]["reason"] == ("cells neither identical nor remapped: shifted 1; shifted by window offset +0 "
+                                      "at port position 1: 1 cell")
+    assert rmap["W__0"]["reason"] == ("cells neither identical nor remapped: different 1; not found at another "
+                                      "window in the port scan: different 1")
+
+
+def test_a_scan_is_used_only_where_it_holds_the_port_samples(tmp_path, capsys):
+    """A scan classifies an animal's cells only when it shares hashed rows with the port hashes and agrees at all.
+
+    Every scan holds the July samples of window 20 at window 25. X's scan disagrees with the port hashes at
+    both rows they share, whether or not both runs record the same commit; Y's shares no hashed row with them,
+    since the port hash run could not read Y; Z's scan could not open Z's recording; U's scan agrees, and only
+    U's cell is shifted.
+    """
+    cells = [("X__0", "X", 0, 20, "A"), ("X__0", "X", 0, 21, "A"), ("Y__0", "Y", 0, 20, "A"),
+             ("Z__0", "Z", 0, 20, "A"), ("U__0", "U", 0, 20, "A")]
+    july = [_hash_row("X", 0, 20, "A", "x20"), _hash_row("X", 0, 21, "A", "x21"), _hash_row("Y", 0, 20, "A", "y20"),
+            _hash_row("Z", 0, 20, "A", "z20"), _hash_row("U", 0, 20, "A", "u20")]
+    lengths = {label: "100" for label in ("X__0", "Y__0", "Z__0", "U__0")}
+    for commit in ("", "abc123"):
+        dirty = "False" if commit else ""
+        port = [_stamped(_hash_row("X", 0, w, "A", f"p{w}", rms=9.0), commit=commit, dirty=dirty) for w in (20, 21)]
+        port += [_stamped(dict(_hash_row("Y", 0, 20, "A", ""), view_sha256=""), "read_error", commit, dirty),
+                 _stamped(_hash_row("Z", 0, 20, "A", "pz", rms=9.0), commit=commit, dirty=dirty),
+                 _stamped(_hash_row("U", 0, 20, "A", "pu", rms=9.0), commit=commit, dirty=dirty)]
+        scan = [_scan_row("X", 0, 20, "A", "other20"), _scan_row("X", 0, 21, "A", "other21"),
+                _scan_row("X", 0, 25, "A", "x20"), _scan_row("Y", 0, 20, "A", "yy"), _scan_row("Y", 0, 25, "A", "y20"),
+                _scan_row("Z", 0, "", "", "", status="scan_read_error"),
+                _scan_row("U", 0, 20, "A", "pu"), _scan_row("U", 0, 25, "A", "u20")]
+        scan = [dict(r, git_commit=commit, src_dirty=dirty) for r in scan]
+        d = tmp_path / (commit or "no_commit")
+        capsys.readouterr()
+        rc, rmap = _run_main(d, cells, july, port, lengths, scan_rows=scan)
+        out = capsys.readouterr().out
+        assert rc == 1
+        _, rows = _read_rows(d / "cells.csv")
+        assert {(c["july_recording"], c["window"]): c["class"] for c in rows} == {
+            ("X__0", "20"): "different", ("X__0", "21"): "different", ("Y__0", "20"): "missing",
+            ("Z__0", "20"): "different", ("U__0", "20"): "shifted"}
+        assert rmap["X__0"]["reason"] == ("cells neither identical nor remapped: different 2; not looked up in the "
+                                          "port scan, which disagrees with the port hashes at 2 of 2 shared rows of "
+                                          "this animal: different 2")
+        assert rmap["Y__0"]["reason"] == ("cells neither identical nor remapped: missing 1; not looked up in the port "
+                                          "scan, which shares no hashed row with the port hashes of this animal: "
+                                          "missing 1")
+        assert rmap["Z__0"]["reason"] == ("cells neither identical nor remapped: different 1; not looked up in the "
+                                          "port scan, which could not read this animal: different 1")
+        assert rmap["U__0"]["reason"].endswith("shifted by window offset +5 at port position 0: 1 cell")
+        assert "X: the scan disagrees with the port hashes at 2 of 2 shared rows" in out
+        assert "Y: the scan shares no hashed row with the port hashes" in out
+        assert "U: the scan agrees with the port hashes at 1 shared row" in out
+        assert "record different code" not in out, "the commits agree, yet X's samples do not"
+
+    checked = CW.read_scan(d / "scan.csv", port=CW.read_hashes(d / "hashes_port.csv"))
+    assert (dict(checked["shared"]), dict(checked["disagreements"])) == ({"X": 2, "U": 1}, {"X": 2})
+    assert [a for a in "XYZU" if CW.scan_usable(checked, a)] == ["U"]
+    assert not CW.scan_usable(CW.read_scan(d / "scan.csv"), "U"), "a scan not compared with the port hashes"
+
+
+def test_a_scan_never_writes_the_committed_map(tmp_path, monkeypatch, capsys):
+    """--port-scan refuses the committed recording map, by default or by another name, and leaves it alone."""
+    committed = tmp_path / "config" / "recording_map.csv"
+    committed.parent.mkdir()
+    committed.write_text("left by the committed run\n")
+    monkeypatch.setattr(CW, "CONFIG_RECORDING_MAP", committed)
+    cells, july = [("X__0", "X", 0, 20, "A")], [_hash_row("X", 0, 20, "A", "s1")]
+    port = [_hash_row("X", 0, 20, "A", "p1", rms=9.0)]
+    d = tmp_path / "inputs"
+    _run_main(d, cells, july, port, {"X__0": "100"}, scan_rows=[_scan_row("X", 0, 20, "A", "p1")])
+    inputs = ["--july", str(d / "hashes_july.csv"), "--port", str(d / "hashes_port.csv"), "--keymap",
+              str(d / "keymap.csv"), "--july-n-fragments", str(d / "july_n_fragments.csv")]
+    scan = ["--port-scan", str(d / "scan.csv")]
+
+    for named in ([], ["--recording-map", str(tmp_path / "inputs" / ".." / "config" / "recording_map.csv")]):
+        capsys.readouterr()
+        with pytest.raises(SystemExit) as stop:
+            CW.main([*inputs, *scan, "--out", str(tmp_path / "refused.csv"), *named])
+        assert stop.value.code == 2 and "--port-scan writes a map that differs" in capsys.readouterr().err
+        assert committed.read_text() == "left by the committed run\n" and not (tmp_path / "refused.csv").exists()
+
+    assert CW.main([*inputs, "--out", str(tmp_path / "cells.csv")]) == 1, "without a scan the default map is written"
+    assert _read_rows(committed)[0] == CW.MAP_FIELDS
+
+
+def test_map_names_the_code_of_each_hash_run(tmp_path, capsys):
+    """The commits and src states of the two hash outputs reach every map row; several of them are all named."""
+    def stamped(row, commit, dirty):
+        return dict(row, git_commit=commit, src_dirty=dirty)
+
+    cells = [("X__0", "X", 0, 20, "A"), ("Y__0", "Y", 0, 3, "A")]
+    july = [stamped(_hash_row("X", 0, 20, "A", "s"), "j1", "False"),
+            stamped(_hash_row("Y", 0, 3, "A", "t"), "j1", "False")]
+    port = [stamped(_hash_row("X", 0, 20, "A", "s"), "p2", "True"),
+            stamped(_hash_row("Y", 0, 3, "A", "t"), "p1", "False")]
+    rc, rmap = _run_main(tmp_path / "run", cells, july, port, {"X__0": "100", "Y__0": "100"})
+    assert rc == 0
+    for row in rmap.values():
+        assert (row["july_commit"], row["july_src_dirty"]) == ("j1", "False")
+        assert (row["port_commit"], row["port_src_dirty"]) == ("p1;p2", "False;True")
+    out = capsys.readouterr().out
+    assert "port hashes: git commit p1;p2, src dirty False;True" in out
+    assert "the port hashes come from several commits" in out and "src differed from the commit in a port" in out
+
+    import score_detectors as SDET
+    reader = SDET.RecordingMap(tmp_path / "run" / "recording_map.csv")
+    assert reader.label("X", 0, "X WT day0") == "X__0" and reader.label("Y", 0, "Y WT day0") == "Y__0"
+
+    rc, rmap = _run_main(tmp_path / "unstamped", cells[:1], [_hash_row("X", 0, 20, "A", "s")],
+                         [_hash_row("X", 0, 20, "A", "s")], {"X__0": "100"})
+    assert (rmap["X__0"]["july_commit"], rmap["X__0"]["port_commit"], rmap["X__0"]["port_src_dirty"]) == ("", "", "")
+
+
+def test_unmapped_recording_lists_the_port_recordings_of_its_date(tmp_path, capsys):
+    """The map gives the July run's n_files, n_fragments and date, and the port recordings of the animal that day.
+
+    The port splits the July day into positions 0 and 2; no labeled window fits position 2, so it has no hash
+    rows and is listed only when a scan covers the animal. Position 1 is another day.
+    """
+    def dated(row, date, n_files, n):
+        return dict(row, date_string=date, n_files=str(n_files), n_fragments=str(n))
+
+    cells = [("X__0", "X", 0, 20, "A")]
+    july = [dated(_hash_row("X", 0, 20, "A", "s"), "Jan-01-2025", 4, 100)]
+    port = [dated(_hash_row("X", 0, 20, "A", "changed", rms=7.0), "Jan-01-2025", 3, 97),
+            dated(_hash_row("X", 1, 20, "A", "other", rms=8.0), "Jan-02-2025", 4, 100)]
+    scan = [_scan_row("X", 2, 0, "A", "short", date="Jan-01-2025", n_files=1, n=3),
+            _scan_row("X", 0, 20, "A", "changed", date="Jan-01-2025", n_files=3, n=97)]
+    columns = ["july_n_files", "july_n_fragments", "july_date_string", "port_positions_on_date",
+               "port_n_files_on_date", "port_n_fragments_on_date"]
+
+    rc, rmap = _run_main(tmp_path / "plain", cells, july, port, {"X__0": "100"})
+    assert rc == 1 and rmap["X__0"]["status"] == "unmapped"
+    assert [rmap["X__0"][k] for k in columns] == ["4", "100", "Jan-01-2025", "0", "3", "97"]
+    assert ("X__0: unmapped, cells neither identical nor remapped: different 1; n_fragments July 100, port -, July "
+            "draw 100; July n_files 4, date Jan-01-2025; port recordings of the animal that day: position 0 "
+            "(n_files 3, n_fragments 97)") in capsys.readouterr().out
+
+    rc, rmap = _run_main(tmp_path / "scan", cells, july, port, {"X__0": "100"}, scan_rows=scan)
+    assert [rmap["X__0"][k] for k in columns] == ["4", "100", "Jan-01-2025", "0;2", "3;1", "97;3"]
+    assert rmap["X__0"]["reason"].endswith("not found at another window in the port scan: different 1")
+
+    rc, rmap = _run_main(tmp_path / "undated", cells, [dated(july[0], "", 4, 100)], port, {"X__0": "100"})
+    assert rmap["X__0"]["port_positions_on_date"] == "", "a recording without a date matches no port recording"
 
 
 def test_cells_in_recording():
@@ -638,6 +1012,115 @@ def test_first_file_in_the_temp_dir_does_not_name_the_run(tmp_path, fake_loader)
     fake_loader([_FakeLRO(_signal(1, 1, seed=0), ["A"], file_path=str(temps["port"] / name))])
     rows = HW.hash_animal("port", "X", {}, {}, {(0, "A"): {0}}, {}, temp_dir=temps["port"])
     assert [(r["status"], r["first_file"]) for r in rows] == [("ok", f"<temp>/{name}")]
+
+
+def test_scan_hashes_every_window_and_column(fake_loader):
+    """A scan writes one row per window and column; a failure gives scan_read_error rows for what it covers.
+
+    Position 0 is sound and ends in a partial window; position 1 has an unreadable window; position 2 cannot
+    be opened.
+    """
+    data0 = _signal(3, 2, seed=0)[: int(2.5 * FAKE_SPF)]
+    fake_loader([_FakeLRO(data0, ["A", "B"]), _FakeLRO(_signal(2, 2, seed=1), ["A", "B"], bad_windows={1}),
+                 _FakeLRO(_signal(1, 2, seed=2), ["A", "B"], unopenable=True)])
+    per_recording = HW.scan_animal("port", "X", {}, {}, {"X__0": [3]})
+    rows = [r for recording in per_recording for r in recording]
+    assert [(r["position"], r["window"], r["channel"], r["column"], r["status"]) for r in rows] == [
+        (0, 0, "A", 0, "scan"), (0, 0, "B", 1, "scan"), (0, 1, "A", 0, "scan"), (0, 1, "B", 1, "scan"),
+        (0, 2, "A", 0, "scan"), (0, 2, "B", 1, "scan"),
+        (1, 0, "A", 0, "scan"), (1, 0, "B", 1, "scan"),
+        (1, 1, "A", 0, "scan_read_error"), (1, 1, "B", 1, "scan_read_error"),
+        (2, "", "", "", "scan_read_error")]
+    for r in rows[:6]:
+        w, j = r["window"], r["column"]
+        x = data0[w * FAKE_SPF:(w + 1) * FAKE_SPF, j]
+        assert (r["raw_sha256"], r["raw_rms"]) == (_sha(x), repr(float(np.sqrt(np.mean(x.astype(float) ** 2)))))
+        assert (r["start_sample"], r["n_samples"], r["n_fragments"]) == (w * FAKE_SPF, len(x), 3)
+        assert r["view_sha256"] == r["july_recording"] == r["error"] == ""
+    assert rows[0]["july_n_fragments"] == "3" and rows[6]["july_n_fragments"] == ""
+    assert rows[8]["error"] == "OSError: window 1 is unreadable" and rows[8]["raw_sha256"] == ""
+    assert rows[10]["error"] == "OSError: the recording cannot be opened" and rows[10]["animalday"] == "X WT day0"
+
+
+def test_main_writes_the_code_version_and_scans_on_request(tmp_path, monkeypatch, fake_loader):
+    """Every row names the commit and src state of the working directory's tree; --all-windows writes scan rows.
+
+    The tree whose code is read is the working directory, not this script's repository; a scan needs --animal.
+    """
+    code = {"git_commit": "c0ffee", "src_dirty": False}
+    seen = []
+    monkeypatch.setattr(HW, "code_version", lambda tree: seen.append(tree) or dict(code))
+    monkeypatch.chdir(tmp_path)
+    argv, _, out, _ = _fake_main(monkeypatch, tmp_path / "hash", {"X": ["ok", "ok"]})
+    assert HW.main(argv) == 0
+    assert seen == [tmp_path.resolve()] and tmp_path.resolve() != REPO
+    assert {(r["git_commit"], r["src_dirty"]) for r in _read_rows(out)[1]} == {("c0ffee", "False")}
+
+    fake_loader([_FakeLRO(_signal(2, 2, seed=0), ["A", "B"])])
+    argv, _, out, partial = _fake_main(monkeypatch, tmp_path / "scan", {"X": ["ok"], "Y": ["ok"]})
+    assert HW.main([*argv, "--all-windows", "--animal", "X"]) == 0
+    fields, rows = _read_rows(out)
+    assert fields == HW.FIELDS and not partial.exists()
+    assert [(r["animal"], r["window"], r["channel"], r["status"]) for r in rows] == [
+        ("X", "0", "A", "scan"), ("X", "0", "B", "scan"), ("X", "1", "A", "scan"), ("X", "1", "B", "scan")]
+    assert {(r["git_commit"], r["src_dirty"]) for r in rows} == {("c0ffee", "False")}
+
+    fake_loader([_FakeLRO(_signal(2, 2, seed=0), ["A", "B"], bad_windows={0})])
+    argv, _, out, _ = _fake_main(monkeypatch, tmp_path / "scan_error", {"X": ["ok"]})
+    assert HW.main([*argv, "--all-windows", "--animal", "X"]) == 1
+    assert [r["status"] for r in _read_rows(out)[1]] == ["scan_read_error"] * 2 + ["scan"] * 2
+
+    argv, _, _, _ = _fake_main(monkeypatch, tmp_path / "no_animal", {"X": ["ok"]})
+    with pytest.raises(SystemExit):
+        HW.main([*argv, "--all-windows"])
+
+
+def test_code_version(tmp_path, monkeypatch, caplog):
+    """The commit is HEAD's, and src is dirty only for a change under src, tracked or not.
+
+    A linked worktree, as the runbook makes for the July tree, and a symlink to a tree have the tree's commit; a
+    plain copy inside another repository, in an ignored directory or not, has none.
+    """
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
+    repo = tmp_path / "tree"
+    (repo / "src").mkdir(parents=True)
+    (repo / "src" / "m.py").write_text("x = 1\n")
+    (repo / "README").write_text("r\n")
+
+    def git(*args):
+        return subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@example.com",
+                               "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null", *args],
+                              capture_output=True, text=True, check=True).stdout.strip()
+
+    assert HW.code_version(repo) == {"git_commit": "", "src_dirty": ""}, "not a git tree yet"
+    git("init", "-q")
+    git("add", "-A")
+    git("commit", "-q", "-m", "first")
+    head = git("rev-parse", "HEAD")
+    assert HW.code_version(repo) == {"git_commit": head, "src_dirty": False}
+    (repo / "README").write_text("changed\n")
+    assert HW.code_version(repo)["src_dirty"] is False, "a change outside src does not count"
+    (repo / "src" / "new.py").write_text("y = 2\n")
+    assert HW.code_version(repo) == {"git_commit": head, "src_dirty": True}
+    (repo / "src" / "new.py").unlink()
+    (repo / "src" / "m.py").write_text("x = 2\n")
+    assert HW.code_version(repo)["src_dirty"] is True
+
+    (repo / ".gitignore").write_text("copies/\n")
+    git("add", "-A")
+    git("commit", "-q", "-m", "second")
+    head = git("rev-parse", "HEAD")
+    worktree, link = tmp_path / "july", tmp_path / "link"
+    git("worktree", "add", "-q", "--detach", str(worktree), head)
+    link.symlink_to(repo, target_is_directory=True)
+    assert HW.code_version(worktree) == HW.code_version(link) == {"git_commit": head, "src_dirty": False}
+    for copy in (repo / "copies" / "july", repo / "sub"):
+        (copy / "src").mkdir(parents=True)
+        (copy / "src" / "m.py").write_text("x = 'july'\n")
+        caplog.clear()
+        assert HW.code_version(copy) == {"git_commit": "", "src_dirty": ""}, copy
+        assert "is not the top level of a git checkout" in caplog.text
+    assert HW.code_version(repo) == {"git_commit": head, "src_dirty": False}
 
 
 # --------------------------------------------------------------------------- output written per animal

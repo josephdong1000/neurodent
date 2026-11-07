@@ -20,7 +20,22 @@ cell of the animal when its length is unknown. ``first_file`` is the recording's
 recording split out of a multi-animal file has no source item, so its construction arguments are searched
 instead, and for an MNE-loaded file they name the intermediate in ``--temp-dir``. A path inside
 ``--temp-dir`` is written as ``<temp>/`` plus its path relative to that directory (for an intermediate, its
-file name), so the July and port outputs agree although their temp directories differ.
+file name), so the July and port outputs agree although their temp directories differ. Every row also
+records the code the run used: ``git_commit`` is the working tree's ``git rev-parse HEAD`` and ``src_dirty``
+whether ``git status --porcelain -- src`` lists anything there, both empty when git cannot tell or the
+working directory is not the top level of a git checkout or worktree (a plain copy inside another repository
+would otherwise get that repository's commit). ``compare_window_hashes.py`` carries them into the recording
+map.
+
+``--all-windows`` scans instead of hashing labeled cells: for the animals named with ``--animal`` it hashes
+every window of every recording, every column, into rows with status scan. A scan row has the raw sha256,
+statistics and first samples of one column in one window, ``channel`` is that column's canonical name, and
+``july_recording`` and ``view_sha256`` are empty. A window that cannot be read gives a scan_read_error row
+per column, and a recording that cannot be opened one scan_read_error row without window or channel.
+``compare_window_hashes.py --port-scan`` looks up different and missing cells there, to tell samples that
+moved by whole windows from samples that changed. A scan reads whole recordings: each animal costs a full
+load, as in a hash run, plus a read of every sample, and writes one row per window and column, about
+600 bytes each, so a day at 1000 Hz with 10 channels gives 172,800 rows, about 100 MB.
 
 The same file runs under the July tree (commit 41353542) and under the port, so it imports only APIs both
 trees have and none of its sibling scripts. The working directory selects the tree's dataset configs and
@@ -39,10 +54,12 @@ port hash run's ``--temp-dir`` through their own ``--temp-dir`` option, so that 
 this check validated.
 
 Rows are written to ``<out>.partial``. Each animal's rows are appended and flushed as soon as the animal
-finishes, so a run stopped by a time or memory limit keeps every animal it finished. When every requested
+finishes, so a run stopped by a time or memory limit keeps every animal it finished. A scan writes its rows
+as each recording is read instead, so its ``<out>.partial`` may end inside an animal. When every requested
 animal has been tried, the file is renamed to ``<out>``; a file still named ``<out>.partial`` comes from a
 run that did not finish. An ``<out>`` left by an earlier run is removed when writing starts. The exit
-status is 1 when an animal could not be loaded or a row has status read_error, and 0 otherwise.
+status is 1 when an animal could not be loaded or a row has status read_error or scan_read_error, and 0
+otherwise.
 
 Run on the cluster from the root of each tree. The keymap, manifest and fragment-count table default to
 the copies in this script's repository; the keymap and manifest are identical in both trees::
@@ -53,6 +70,12 @@ the copies in this script's repository; the keymap and manifest are identical in
     cd <port-worktree>
     PYTHONPATH=$PWD/src python scripts/labeling/hash_labeled_windows.py --tree port \\
         --out <scratch>/hashes_port.csv --temp-dir <scratch>/hash_tmp_port
+
+A scan of the port for some animals, with its own empty temp directory::
+
+    cd <port-worktree>
+    PYTHONPATH=$PWD/src python scripts/labeling/hash_labeled_windows.py --tree port --all-windows \\
+        --animal <id> [<id> ...] --out <scratch>/scan_port.csv --temp-dir <scratch>/scan_tmp_port
 """
 
 import argparse
@@ -61,6 +84,7 @@ import hashlib
 import json
 import logging
 import os
+import subprocess
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -91,12 +115,15 @@ FRAG_S = 5.0    # render_context.FRAG_S: a labeled window is one 5 s fragment
 N_HEAD = 4      # leading raw samples written per cell
 TEMP_TAG = "<temp>"             # stands for the run's --temp-dir in first_file
 PARTIAL_SUFFIX = ".partial"     # the output's suffix until the run finishes
+SCAN = "scan"                   # status of a scan row with hashed samples (--all-windows)
+SCAN_ERROR = "scan_read_error"  # status of a scan row whose samples could not be read
 
 FIELDS = [
     "tree", "animal", "position", "animalday", "date_string", "first_file", "n_files", "n_fragments", "fs",
     "samples_per_fragment", "july_n_fragments", "july_recording", "window", "channel", "column", "status",
     "error", "start_sample", "n_samples", "dtype", "raw_sha256", "view_sha256", "raw_rms", "raw_mean",
     "raw_ptp", *[f"raw_head_{k}" for k in range(N_HEAD)], "channel_names", "canonical_channels",
+    "git_commit", "src_dirty",
 ]
 
 
@@ -124,6 +151,41 @@ def check_tree():
     local = cwd / "config" / "config.local.yaml"
     log.info(f"config/config.local.yaml {'is' if local.exists() else 'is not'} present in this tree")
     return pkg
+
+
+def code_version(tree):
+    """Return the git commit of a tree and whether its ``src`` directory differs from that commit.
+
+    Only the top level of a git checkout or worktree has a commit. git answers for a plain copy inside another
+    repository, such as an archive unpacked in an ignored directory, with that repository's commit, so such a
+    tree records none.
+
+    Args:
+        tree (str | Path): Root of the tree under test.
+
+    Returns:
+        dict[str, str | bool]: ``git_commit``, the output of ``git rev-parse HEAD``, and ``src_dirty``, True
+        when ``git status --porcelain -- src`` lists a modified or untracked file; each is empty when git
+        cannot tell or the tree is not the top level of its repository.
+    """
+    def git(*args):
+        try:
+            return subprocess.run(["git", "-C", str(tree), *args], capture_output=True, text=True,
+                                  check=True).stdout.strip()
+        except (OSError, subprocess.CalledProcessError):
+            return None
+
+    unknown = {"git_commit": "", "src_dirty": ""}
+    top = git("rev-parse", "--show-toplevel")
+    if not top:
+        return unknown
+    if Path(top).resolve() != Path(tree).resolve():
+        log.warning(f"{tree} is not the top level of a git checkout but lies inside the repository at {top}, "
+                    "whose commit does not name this tree's code")
+        return unknown
+    commit = git("rev-parse", "HEAD")
+    status = git("status", "--porcelain", "--", "src")
+    return {"git_commit": commit or "", "src_dirty": "" if status is None else bool(status)}
 
 
 def prepare_temp_dir(path, reuse=False):
@@ -359,6 +421,16 @@ def _row(info, window, channel, july_recording, **values):
     return row
 
 
+def _raw_values(x):
+    """The raw sha256, statistics and first samples of one column of a window, as row values."""
+    x64 = x.astype(np.float64)
+    out = {"raw_sha256": _sha256_f32(x), "raw_rms": _num(np.sqrt(np.mean(x64 ** 2))), "raw_mean": _num(np.mean(x64)),
+           "raw_ptp": _num(np.ptp(x64))}
+    for k in range(min(N_HEAD, x64.size)):
+        out[f"raw_head_{k}"] = _num(x64[k])
+    return out
+
+
 def _hash_cell(raw, view, canonical, ch):
     """Return the status of one cell and, when exactly one column carries its channel, its hashes.
 
@@ -377,14 +449,42 @@ def _hash_cell(raw, view, canonical, ch):
         return {"status": "channel_absent" if not cols else "channel_duplicate",
                 "column": ";".join(str(j) for j in cols)}
     col = cols[0]
-    x = raw[:, col]
-    x64 = x.astype(np.float64)
-    out = {"status": "ok", "column": col, "raw_sha256": _sha256_f32(x), "view_sha256": _sha256_f32(view[:, col]),
-           "raw_rms": _num(np.sqrt(np.mean(x64 ** 2))), "raw_mean": _num(np.mean(x64)),
-           "raw_ptp": _num(np.ptp(x64))}
-    for k in range(min(N_HEAD, x64.size)):
-        out[f"raw_head_{k}"] = _num(x64[k])
+    out = {"status": "ok", "column": col, **_raw_values(raw[:, col])}
+    out["view_sha256"] = _sha256_f32(view[:, col])
     return out
+
+
+def _open_recording(lro, info, temp_dir=None):
+    """Store a recording's columns in ``info`` and return what reading its windows needs.
+
+    Each value is stored as soon as it is known, so when opening fails part way, ``info`` keeps what was
+    learned for the rows that report the failure.
+
+    Args:
+        lro: A ``LongRecordingOrganizer``.
+        info (dict): Row values of the recording, updated in place.
+        temp_dir (str | Path | None, optional): The run's temp directory, for :func:`first_source_path`.
+            Defaults to None.
+
+    Returns:
+        tuple: The ``LongRecordingAnalyzer``, the samples per fragment, and the channel names, canonical
+        channel names and recording channel ids, each a list of str.
+    """
+    info["animalday"] = getattr(lro, "animalday", "") or ""
+    info["date_string"] = _date_string(lro)
+    info["first_file"] = first_source_path(lro, temp_dir)
+    info["n_files"] = len(getattr(lro, "file_durations", None) or [])
+    lan = LongRecordingAnalyzer(lro, fragment_len_s=FRAG_S, apply_notch_filter=True)
+    info["n_fragments"] = int(lan.n_fragments)
+    info["fs"] = int(lan.f_s)
+    spf = int(lro.LongRecording.time_to_sample_index(FRAG_S))
+    info["samples_per_fragment"] = spf
+    names = [str(c) for c in lro.channel_names]
+    info["channel_names"] = ";".join(names)
+    canonical = [str(c) for c in resolve_channels(list(lro.channel_names))]
+    info["canonical_channels"] = ";".join(canonical)
+    ids = [str(c) for c in lro.LongRecording.get_channel_ids()]
+    return lan, spf, names, canonical, ids
 
 
 def hash_recording(tree, animal, position, lro, cells, july_n_fragments, temp_dir=None):
@@ -413,23 +513,8 @@ def hash_recording(tree, animal, position, lro, cells, july_n_fragments, temp_di
     july_here = july_n_fragments.get(label, [])
     info = {"tree": tree, "animal": animal, "position": position,
             "july_n_fragments": ";".join(str(n) for n in july_here)}
-    # Opening the recording: each value is stored as soon as it is known, so read_error rows carry it.
     try:
-        info["animalday"] = getattr(lro, "animalday", "") or ""
-        info["date_string"] = _date_string(lro)
-        info["first_file"] = first_source_path(lro, temp_dir)
-        info["n_files"] = len(getattr(lro, "file_durations", None) or [])
-        lan = LongRecordingAnalyzer(lro, fragment_len_s=FRAG_S, apply_notch_filter=True)
-        n_fragments = int(lan.n_fragments)
-        info["n_fragments"] = n_fragments
-        info["fs"] = int(lan.f_s)
-        spf = int(lro.LongRecording.time_to_sample_index(FRAG_S))
-        info["samples_per_fragment"] = spf
-        names = [str(c) for c in lro.channel_names]
-        info["channel_names"] = ";".join(names)
-        canonical = [str(c) for c in resolve_channels(list(lro.channel_names))]
-        info["canonical_channels"] = ";".join(canonical)
-        ids = [str(c) for c in lro.LongRecording.get_channel_ids()]
+        lan, spf, names, canonical, ids = _open_recording(lro, info, temp_dir)
     except Exception as e:  # a recording that cannot be opened costs only the cells it covers
         error = _error_text(e)
         log.exception(f"{label}: could not open the recording, {error}")
@@ -438,6 +523,7 @@ def hash_recording(tree, animal, position, lro, cells, july_n_fragments, temp_di
         return [_row(info, w, ch, july_label, status="read_error", error=error,
                      start_sample="" if spf is None else spf * w)
                 for w, ch, july_label in covered]
+    n_fragments = info["n_fragments"]
 
     log.info(f"{label}: animalday {info['animalday']!r}, date {info['date_string']!r}, n_fragments {n_fragments}, "
              f"fs {info['fs']}, samples_per_fragment {spf}, {info['n_files']} file(s), first file "
@@ -509,14 +595,149 @@ def hash_animal(tree, animal, samples_config, config, cells, july_n_fragments, t
     Raises:
         Exception: Whatever ``load_animal_recordings`` raises when the animal cannot be loaded at all.
     """
-    channel_subset = samples_config.get("_animal_channel_subsets", {}).get(animal)
-    ao = load_animal_recordings(samples_config, config, [("", animal, "")], animal,
-                                channel_subset=channel_subset, logger=log)
-    log.info(f"{animal}: {len(ao.long_recordings)} recording(s)")
+    ao = load_animal(animal, samples_config, config)
     rows = []
     for position, lro in enumerate(ao.long_recordings):
         rows += hash_recording(tree, animal, position, lro, cells, july_n_fragments, temp_dir=temp_dir)
     return rows
+
+
+def load_animal(animal, samples_config, config):
+    """Load one animal the way the July bundle did: one ``load_animal_recordings`` call with its channel subset.
+
+    Args:
+        animal (str): Animal id.
+        samples_config (dict): Expanded samples config of the animal's dataset, already applied.
+        config (dict): The dataset config.
+
+    Returns:
+        The animal's ``AnimalOrganizer``.
+
+    Raises:
+        Exception: Whatever ``load_animal_recordings`` raises when the animal cannot be loaded at all.
+    """
+    channel_subset = samples_config.get("_animal_channel_subsets", {}).get(animal)
+    ao = load_animal_recordings(samples_config, config, [("", animal, "")], animal,
+                                channel_subset=channel_subset, logger=log)
+    log.info(f"{animal}: {len(ao.long_recordings)} recording(s)")
+    return ao
+
+
+def scan_recording(tree, animal, position, lro, july_n_fragments, temp_dir=None):
+    """Yield one scan row per window and column of a recording, for ``--all-windows``.
+
+    A scan row holds the raw sha256, statistics and first samples of one column in one window, with status
+    scan and no rater-view hash; its channel is the column's canonical name. A failure gives rows with status
+    scan_read_error and the error text instead of being raised: when a window cannot be read, one per
+    column; when a column cannot be hashed, that one; when the recording cannot be opened, one row with no
+    window or channel.
+
+    Args:
+        tree (str): Tree label written to every row.
+        animal (str): Animal id.
+        position (int): Position of the recording in this tree's ``long_recordings``.
+        lro: The ``LongRecordingOrganizer`` at that position.
+        july_n_fragments (dict[str, list[int]]): Recording label to the n_fragments values that reproduce
+            its July window draw.
+        temp_dir (str | Path | None, optional): The run's temp directory, for :func:`first_source_path`.
+            Defaults to None.
+
+    Yields:
+        dict: Rows with the columns in :data:`FIELDS`, window by window.
+    """
+    label = f"{animal}__{position}"
+    info = {"tree": tree, "animal": animal, "position": position,
+            "july_n_fragments": ";".join(str(n) for n in july_n_fragments.get(label, []))}
+    try:
+        _, spf, _, canonical, _ = _open_recording(lro, info, temp_dir)
+    except Exception as e:  # a recording that cannot be opened gives one row saying why
+        error = _error_text(e)
+        log.exception(f"{label}: could not open the recording for the scan, {error}")
+        yield _row(info, "", "", "", status=SCAN_ERROR, error=error)
+        return
+    n_fragments = info["n_fragments"]
+    log.info(f"{label}: scanning {n_fragments} windows of {len(canonical)} channels {canonical}, "
+             f"{info['n_files']} file(s), date {info['date_string']!r}")
+
+    n_failed = 0
+    for w in range(n_fragments):
+        window = dict(info, start_sample=spf * w)
+        try:
+            raw = np.asarray(_traces_uV(lro.get_fragment(FRAG_S, w)))
+            window.update(n_samples=raw.shape[0], dtype=str(raw.dtype))
+        except Exception as e:  # a window that cannot be read costs only its own rows
+            error = _error_text(e)
+            if n_failed == 0:
+                log.exception(f"{label} window {w}: could not read the samples, {error}")
+            else:
+                log.error(f"{label} window {w}: could not read the samples, {error}")
+            n_failed += 1
+            for j, ch in enumerate(canonical):
+                yield _row(window, w, ch, "", column=j, status=SCAN_ERROR, error=error)
+            continue
+        for j, ch in enumerate(canonical):
+            try:
+                values = _raw_values(raw[:, j])
+            except Exception as e:  # a column that cannot be hashed costs only its own row
+                error = _error_text(e)
+                log.error(f"{label} window {w}: could not hash column {j} ({ch}), {error}")
+                yield _row(window, w, ch, "", column=j, status=SCAN_ERROR, error=error)
+                continue
+            yield _row(window, w, ch, "", column=j, status=SCAN, **values)
+    log.info(f"{label}: scanned {n_fragments} windows, {n_failed} of them unreadable")
+
+
+def scan_animal(tree, animal, samples_config, config, july_n_fragments, temp_dir=None):
+    """Load one animal as :func:`hash_animal` does and return the scan rows of each recording.
+
+    The rows are produced as they are iterated, so a caller can write them without holding them all.
+
+    Args:
+        tree (str): Tree label written to every row.
+        animal (str): Animal id.
+        samples_config (dict): Expanded samples config of the animal's dataset, already applied.
+        config (dict): The dataset config.
+        july_n_fragments (dict[str, list[int]]): Recording label to its July n_fragments matches.
+        temp_dir (str | Path | None, optional): The run's temp directory, for :func:`first_source_path`.
+            Defaults to None.
+
+    Returns:
+        list[Iterator[dict]]: The rows of :func:`scan_recording` for each recording, in position order.
+
+    Raises:
+        Exception: Whatever ``load_animal_recordings`` raises when the animal cannot be loaded at all.
+    """
+    ao = load_animal(animal, samples_config, config)
+    return [scan_recording(tree, animal, position, lro, july_n_fragments, temp_dir=temp_dir)
+            for position, lro in enumerate(ao.long_recordings)]
+
+
+def write_scan(writer, fh, tree, animal, samples_config, config, july_n_fragments, counts, temp_dir=None,
+               code=None):
+    """Scan one animal (:func:`scan_animal`) and write its rows as they are read, flushing after each recording.
+
+    Args:
+        writer (csv.DictWriter): Writer of the output.
+        fh: The output's file handle.
+        tree (str): Tree label written to every row.
+        animal (str): Animal id.
+        samples_config (dict): Expanded samples config of the animal's dataset, already applied.
+        config (dict): The dataset config.
+        july_n_fragments (dict[str, list[int]]): Recording label to its July n_fragments matches.
+        counts (Counter): Rows written by status, updated as rows are written.
+        temp_dir (str | Path | None, optional): The run's temp directory. Defaults to None.
+        code (dict | None, optional): Values written to every row, from :func:`code_version`. Defaults to
+            None.
+
+    Raises:
+        Exception: Whatever ``load_animal_recordings`` raises when the animal cannot be loaded at all.
+    """
+    for rows in scan_animal(tree, animal, samples_config, config, july_n_fragments, temp_dir=temp_dir):
+        for row in rows:
+            row.update(code or {})
+            writer.writerow(row)
+            counts[row["status"]] += 1
+        fh.flush()  # the operating system keeps flushed rows when the process is killed
 
 
 def main(argv=None):
@@ -524,12 +745,13 @@ def main(argv=None):
 
     Rows go to ``<out>.partial``, flushed after each animal, and the file is renamed to ``<out>`` once every
     requested animal has been tried. A file from an earlier run at ``<out>`` is removed when writing starts.
+    With ``--all-windows`` the rows are scan rows instead, flushed after each recording.
 
     Args:
         argv (list[str], optional): Command-line arguments. Defaults to ``sys.argv[1:]``.
 
     Returns:
-        int: 0 when every animal loaded and no row has status read_error, 1 otherwise.
+        int: 0 when every animal loaded and no row has status read_error or scan_read_error, 1 otherwise.
     """
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--tree", required=True, help="label written to every row, for example july or port")
@@ -546,10 +768,26 @@ def main(argv=None):
     p.add_argument("--reuse-temp-dir", action="store_true",
                    help="accept intermediates already in --temp-dir, for example a preserved copy of the cache "
                         "the July bundle read; every reused file is logged")
+    p.add_argument("--all-windows", action="store_true",
+                   help="scan the --animal animals: hash every window of every recording, every column, as rows "
+                        "with status scan, for compare_window_hashes.py --port-scan. It reads whole recordings, "
+                        "about 600 bytes of output per window and column")
     args = p.parse_args(argv)
+    if args.all_windows and not args.animal:
+        p.error("--all-windows reads every sample of every recording; name the animals to scan with --animal")
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
     check_tree()
+    tree_dir = Path.cwd().resolve()
+    code = code_version(tree_dir)
+    log.info(f"{tree_dir}: git commit {code['git_commit'] or 'unknown'}, src dirty {code['src_dirty']!r}")
+    if not code["git_commit"]:
+        log.warning(f"no git commit of {tree_dir} is recorded, so the rows name no code version")
+    elif code["src_dirty"] is True:
+        log.warning(f"src in {tree_dir} differs from commit {code['git_commit']}, so that commit is not exactly "
+                    "the code that ran")
+    elif code["src_dirty"] == "":
+        log.warning(f"git could not tell whether src in {tree_dir} differs from commit {code['git_commit']}")
     temp_dir = prepare_temp_dir(args.temp_dir, reuse=args.reuse_temp_dir)
     cells = read_keymap_cells(args.keymap)
     manifest = json.loads(Path(args.manifest).read_text())
@@ -570,6 +808,7 @@ def main(argv=None):
     if out.exists():
         log.warning(f"removing {out}, left by an earlier run, so that only a run that finishes leaves a file there")
         out.unlink()
+    ok, error_status = (SCAN, SCAN_ERROR) if args.all_windows else ("ok", "read_error")
     n_rows = n_hashed = 0
     read_errors = Counter()
     with open(partial, "w", newline="", encoding="utf-8") as fh:
@@ -585,6 +824,20 @@ def main(argv=None):
             apply_samples_config(samples_config)
             log.info(f"dataset {ds}: {len(members)} animal(s)")
             for a in members:
+                if args.all_windows:
+                    counts = Counter()
+                    try:
+                        write_scan(writer, fh, args.tree, a, samples_config, config, july_n_fragments, counts,
+                                   temp_dir=temp_dir, code=code)
+                    except Exception as e:  # one animal that fails must not stop the others
+                        log.exception(f"{a}: failed, {type(e).__name__}: {e}")
+                        failures.append({"animal": a, "error": f"{type(e).__name__}: {e}"})
+                    n_rows += sum(counts.values())
+                    n_hashed += counts[ok]
+                    read_errors[a] = counts[error_status]
+                    log.info(f"{a}: wrote {sum(counts.values())} scan rows ({read_errors[a]} read errors) to "
+                             f"{partial}")
+                    continue
                 try:
                     rows = hash_animal(args.tree, a, samples_config, config, cells[a], july_n_fragments,
                                        temp_dir=temp_dir)
@@ -592,6 +845,8 @@ def main(argv=None):
                     log.exception(f"{a}: failed, {type(e).__name__}: {e}")
                     failures.append({"animal": a, "error": f"{type(e).__name__}: {e}"})
                     continue
+                for r in rows:
+                    r.update(code)
                 writer.writerows(rows)
                 fh.flush()  # the operating system keeps flushed rows when the process is killed
                 n_rows += len(rows)
@@ -605,7 +860,7 @@ def main(argv=None):
              f"{len(animals) - len(failures)} of {len(animals)} animal(s) to {out}")
     for a, n in read_errors.items():
         if n:
-            log.error(f"{a}: {n} row(s) with status read_error; the error column says why")
+            log.error(f"{a}: {n} row(s) with status {error_status}; the error column says why")
     for f in failures:
         log.error(f"{f['animal']}: {f['error']}")
     return 1 if failures or n_errors else 0
