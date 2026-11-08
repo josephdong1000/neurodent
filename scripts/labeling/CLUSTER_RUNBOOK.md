@@ -849,7 +849,7 @@ refuses scoring code the selection did not record.
 
 Send the owner the selection printout and the event-cell line as printed, plain numbers without verdicts, with
 `$OUT/dev_config_lists.txt` from step 4 and the jobacct lines of steps 4 and 5. Step 6 and step 8 may start now.
-Step 7 waits for the owner's go.
+Step 7 waits for the owner's go, which comes after step 6's config-list printout.
 
 ## 6. Test features
 
@@ -872,6 +872,22 @@ sbatch --parsable --job-name=test_features --cpus-per-task=32 --mem=128G --time=
 Outputs as in step 4, under `test_features`. Success: exit code 0 and, as the script's last line,
 `wrote A animals, R recordings, 38 autoreject configurations to ...`, with A = 6 unless animals were left out.
 The checks afterwards, the rules while it runs, the failures and `--resume` are as in step 4.
+
+The config-list printout too, into its own file. The only date-keyed list among the labeled animals
+(MMUT(2)_cohort6_group1) is in the test split, so this is the first look at how its keys matched:
+
+```bash
+source /mnt/isilon/marsh_single_unit/YY_PyEEG/neurodent_wt/autoreject/scripts/labeling/cluster/env.sh || exit 1
+"$PY" -c 'import json, sys; p = json.load(open(sys.argv[1]))
+keys = ("config_list_by_recording", "config_list_matches", "config_list_unmatched", "config_list_uncovered",
+        "config_list_unknown_channels")
+print(json.dumps({k: p.get(k) for k in keys}, indent=1))' "$OUT/test_features.parquet.provenance.json" \
+    | tee "$OUT/test_config_lists.txt"
+```
+
+Send `test_config_lists.txt` and the jobacct line of step 6 to the owner, naming every entry under
+`config_list_unmatched`, `config_list_uncovered` and `config_list_unknown_channels`. The owner's go for step 7
+comes after they have seen it.
 
 ## 7. Test score, once
 
