@@ -27,31 +27,61 @@ output would flatter it), and tuning and testing are split by animal.
 
 ## Evaluation order
 
-The evaluation is pre-registered in `config/labeling/preregistration.yaml` (locked 2026-11-06); later changes
-go under its `amendments`, dated.
-`CLUSTER_RUNBOOK.md` has the commands.
+The evaluation is pre-registered in `config/labeling/preregistration.yaml`, locked 2026-11-06 and amended
+2026-11-07. A later change is a dated entry under its `amendments`, approved by the owner before the step it
+affects. `CLUSTER_RUNBOOK.md` is the procedure on the cluster, where the recordings are, with its settings, job
+wrapper and worktree bootstrap in `cluster/`. The design write-up is
+https://claude.ai/artifact/Q5NSyG1BjMbJvPJQTYdPc7.
 
-1. Sample check: `hash_labeled_windows.py` under the July code and the current code, each with its own empty
+Detectors run together in the pipeline, so the decision is which combination to run. The members are per-cell
+reject masks: F, the fragment filters at their settings in `config/config.yaml`, applied as the pipeline applies
+them; L, LOF at `channel_filter_config.lof.reject_lof_threshold`; M, the dataset configs' `bad_channels` lists;
+and A(k), configuration k of the 38-configuration autoreject grid. A combination rejects a cell when any member
+does. The combinations, under the names every output JSON uses:
+
+- `today`: F or M, the manual branch that zeitgeber, relfreq and the figures use;
+- `replace`: F or A(k);
+- `add`: F or M or A(k);
+- `lof_branch`: F or L, a reference;
+- `autoreject_alone`: A(k); `filters_alone`: F; `config_lists_alone`: M, on the cells whose recording has a list.
+
+Each is scored against the majority consensus, which decides, and against the any and unanimous rules alongside
+it, on dev and on test, pooled and per dataset, cv_group, animal, isday and genotype.
+
+1. Sample check: `hash_labeled_windows.py` under the July tree (41353542) and the port, each with its own empty
    `--temp-dir`, then `compare_window_hashes.py`, which writes `config/labeling/recording_map.csv`. Labels name
-   recordings by their July position; the map ties each to a current recording by identity. The comparison
-   also checks each July-tree fragment count against `config/labeling/july_n_fragments.csv` (recovered from
-   the keymap by `july_fragment_counts.py`) and exits 0 only when every labeled recording is mapped. Later
-   scoring runs pass the current-code run's directory as `--temp-dir`.
-2. Dev features: `extract_dev_features.py --which dev`, one row per labeled cell with every detector's score.
-3. Selection: `select_detectors.py` freezes one detector and reports nested and leave-one-dataset-out
-   checks and rater agreement.
-4. Event cells: `report_event_cells.py` on dev.
-5. Test: `extract_dev_features.py --which test`, then `score_test.py`, which runs once.
-6. Label-free checks: `rejection_rates.py` and `inject_artifacts.py` on animals outside the labeled set that
-   the pipeline's quality filter keeps.
+   recordings by their July position; the map ties each to a port recording by the hashes of its samples and
+   records the port's src tree (`port_src_tree`), written only when the port run's src had no uncommitted
+   changes. The comparison also checks each July-tree fragment count against
+   `config/labeling/july_n_fragments.csv` (recovered from the keymap by `july_fragment_counts.py`) and exits 0
+   only when every labeled recording is mapped. An optional scan (`--all-windows`, then `--port-scan`) tells
+   samples that moved by whole windows from samples that changed. Every later run passes the port run's temp
+   directory as `--temp-dir`.
+2. Dev features: `extract_dev_features.py --which dev`, one row per labeled cell with the filter, LOF, config list
+   and autoreject values. It refuses a recording map whose `port_src_tree` is missing, empty or not its own src
+   tree, and refuses to run while src has uncommitted changes.
+3. Selection: `select_detectors.py` freezes k, the configuration with the highest dev F1 of replace(k)
+   (`pick.autoreject_config`), and reports every combination with its interval, the paired differences replace
+   minus today and add minus today, nested leave-one-group-out and leave-one-dataset-out runs of the choice, the
+   ranking of the 43 single detectors as a diagnostic, and rater agreement.
+4. Event cells: `report_event_cells.py` on dev, for the combinations and the single detectors.
+5. Test: `extract_dev_features.py --which test` with the dev run's flags, then `score_test.py`, which runs once.
+6. Label-free checks: `rejection_rates.py` and `inject_artifacts.py` for the 6 named configurations and k, on two
+   unlabeled animals per labeled dataset and two iqsec2 animals that the pipeline's quality filter keeps, drawn
+   with seed 0.
 
-`score_detectors.py` scores detectors at their config settings on dev, without tuning. Every script that
-reads labels refuses animals outside its partition, and nothing but `score_test.py` reads test labels
-against a detector.
+`score_detectors.py` scores detectors at their config settings on dev, without tuning; it is not part of the
+pre-registered evaluation. Every script that reads labels refuses animals outside its partition, and nothing but
+`score_test.py` scores test labels against a detector; `extract_dev_features.py --which test` reads them only to
+attach the consensus.
 
-Tests: `uv run pytest tests/test_scoring.py tests/test_labeling_bundle.py tests/test_cohort_labeling.py
-tests/test_detector_selection.py tests/test_evaluation_protocol.py tests/test_hash_check.py
-tests/test_label_free_checks.py tests/test_autoreject_detector.py`.
+Tests, 11 files; `-m "not slow"` would skip their runs on the mini_real recordings, and the 3 browser tests in
+`test_labeling_bundle.py` skip without playwright chromium:
+
+    uv run pytest tests/test_scoring.py tests/test_labeling_bundle.py tests/test_cohort_labeling.py \
+        tests/test_detector_selection.py tests/test_evaluation_protocol.py tests/test_hash_check.py \
+        tests/test_label_free_checks.py tests/test_autoreject_detector.py tests/test_combinations.py \
+        tests/test_config_settings.py tests/test_extract_features.py
 
 ## The rubric (this lives only here)
 
