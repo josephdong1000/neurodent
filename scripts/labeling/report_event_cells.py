@@ -13,12 +13,13 @@ cell (for example ``artifact+artifact+event``), plus a coarse class:
 - ``no_votes``: every rater unsure or blank (normally absent, since consensus drops such cells).
 
 Rows come first for the combinations of ``select_detectors.py`` with the selection's autoreject configuration
-k and settings: today, replace, add, autoreject_alone, filters_alone and config_lists_alone (the last only on
-cells with a config list). M reads the config list entries of the dev features' provenance the selection
+k and settings: today (F or M), replace (F or A(k)), add (F or M or A(k)), lof_branch (F or L),
+autoreject_alone, filters_alone and config_lists_alone (the last only on cells whose recording has a config
+list). F, L and M read the recording channels and config lists of the dev features' provenance the selection
 recorded, so ``--features`` must be the parquet the selection was made on; the run refuses another. Then the
 single detectors of the diagnostic ranking: filters with their deployable tau, autoreject configurations with
-their masks. The test split's version of this report is produced only inside ``score_test.py``, for the
-combinations.
+their masks. The patterns hold every rater's category, so they do not depend on a consensus rule. The test
+split's version of this report is produced only inside ``score_test.py``, for the combinations.
 
     uv run python scripts/labeling/report_event_cells.py --features results/labeling/dev_features.parquet \\
         --selection results/labeling/dev_selection.json --out results/labeling/dev_event_cells.csv
@@ -91,15 +92,19 @@ def combination_predictions(df, selection):
 
     Args:
         df: Cells with the member columns.
-        selection: The dev selection JSON from ``select_detectors.py``; M reads the config list entries of the
-            features provenance it recorded.
+        selection: The dev selection JSON from ``select_detectors.py``; F, L and M read the recording records of
+            the features provenance it recorded.
 
     Returns:
         ``({combination: 0/1 per cell}, {combination: bool per cell})``.
+
+    Raises:
+        SystemExit: If the recorded provenance lacks the recording records or they do not describe ``df``.
     """
     SD.require_member_columns(df)
-    unknown = ((selection.get("features") or {}).get("provenance") or {}).get("config_list_unknown_channels")
-    members, _ = SD.member_masks(df, selection["settings"], unknown)
+    prov = (selection.get("features") or {}).get("provenance") or {}
+    SD.require_recording_records(prov, "selection's dev")
+    members, _ = SD.member_masks(df, selection["settings"], prov)
     preds = SD.combination_preds(members, SD.mask_pred(df, selection["pick"]["autoreject_config"]))
     return preds, SD.combination_cells(df)
 

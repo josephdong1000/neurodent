@@ -2,11 +2,14 @@
 
 Everything runs on synthetic cells and fake labels generated here; no recording and no real label file is
 read. Covered: N-rater consensus with rater categories, pairwise agreement, the split guard, the recording
-map, cell alignment with metadata, the combination selection end to end with its nested runs, diagnostic
-ranking and refusals, the event-cell report with the combinations, and the one-shot test scoring with its
-output and refusals.
+map, cell alignment with metadata, the combination selection end to end with its nested runs, the any and
+unanimous rules reported alongside majority with their paired intervals and printed values, diagnostic ranking
+and refusals (the recording records, config.yaml, the dataset configs and config.local.yaml against what the
+extraction recorded, a y other than the majority of the categories), the event-cell report with the
+combinations, and the one-shot test scoring with its output and refusals.
 """
 
+import hashlib
 import json
 import re
 import shutil
@@ -116,14 +119,44 @@ CONFIG = {"analysis": {
     "channel_filter_config": {"manual": {"reject_channels": [], "min_valid_channels": 3},
                               "lof": {"reject_lof_threshold": 2.5, "reject_channels": [], "min_valid_channels": 3}},
 }}
+# The sha256 of the config _write_config writes by default, which the synthetic extractions record.
+CONFIG_SHA = hashlib.sha256(yaml.safe_dump(CONFIG).encode()).hexdigest()
+
+
+def _dataset_config(channels=CHANNELS):
+    """The text of a dataset config with an inline samples channel map."""
+    return yaml.safe_dump({"samples_data": {"channels": {c: [c] for c in channels}, "animals": []}}, sort_keys=False)
+
+
+# The sha256 of each dataset config _write_datasets writes by default, which the synthetic extractions record.
+DATASET_SHA = hashlib.sha256(_dataset_config().encode()).hexdigest()
+
+# Three raters' categories, drawn per cell. y is their majority consensus; the any and unanimous ones differ on
+# some patterns, and unsure, blank and event votes take part.
+PATTERNS = [("artifact", "artifact", "artifact"), ("artifact", "artifact", "clean"), ("artifact", "event", "unsure"),
+            ("artifact", "clean", "event"), ("clean", "event", "clean"), ("clean", "unsure", None),
+            ("unsure", "artifact", "unsure"), ("clean", "clean", "clean")]
+VOTE = {"artifact": 1, "clean": 0, "event": 0}
+
+
+def _votes(pattern):
+    return [VOTE[c] for c in pattern if c in VOTE]
+
+
+def _rule(pattern, rule):
+    """The consensus of one pattern under a rule, written out from the pre-registration's wording."""
+    votes = _votes(pattern)
+    return int({"majority": 2 * sum(votes) >= len(votes), "any": sum(votes) > 0,
+                "unanimous": sum(votes) == len(votes)}[rule])
 
 
 def _cells(animals, seed, perfect=PERFECT):
     """Cells for (animal, group, dataset) triples, 40 windows of 4 channels each.
 
-    One grid column (``perfect``) predicts y exactly and the rest are noise. Filter scores stay inside the
-    config settings, so F rejects nothing; LOF flags RBar of each dataset's first animal, and the config lists
-    name LBar for the ds2 animals, whose lists are defined. Genotypes alternate and isday follows the window.
+    Each cell draws its raters' categories from PATTERNS and y is their majority consensus. One grid column
+    (``perfect``) predicts y exactly and the rest are noise. Filter scores stay inside the config settings, so F
+    rejects nothing; LOF flags RBar of each dataset's first animal, and the config lists name LBar for the ds2
+    animals, whose lists are defined. Genotypes alternate and isday follows the window.
     """
     rng = np.random.default_rng(seed)
     rows, first = [], set()
@@ -135,21 +168,25 @@ def _cells(animals, seed, perfect=PERFECT):
         for w in range(40):
             beta = rng.uniform(0.05, 0.3)
             for ch in CHANNELS:
-                y = int(rng.random() < 0.3)
-                cats = ["artifact" if y else "clean", "artifact" if y else "event", "clean"]
-                rows.append({"recording": f"{animal}__0", "window": w, "channel": ch, "t_start_s": 5.0 * w, "y": y,
-                             "rms": rng.uniform(80, 200), "logrmsz_abs": abs(rng.normal(0, 0.5)),
-                             "beta_wmax": beta, "lof": lof[ch], "animal": animal,
-                             "animalday": f"{animal} WT Jan-01-2025", "dataset": dataset, "cv_group": group,
-                             "genotype": "WT" if i % 2 else "KO",
+                pattern = PATTERNS[rng.integers(len(PATTERNS))]
+                rows.append({"recording": f"{animal}__0", "window": w, "channel": ch, "t_start_s": 5.0 * w,
+                             "y": _rule(pattern, "majority"), "rms": rng.uniform(80, 200),
+                             "logrmsz_abs": abs(rng.normal(0, 0.5)), "beta_wmax": beta, "lof": lof[ch],
+                             "animal": animal, "animalday": f"{animal} WT Jan-01-2025", "dataset": dataset,
+                             "cv_group": group, "genotype": "WT" if i % 2 else "KO",
                              "timestamp": pd.Timestamp("2025-01-01") + pd.Timedelta(seconds=5 * w),
-                             "isday": bool(w % 2), "n_raters": 3, "any_event": not y,
+                             "isday": bool(w % 2), "n_raters": len(_votes(pattern)), "any_event": "event" in pattern,
                              "config_list": int(defined and ch == "LBar"), "config_list_defined": defined,
-                             "cat_A": cats[0], "cat_B": cats[1], "cat_C": cats[2]})
+                             "cat_A": pattern[0], "cat_B": pattern[1], "cat_C": pattern[2]})
     df = pd.DataFrame(rows)
     for name in GRID:
         df[name] = df["y"] if name == perfect else (rng.random(len(df)) < 0.3).astype(int)
     return df
+
+
+def _expected(df, rule):
+    """Each cell's consensus under ``rule`` from its categories, by _rule."""
+    return np.array([_rule(p, rule) for p in zip(df["cat_A"], df["cat_B"], df["cat_C"])])
 
 
 DEV = [("d1", "g1", "ds1"), ("d2", "g1", "ds1"), ("d3", "g2", "ds1"), ("d4", "g3", "ds2"), ("d5", "g4", "ds2"),
@@ -157,20 +194,38 @@ DEV = [("d1", "g1", "ds1"), ("d2", "g1", "ds1"), ("d3", "g2", "ds1"), ("d4", "g3
 TEST = [("t1", "h1", "ds1"), ("t2", "h2", "ds2"), ("t3", "h3", "ds2"), ("t4", "h4", "ds3")]
 
 
-INPUTS = ["keymap", "split", "recording_map", "config/config.yaml", "config/datasets/ds2.yaml"]
+INPUTS = ["keymap", "split", "recording_map"]
+
+
+def _records(df):
+    """The recording records extract_dev_features writes for these cells: each recording's own channels and its
+    config list, in the standardized order (CHANNELS)."""
+    records = {"recording_channels": {}, "config_list_by_recording": {}}
+    for rec, sub in df.groupby("recording"):
+        records["recording_channels"][rec] = [c for c in CHANNELS if c in set(sub["channel"])]
+        defined = bool(sub["config_list_defined"].iloc[0]) if "config_list_defined" in sub else False
+        listed = set(sub.loc[sub["config_list"] == 1, "channel"]) if "config_list" in sub else set()
+        records["config_list_by_recording"][rec] = {"defined": defined, "channels": [c for c in CHANNELS if c in listed],
+                                                    "absent": []}
+    return records
 
 
 def _provenance(which, top=None, **params):
     """Feature provenance as extract_dev_features writes it, with top-level and parameter overrides.
 
     The label files differ between the partitions, as they do in a real run; every other input is the same.
+    config/config.yaml and each dataset's config are recorded with the sha256 of the files _write_config writes by
+    default, as the extraction records them (score_detectors.config_files).
     """
     p = {"which": which, "rule": "majority", "raters": ["A", "B", "C"], "ar_max_fit_fragments": 5000, "seed": 0,
          "configs": GRID, "positional_recordings": False, "temp_dir": "/scratch/hash_port",
          "datasets": list(DATASETS), "lof_chunk_duration_s": 60, "chunk_duration_s": 3600}
     p.update(params)
     inputs = {**{f"labels_{r}": {"path": f"labels_{r}_{which}.csv", "sha256": f"{r} {which}"} for r in "ABC"},
-              **{name: {"path": name, "sha256": f"{name} 0"} for name in INPUTS}}
+              **{name: {"path": name, "sha256": f"{name} 0"} for name in INPUTS},
+              "config/config.yaml": {"path": "config/config.yaml", "sha256": CONFIG_SHA},
+              **{f"config/datasets/{d}.yaml": {"path": f"config/datasets/{d}.yaml", "sha256": DATASET_SHA}
+                 for d in DATASETS}}
     prov = {"params": p, "code": {f: "same" for f in ST.matched_code()}, "src_tree": "tree0", "src_dirty": False,
             "inputs": inputs, "config_list_unknown_channels": []}
     prov.update(top or {})
@@ -178,10 +233,11 @@ def _provenance(which, top=None, **params):
 
 
 def _write_features(tmp_path, name, df, which, top=None, **params):
-    """Write the parquet and its provenance, which records the parquet's sha256 unless ``top`` overrides it."""
+    """Write the parquet and its provenance, which records the parquet's sha256 and the cells' recording records
+    unless ``top`` overrides them."""
     path = tmp_path / f"{name}.parquet"
     df.to_parquet(path)
-    top = {"outputs": {"features": {"path": str(path), "sha256": SD._sha256(path)}}, **(top or {})}
+    top = {"outputs": {"features": {"path": str(path), "sha256": SD._sha256(path)}}, **_records(df), **(top or {})}
     Path(str(path) + ".provenance.json").write_text(json.dumps(_provenance(which, top, **params)))
     return path
 
@@ -190,13 +246,13 @@ def _write_datasets(folder, channels=CHANNELS):
     """The dataset configs beside ``folder/config.yaml``, each with an inline samples channel map."""
     (folder / "datasets").mkdir(exist_ok=True)
     for name in DATASETS:
-        config = {"samples_data": {"channels": {c: [c] for c in channels}, "animals": []}}
-        (folder / "datasets" / f"{name}.yaml").write_text(yaml.safe_dump(config, sort_keys=False))
+        (folder / "datasets" / f"{name}.yaml").write_text(_dataset_config(channels))
 
 
-def _write_config(path, **lof):
+def _write_config(path, extra=None, **lof):
     config = json.loads(json.dumps(CONFIG))
     config["analysis"]["channel_filter_config"]["lof"].update(lof)
+    config["analysis"].update(extra or {})
     path.write_text(yaml.safe_dump(config))
     _write_datasets(path.parent)
     return path
@@ -213,6 +269,8 @@ def _cohort_dir(tmp_path_factory):
     base = tmp_path_factory.mktemp("cohort")
     (base / "split.json").write_text(json.dumps({"dev": [a for a, _, _ in DEV], "test": [a for a, _, _ in TEST]}))
     _write_config(base / "config.yaml")
+    assert SD._sha256(base / "config.yaml") == CONFIG_SHA
+    assert all(SD._sha256(base / "datasets" / f"{d}.yaml") == DATASET_SHA for d in DATASETS)
     _write_features(base, "dev", _cells(DEV, 0), "dev")
     _write_features(base, "test", _cells(TEST, 1, perfect=TEST_PERFECT), "test")
     SD.main(["--features", str(base / "dev.parquet"), "--split", str(base / "split.json"),
@@ -242,23 +300,91 @@ def _claimed(cohort):
     return sorted(p.name for p in cohort["tmp"].glob("*" + ST.SCORED_SUFFIX))
 
 
+def _check_alongside(combos, df, f, m, a):
+    """Assert that each combination's alongside entries score the any and unanimous consensus of the cells'
+    categories, with intervals, breakdowns and paired differences, and that majority is y.
+
+    ``f``, ``m`` and ``a`` are F, M and A(k) on ``df``. Under every rule, replace and add are scored again from
+    them, and so are their paired F1 differences from today with the intervals, at the runs' ``--boot`` of 30.
+    """
+    expected_y = {rule: _expected(df, rule) for rule in ("majority", *SD.ALONGSIDE)}
+    assert (expected_y["majority"] == df["y"].to_numpy()).all()
+    assert (expected_y["any"] != expected_y["majority"]).any() and (expected_y["unanimous"] != expected_y["majority"]).any()
+    preds = {"today": (f | m).astype(int), "replace": (f | a).astype(int), "add": (f | m | a).astype(int)}
+    groups = df["cv_group"].to_numpy()
+    for name, entry in combos.items():
+        assert entry["rule"] == "majority" and set(entry["alongside"]) == set(SD.ALONGSIDE), name
+        for rule in SD.ALONGSIDE:
+            scored = entry["alongside"][rule]
+            assert set(scored) >= {"pooled", "ci95", *SD.BREAKDOWNS}, (name, rule)
+            assert len(scored["ci95"]) == 2 and scored["pooled"]["n"] == entry["pooled"]["n"]
+    for rule, y in expected_y.items():
+        for name in SD.PAIRED:
+            got = combos[name] if rule == "majority" else combos[name]["alongside"][rule]
+            assert got["pooled"]["f1"] == pytest.approx(f1_score(y, preds[name])), (name, rule)
+            assert got["pooled"]["tp"] + got["pooled"]["fn"] == y.sum()
+            assert {k: v["n"] for k, v in got["per_dataset"].items()} == df["dataset"].value_counts().to_dict()
+            d = got["minus_today"]
+            assert set(d) == {"f1_difference", "ci95"}, (name, rule)
+            assert d["f1_difference"] == pytest.approx(f1_score(y, preds[name]) - f1_score(y, preds["today"])), \
+                (name, rule)
+            assert d["ci95"] == list(SD.paired_delta_ci(y, preds[name], preds["today"], groups, n=30)), (name, rule)
+
+
+def _printed_rows(combos):
+    """The lines print_combinations writes for the paired differences under majority and for the table of F1 with
+    its interval under each rule, built from the combinations a run wrote."""
+    rows = []
+    for name, base in SD.PAIRED.items():
+        d = combos[name][f"minus_{base}"]
+        rows.append(f"{name} minus {base}: F1 difference {d['f1_difference']:.3f} [{d['ci95'][0]:.3f}, "
+                    f"{d['ci95'][1]:.3f}]")
+    for name, c in combos.items():
+        entries = [c, *(c["alongside"][rule] for rule in SD.ALONGSIDE)]
+        rows.append(f"{name:20} " + " ".join(SD._f1_with_ci(e["pooled"]["f1"], e["ci95"]) for e in entries))
+    for name, base in SD.PAIRED.items():
+        key = f"minus_{base}"
+        entries = [combos[name][key], *(combos[name]["alongside"][rule][key] for rule in SD.ALONGSIDE)]
+        rows.append(f"{name + ' minus ' + base:20} "
+                    + " ".join(SD._f1_with_ci(e["f1_difference"], e["ci95"]) for e in entries))
+    return rows
+
+
+def _check_printed(printed, combos):
+    """Assert that the printout holds the rule table's header, majority first, and every row of
+    :func:`_printed_rows`: each column shows its own rule's values."""
+    table = printed[printed.index("F1 with its 95% CI under each rule"):].splitlines()
+    assert table[1].split() == ["majority", *SD.ALONGSIDE]
+    lines = printed.splitlines()
+    missing = [row for row in _printed_rows(combos) if row not in lines]
+    assert not missing, missing
+
+
 def test_selection_picks_the_column_that_completes_replace(cohort):
     out = json.loads(cohort["selection"].read_text())
     assert set(out) == {"pick", "settings", "member_masks", "combinations", "nested_replace_logo",
                         "nested_replace_lodo", "diagnostic", "rater_agreement", "features", "provenance"}
     assert out["pick"] == {"autoreject_config": PERFECT, "replace_f1": 1.0, "tie_broken": False}
     assert out["settings"]["lof"] == {"reject_lof_threshold": 2.5, "min_valid_channels": 3}
-    assert out["settings"]["config"]["sha256"] == SD._sha256(cohort["config"])
+    assert out["settings"]["config"]["sha256"] == SD._sha256(cohort["config"]) == CONFIG_SHA
     assert out["settings"]["canonical_channels"] == {name: list(CHANNELS) for name in DATASETS}
     assert out["features"]["sha256"] == SD._sha256(cohort["dev"])
     assert {rel: out["provenance"]["code"][rel] for rel in SD.SCORING_CODE} == SD.scoring_code_hashes()
-    assert out["member_masks"]["absent_channels"] == {}
-    assert out["member_masks"]["F"]["n_rejected"] == 0
-    assert out["member_masks"]["L"]["n_rejected"] == 3 * 40  # RBar of d1, d4 and d6
-    assert out["member_masks"]["M"]["n_rejected"] == 2 * 40 and out["member_masks"]["M"]["n_defined"] == 2 * 160
+    masks = out["member_masks"]
+    assert masks["padded_channels"] == {} and masks["channels_without_cells"] == {}
+    assert masks["F"]["n_rejected"] == 0
+    assert masks["L"]["n_rejected"] == 3 * 40  # RBar of d1, d4 and d6
+    assert masks["M"]["n_rejected"] == 2 * 40 and masks["M"]["n_defined"] == 2 * 160
     combos = out["combinations"]
-    assert list(combos) == list(SD.COMBINATIONS)
+    assert list(combos) == list(SD.COMBINATIONS) == ["today", "replace", "add", "lof_branch", "autoreject_alone",
+                                                     "filters_alone", "config_lists_alone"]
+    assert {name: c["definition"] for name, c in combos.items()} == {
+        "today": "F or M", "replace": "F or A(k)", "add": "F or M or A(k)", "lof_branch": "F or L",
+        "autoreject_alone": "A(k)", "filters_alone": "F", "config_lists_alone": "M"}
     assert combos["replace"]["pooled"]["f1"] == pytest.approx(1.0)
+    dev = pd.read_parquet(cohort["dev"])
+    assert combos["today"]["pooled"]["tp"] + combos["today"]["pooled"]["fp"] == 2 * 40, "today is F or M: LBar of ds2"
+    assert combos["lof_branch"]["pooled"]["flag_rate"] == pytest.approx(3 * 40 / len(dev)), "F or L: RBar"
     assert combos["config_lists_alone"]["pooled"]["n"] == 2 * 160  # only the ds2 cells have lists
     assert set(combos["config_lists_alone"]["per_dataset"]) == {"ds2"}
     assert combos["replace"]["minus_today"]["f1_difference"] > 0
@@ -269,6 +395,7 @@ def test_selection_picks_the_column_that_completes_replace(cohort):
     assert set(combos["today"]["per_animal"]) == {a for a, _, _ in DEV}
     assert set(combos["today"]["per_isday"]) == {"True", "False"}
     assert set(combos["today"]["per_genotype"]) == {"WT", "KO"}
+    _check_alongside(combos, dev, np.zeros(len(dev), int), dev["config_list"].to_numpy(), dev[PERFECT].to_numpy())
     logo, lodo = out["nested_replace_logo"], out["nested_replace_lodo"]
     assert {f["held_out"] for f in logo["folds"]} == {g for _, g, _ in DEV}
     assert {f["held_out"] for f in lodo["folds"]} == {"ds1", "ds2", "ds3"}
@@ -279,6 +406,20 @@ def test_selection_picks_the_column_that_completes_replace(cohort):
     assert diag["order"][0] == PERFECT and "pooled" in diag["leaderboard"]["high_rms"]
     assert "config_list" not in diag["leaderboard"] and "config_list_defined" not in diag["leaderboard"]
     assert out["rater_agreement"]["overall"], "pairwise agreement reported"
+
+
+def test_selection_prints_every_rule(cohort, capsys):
+    """The printout holds each combination's F1 and interval, and each paired difference, under every rule, with
+    the values the run wrote."""
+    out = cohort["tmp"] / "printed.json"
+    SD.main(_select_args(cohort, cohort["dev"], out))
+    printed = capsys.readouterr().out
+    combos = json.loads(out.read_text())["combinations"]
+    _check_printed(printed, combos)
+    for name in SD.PAIRED:  # the rules disagree here, so a column showing another rule's values differs
+        assert all(combos[name]["alongside"][rule]["pooled"]["f1"] != combos[name]["pooled"]["f1"]
+                   and combos[name]["alongside"][rule]["minus_today"]["ci95"] != combos[name]["minus_today"]["ci95"]
+                   for rule in SD.ALONGSIDE), name
 
 
 def test_selection_records_the_runs_its_cells_cannot_support(cohort):
@@ -306,6 +447,7 @@ def test_selection_records_the_runs_its_cells_cannot_support(cohort):
     assert result["nested_replace_logo"]["not_run"] == one_group and result["diagnostic"]["not_run"] == one_group
     assert result["diagnostic"]["order"] == [] and result["combinations"]["replace"]["pooled"]["f1"] == 1.0
     assert all(np.isnan(v) for v in result["combinations"]["replace"]["ci95"]), "one group: nothing to resample"
+    assert all(np.isnan(v) for v in result["combinations"]["replace"]["alongside"]["any"]["ci95"])
     events = cohort["tmp"] / "one_group_events.csv"
     EV.main(["--features", str(path), "--selection", str(out), "--split", str(cohort["split"]), "--out", str(events)])
     no_lists = [c for c in SD.COMBINATIONS if c != "config_lists_alone"]  # only the ds2 animals have lists
@@ -346,6 +488,123 @@ def test_selection_refuses_features_score_test_would_refuse(cohort, top, which, 
     assert not out.exists()
 
 
+@pytest.mark.parametrize("record", SD.RECORDING_RECORDS)
+def test_selection_and_test_scoring_refuse_features_without_recording_records(cohort, record):
+    dev = pd.read_parquet(cohort["dev"])
+    path = _write_features(cohort["tmp"], "dev_bare", dev, "dev", {record: None})
+    out = cohort["tmp"] / "bare_selection.json"
+    with pytest.raises(SystemExit, match=re.escape(f"the dev features' provenance lacks ['{record}']")):
+        SD.main(_select_args(cohort, path, out))
+    test = _write_features(cohort["tmp"], "test_bare", pd.read_parquet(cohort["test"]), "test", {record: None})
+    with pytest.raises(SystemExit, match=re.escape(f"the test features' provenance lacks ['{record}']")):
+        ST.main(_score_args(cohort, test, "bare_score.json"))
+    selection = json.loads(cohort["selection"].read_text())
+    del selection["features"]["provenance"][record]
+    stale = cohort["tmp"] / "stale_selection.json"
+    stale.write_text(json.dumps(selection))
+    with pytest.raises(SystemExit, match="selection's dev features' provenance lacks"):
+        EV.main(["--features", str(cohort["dev"]), "--selection", str(stale), "--split", str(cohort["split"]),
+                 "--out", str(cohort["tmp"] / "bare_events.csv")])
+    assert not out.exists() and not (cohort["tmp"] / "bare_score.json").exists() and _claimed(cohort) == []
+
+
+@pytest.mark.parametrize("change, match", [
+    (lambda r: r["recording_channels"].pop("d3__0"), "no recording_channels or config_list_by_recording entry for "
+                                                      "['d3__0']"),
+    (lambda r: r["recording_channels"].update(d3__0=["LMot", "RMot", "LBar"]), "d3__0: cells on channels outside its "
+                                                                               "recording_channels: ['RBar']"),
+    (lambda r: r["recording_channels"].update(d3__0=[*CHANNELS, "LHip"]), "d3__0: recording_channels names ['LHip']"),
+    (lambda r: r["config_list_by_recording"].update(d4__0={"defined": True, "channels": [], "absent": []}),
+     "disagree with config_list_by_recording on 40 cells"),
+    (lambda r: r["config_list_by_recording"].update(d1__0={"defined": False, "channels": ["LMot"], "absent": []}),
+     "d1__0: config_list_by_recording names ['LMot'] while no list applies"),
+    (lambda r: r["config_list_by_recording"].update(d4__0={"defined": True, "channels": ["LBar"], "absent": ["RMot"]}),
+     "d4__0: config_list_by_recording puts ['RMot'] on the wrong side"),
+    (lambda r: r["config_list_by_recording"].update(d4__0={"defined": "yes", "channels": ["LBar"], "absent": []}),
+     "d4__0: config_list_by_recording is not"),
+])
+def test_selection_refuses_recording_records_that_do_not_describe_the_cells(cohort, change, match):
+    dev = pd.read_parquet(cohort["dev"])
+    records = _records(dev)
+    change(records)
+    path = _write_features(cohort["tmp"], "dev_records", dev, "dev", records)
+    out = cohort["tmp"] / "records_selection.json"
+    with pytest.raises(SystemExit, match=re.escape(match)):
+        SD.main(_select_args(cohort, path, out))
+    assert not out.exists()
+
+
+def test_selection_and_test_scoring_refuse_another_config(cohort):
+    """A config.yaml other than the one the extraction recorded is refused, even when the filter settings are
+    the same."""
+    _write_config(cohort["config"], extra={"note": "edited after the extraction"})
+    out = cohort["tmp"] / "edited_selection.json"
+    with pytest.raises(SystemExit, match="the dev extraction recorded") as err:
+        SD.main(_select_args(cohort, cohort["dev"], out))
+    assert f"recorded '{CONFIG_SHA}' for config/config.yaml" in str(err.value)
+    assert not out.exists()
+    with pytest.raises(SystemExit, match="the test extraction recorded"):
+        ST.main(_score_args(cohort, cohort["test"], "edited_score.json"))
+    assert not (cohort["tmp"] / "edited_score.json").exists() and _claimed(cohort) == []
+    _write_config(cohort["config"])
+    unrecorded = _write_features(cohort["tmp"], "dev_unrecorded", pd.read_parquet(cohort["dev"]), "dev",
+                                 {"inputs": {}})
+    with pytest.raises(SystemExit, match="the dev extraction recorded None"):
+        SD.main(_select_args(cohort, unrecorded, out))
+
+
+def test_selection_and_test_scoring_refuse_config_files_changed_after_extraction(cohort):
+    """A dataset config edited after both extractions, a config.local.yaml they did not record, or a recorded
+    dataset config now gone is refused before any setting is read. ds1 gaining a channel would otherwise change
+    the canonical channels F, L and M count."""
+    ds1 = cohort["tmp"] / "datasets" / "ds1.yaml"
+    ds1.write_text(_dataset_config([*CHANNELS, "LHip"]))
+    out = cohort["tmp"] / "drift_selection.json"
+    with pytest.raises(SystemExit, match="the config files differ from those the dev features") as err:
+        SD.main(_select_args(cohort, cohort["dev"], out))
+    assert f"{ds1} has sha256 {SD._sha256(ds1)}, and the dev extraction recorded '{DATASET_SHA}' for " \
+           "config/datasets/ds1.yaml" in str(err.value)
+    assert "ds2.yaml" not in str(err.value) and "config/config.yaml" not in str(err.value)
+    ds1.write_text(_dataset_config() + "# edited after the extraction\n")  # the settings stay the same
+    with pytest.raises(SystemExit, match="the config files differ from those the test features") as err:
+        ST.main(_score_args(cohort, cohort["test"], "drift_score.json"))
+    assert f"the test extraction recorded '{DATASET_SHA}' for config/datasets/ds1.yaml" in str(err.value)
+    assert not out.exists() and not (cohort["tmp"] / "drift_score.json").exists() and _claimed(cohort) == []
+
+    _write_datasets(cohort["tmp"])
+    local = cohort["tmp"] / "config.local.yaml"
+    local.write_text(yaml.safe_dump({"note": "added after the extraction"}))
+    unrecorded = f"{local} is read for the settings, and the {{}} extraction recorded None for config/config.local.yaml"
+    with pytest.raises(SystemExit, match=re.escape(unrecorded.format("dev"))):
+        SD.main(_select_args(cohort, cohort["dev"], out))
+    with pytest.raises(SystemExit, match=re.escape(unrecorded.format("test"))):
+        ST.main(_score_args(cohort, cohort["test"], "drift_score.json"))
+    local.unlink()
+    (cohort["tmp"] / "datasets" / "ds3.yaml").unlink()
+    with pytest.raises(SystemExit, match=re.escape(f"{cohort['tmp'] / 'datasets' / 'ds3.yaml'} is missing, and the dev "
+                                                   f"extraction recorded '{DATASET_SHA}'")):
+        SD.main(_select_args(cohort, cohort["dev"], out))
+    assert not out.exists() and not (cohort["tmp"] / "drift_score.json").exists() and _claimed(cohort) == []
+    _write_datasets(cohort["tmp"])
+    SD.main(_select_args(cohort, cohort["dev"], out))
+    assert json.loads(out.read_text())["pick"] == json.loads(cohort["selection"].read_text())["pick"]
+
+
+def test_a_y_other_than_the_majority_of_the_categories_is_refused(cohort):
+    dev = pd.read_parquet(cohort["dev"])
+    flipped = dev.assign(y=np.where(np.arange(len(dev)) < 3, 1 - dev["y"], dev["y"]))
+    path = _write_features(cohort["tmp"], "dev_flipped", flipped, "dev")
+    out = cohort["tmp"] / "flipped_selection.json"
+    with pytest.raises(SystemExit, match="y differs on 3 cells from the majority consensus"):
+        SD.main(_select_args(cohort, path, out))
+    assert not out.exists()
+    test = pd.read_parquet(cohort["test"])
+    test = _write_features(cohort["tmp"], "test_flipped", test.assign(y=1 - test["y"]), "test")
+    with pytest.raises(SystemExit, match=f"y differs on {len(pd.read_parquet(test))} cells"):
+        ST.main(_score_args(cohort, test, "flipped_score.json"))
+    assert not (cohort["tmp"] / "flipped_score.json").exists() and _claimed(cohort) == []
+
+
 def test_a_provenance_without_its_parquet_is_refused(cohort):
     """An extraction stopped after writing the provenance and before renaming the parquet into place."""
     dev = _write_features(cohort["tmp"], "dev_gone", pd.read_parquet(cohort["dev"]), "dev")
@@ -376,7 +635,8 @@ def test_score_test_scores_the_combinations_once(cohort, capsys):
     assert list(combos) == list(SD.COMBINATIONS)
     # The frozen k is noise on the test cells, and another column would complete replace there.
     test = pd.read_parquet(cohort["test"])
-    f, _ = SD.fragment_reject(test, SD.load_settings(cohort["config"], datasets=DATASETS))
+    settings = SD.load_settings(cohort["config"], datasets=DATASETS)
+    f, _ = SD.fragment_reject(test, settings, SD.recorded_channels(test, _records(test), settings))
     frozen = f1_score(test["y"], f | test[PERFECT])
     assert combos["replace"]["pooled"]["f1"] == pytest.approx(frozen) and frozen < 0.6
     assert combos["autoreject_alone"]["pooled"]["f1"] == pytest.approx(f1_score(test["y"], test[PERFECT]))
@@ -385,11 +645,12 @@ def test_score_test_scores_the_combinations_once(cohort, capsys):
     assert set(combos["replace"]["per_animal"]) == {a for a, _, _ in TEST}
     assert combos["config_lists_alone"]["pooled"]["n"] == 2 * 160  # t2 and t3, the ds2 animals
     assert set(combos["add"]["minus_today"]) == {"f1_difference", "ci95"}
+    _check_alongside(combos, test, f, test["config_list"].to_numpy(), test[PERFECT].to_numpy())
     events = pd.DataFrame(result["event_cells"])
     assert set(events["detector"]) == set(SD.COMBINATIONS)
     assert events.loc[events["detector"] == "config_lists_alone", "n_cells"].sum() == 2 * 160
     assert result["rater_agreement"]["overall"]
-    assert "replace minus today" in capsys.readouterr().out
+    _check_printed(capsys.readouterr().out, combos)
     assert _claimed(cohort) == ["dev_selection.json.test_scored", "test.parquet.test_scored"]
     with pytest.raises(SystemExit, match="scored once"):
         ST.main(args)
@@ -447,6 +708,8 @@ def test_score_test_refuses_a_parquet_its_provenance_does_not_describe(cohort):
     (lambda df: df.drop(columns="genotype"), "the features lack ['genotype']"),
     (lambda df: df.drop(columns="isday"), "the features lack ['isday']"),
     (lambda df: df.assign(y=np.where(np.arange(len(df)) == 0, 2, df["y"])), "y holds values other than 0 and 1"),
+    (lambda df: df.assign(cat_B=np.where(np.arange(len(df)) == 0, "maybe", df["cat_B"])),
+     "rater categories ['maybe'] are not among"),
 ])
 def test_score_test_checks_every_column_it_reads_before_claiming(cohort, change, match):
     test = _write_features(cohort["tmp"], "test_cols", change(pd.read_parquet(cohort["test"])), "test")
@@ -543,13 +806,16 @@ def test_event_report(cohort):
     table = pd.read_csv(out)
     assert list(pd.unique(table["detector"])) == [*SD.COMBINATIONS, PERFECT, "high_rms"]
     for name in ("replace", PERFECT):
-        rows = table[table["detector"] == name].set_index("coarse_class")
-        assert rows.loc["bad_and_clean", "rejection_rate"] == 1.0  # the y=1 cells: two bad votes, one clean
-        assert rows.loc["event_no_bad", "rejection_rate"] == 0.0
+        rows = table[table["detector"] == name].set_index("pattern")
+        assert rows.loc["artifact+artifact+clean", "rejection_rate"] == 1.0  # the majority says bad
+        assert rows.loc["artifact+clean+event", "rejection_rate"] == 0.0  # one bad vote of three
+        assert rows.loc["clean+clean+event", "rejection_rate"] == 0.0
     lists = table[table["detector"] == "config_lists_alone"]
     assert lists["n_cells"].sum() == 2 * 160 and lists["n_rejected"].sum() == 2 * 40
     today = table[table["detector"] == "today"]
-    assert today["n_cells"].sum() == len(DEV) * 160 and today["n_rejected"].sum() == 3 * 40 + 2 * 40
+    assert today["n_cells"].sum() == len(DEV) * 160 and today["n_rejected"].sum() == 2 * 40, "F or M"
+    lof_branch = table[table["detector"] == "lof_branch"]
+    assert lof_branch["n_rejected"].sum() == 3 * 40, "F or L"
     other = _write_features(cohort["tmp"], "dev_other", pd.read_parquet(cohort["dev"]).iloc[1:], "dev")
     with pytest.raises(SystemExit, match="not the parquet the selection was made on"):
         EV.main(["--features", str(other), "--selection", str(cohort["selection"]), "--split", str(cohort["split"]),

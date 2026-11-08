@@ -21,11 +21,16 @@ recording split out of a multi-animal file has no source item, so its constructi
 instead, and for an MNE-loaded file they name the intermediate in ``--temp-dir``. A path inside
 ``--temp-dir`` is written as ``<temp>/`` plus its path relative to that directory (for an intermediate, its
 file name), so the July and port outputs agree although their temp directories differ. Every row also
-records the code the run used: ``git_commit`` is the working tree's ``git rev-parse HEAD`` and ``src_dirty``
-whether ``git status --porcelain -- src`` lists anything there, both empty when git cannot tell or the
-working directory is not the top level of a git checkout or worktree (a plain copy inside another repository
-would otherwise get that repository's commit). ``compare_window_hashes.py`` carries them into the recording
-map.
+records the code the run used: ``git_commit`` is the working tree's ``git rev-parse HEAD``, ``src_dirty``
+whether ``git status --porcelain -- src`` lists anything there, and ``src_tree`` the git object id of ``src``
+at that commit (``git rev-parse HEAD:src``). Each is empty when git cannot tell or the working directory is
+not the top level of a git checkout or worktree (a plain copy inside another repository would otherwise get
+that repository's commit). ``compare_window_hashes.py`` carries them into the recording map. The src tree
+names the loader code apart from the commit: it stays the same when only files outside ``src`` change, such
+as the committed map, and ``extract_dev_features.py`` checks its own src tree against the map's
+``port_src_tree``. The map takes a run's src tree only when src_dirty is False, since with uncommitted changes
+under ``src`` the tree is not the code that ran. A port run without a recorded src tree and a clean ``src``
+therefore gives a map that ``extract_dev_features.py`` refuses.
 
 ``--all-windows`` scans instead of hashing labeled cells: for the animals named with ``--animal`` it hashes
 every window of every recording, every column, into rows with status scan. A scan row has the raw sha256,
@@ -123,7 +128,7 @@ FIELDS = [
     "samples_per_fragment", "july_n_fragments", "july_recording", "window", "channel", "column", "status",
     "error", "start_sample", "n_samples", "dtype", "raw_sha256", "view_sha256", "raw_rms", "raw_mean",
     "raw_ptp", *[f"raw_head_{k}" for k in range(N_HEAD)], "channel_names", "canonical_channels",
-    "git_commit", "src_dirty",
+    "git_commit", "src_dirty", "src_tree",
 ]
 
 
@@ -154,7 +159,7 @@ def check_tree():
 
 
 def code_version(tree):
-    """Return the git commit of a tree and whether its ``src`` directory differs from that commit.
+    """Return the git commit of a tree, whether its ``src`` directory differs from it, and the id of that ``src``.
 
     Only the top level of a git checkout or worktree has a commit. git answers for a plain copy inside another
     repository, such as an archive unpacked in an ignored directory, with that repository's commit, so such a
@@ -164,9 +169,10 @@ def code_version(tree):
         tree (str | Path): Root of the tree under test.
 
     Returns:
-        dict[str, str | bool]: ``git_commit``, the output of ``git rev-parse HEAD``, and ``src_dirty``, True
-        when ``git status --porcelain -- src`` lists a modified or untracked file; each is empty when git
-        cannot tell or the tree is not the top level of its repository.
+        dict[str, str | bool]: ``git_commit``, the output of ``git rev-parse HEAD``; ``src_dirty``, True
+        when ``git status --porcelain -- src`` lists a modified or untracked file; and ``src_tree``, the
+        output of ``git rev-parse HEAD:src``, the value ``score_detectors.src_state`` records for a scoring
+        run. Each is empty when git cannot tell or the tree is not the top level of its repository.
     """
     def git(*args):
         try:
@@ -175,7 +181,7 @@ def code_version(tree):
         except (OSError, subprocess.CalledProcessError):
             return None
 
-    unknown = {"git_commit": "", "src_dirty": ""}
+    unknown = {"git_commit": "", "src_dirty": "", "src_tree": ""}
     top = git("rev-parse", "--show-toplevel")
     if not top:
         return unknown
@@ -184,8 +190,10 @@ def code_version(tree):
                     "whose commit does not name this tree's code")
         return unknown
     commit = git("rev-parse", "HEAD")
+    src_tree = git("rev-parse", "HEAD:src")
     status = git("status", "--porcelain", "--", "src")
-    return {"git_commit": commit or "", "src_dirty": "" if status is None else bool(status)}
+    return {"git_commit": commit or "", "src_dirty": "" if status is None else bool(status),
+            "src_tree": src_tree or ""}
 
 
 def prepare_temp_dir(path, reuse=False):
@@ -780,14 +788,20 @@ def main(argv=None):
     check_tree()
     tree_dir = Path.cwd().resolve()
     code = code_version(tree_dir)
-    log.info(f"{tree_dir}: git commit {code['git_commit'] or 'unknown'}, src dirty {code['src_dirty']!r}")
+    log.info(f"{tree_dir}: git commit {code['git_commit'] or 'unknown'}, src dirty {code['src_dirty']!r}, "
+             f"src tree {code['src_tree'] or 'unknown'}")
+    refused = ("a recording map made from these rows as the port hashes has an empty port_src_tree, which "
+               "extract_dev_features.py refuses")
     if not code["git_commit"]:
         log.warning(f"no git commit of {tree_dir} is recorded, so the rows name no code version")
     elif code["src_dirty"] is True:
-        log.warning(f"src in {tree_dir} differs from commit {code['git_commit']}, so that commit is not exactly "
-                    "the code that ran")
+        log.warning(f"src in {tree_dir} differs from commit {code['git_commit']}, so neither that commit nor its "
+                    f"src tree is exactly the code that ran, and {refused}")
     elif code["src_dirty"] == "":
-        log.warning(f"git could not tell whether src in {tree_dir} differs from commit {code['git_commit']}")
+        log.warning(f"git could not tell whether src in {tree_dir} differs from commit {code['git_commit']}, so "
+                    f"{refused}")
+    if not code["src_tree"]:
+        log.warning(f"no src tree of {tree_dir} is recorded, so {refused}")
     temp_dir = prepare_temp_dir(args.temp_dir, reuse=args.reuse_temp_dir)
     cells = read_keymap_cells(args.keymap)
     manifest = json.loads(Path(args.manifest).read_text())
@@ -812,7 +826,7 @@ def main(argv=None):
     n_rows = n_hashed = 0
     read_errors = Counter()
     with open(partial, "w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=FIELDS)
+        writer = csv.DictWriter(fh, fieldnames=FIELDS, lineterminator="\n")
         writer.writeheader()
         fh.flush()
         for ds in manifest["datasets"]:

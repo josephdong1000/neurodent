@@ -5,16 +5,22 @@ keymap and manifest, into separate outputs and temp directories; the two outputs
 and ``compare_window_hashes.py`` must call every cell identical, classify perturbed copies of the port
 output, and leave a recording unmapped when its July-tree length does not reproduce the July draw. A third
 run scans both animals (``--all-windows``), and a July table whose F22 windows sit three windows later than
-the port's must come out shifted by -3 with that scan. Those tests load recordings through SpikeInterface and
-are marked integration and slow. The other tests run on synthetic tables and draws: classification edge
-cases, shifted cells found through a port scan (used only for animals where it holds the port hashes'
-samples, and never written to the committed map), the recording map, its July-tree length check, the commit
-and date columns that explain an unmapped recording, the exit code, the map's reader in
-``score_detectors.py``, and the recovery of July fragment counts by ``july_fragment_counts.py``. Fake
-recordings stand in for the loader to test read_error rows (and that ``compare_window_hashes.py`` counts them
-as not hashed), scan rows, the output written one animal at a time to ``<out>.partial``, ``first_file`` for
-intermediates in the temp directory, and that a run records the commit of the tree in its working directory.
-A throwaway git repository, with a linked worktree and plain copies inside it, tests how a commit is read.
+the port's must come out shifted by -3 with that scan. A fourth run, from a worktree of this repository made
+with ``git worktree add --detach`` and removed with ``git worktree remove``, as the runbook runs the July
+tree, must record that worktree's commit and src tree. Since all these runs use this repository's code, the
+comparison must say that the July run did not use the July code. Those tests load recordings through
+SpikeInterface and are marked integration and slow. The other tests run on synthetic tables and draws:
+classification edge cases, shifted cells found through a port scan (used only for animals where it holds the
+port hashes' samples, and never written to the committed map), the recording map, its July-tree length check,
+the code and date columns that explain an unmapped recording, port_src_tree written only when every port row
+records one with a clean src, the printout naming a July run made under the port's code, the exit code, the
+map's reader in ``score_detectors.py``, and the recovery of July fragment counts by ``july_fragment_counts.py``.
+Fake recordings stand in for the loader to test read_error rows (and that ``compare_window_hashes.py`` counts
+them as not hashed), scan rows, the output written one animal at a time to ``<out>.partial``, ``first_file``
+for intermediates in the temp directory, and that a run records the code of the tree in its working directory:
+in a worktree of this repository, the src tree a scoring run records, which the extraction accepts in the map
+unless the run had an uncommitted change under src, and in a plain directory, nothing. A throwaway git
+repository, with a linked worktree and plain copies inside it, tests how a commit and src tree are read.
 """
 
 import csv
@@ -260,15 +266,25 @@ def mini_scan(mini_hashes):
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_runs_record_their_commit(mini_hashes, tmp_path):
-    """Each run writes the tree's commit and src state in every row, and the map carries them for both trees."""
+def test_runs_record_their_commit(mini_hashes, tmp_path, capsys):
+    """Each run writes the tree's commit, src state and src tree in every row; the map carries them for both trees.
+
+    The map writes the src tree only when src is clean. Both runs come from this repository, so the printout says
+    that the July run did not use the July code.
+    """
     commit, dirty = _git("rev-parse", "HEAD"), str(bool(_git("status", "--porcelain", "--", "src")))
+    src_tree = _git("rev-parse", "HEAD:src")
     for tree in ("july", "port"):
         rows = pd.read_csv(mini_hashes[tree], dtype=str)
         assert set(rows["git_commit"]) == {commit} and set(rows["src_dirty"]) == {dirty}, tree
+        assert set(rows["src_tree"]) == {src_tree}, tree
+    capsys.readouterr()
     _, _, rmap = _compare(mini_hashes, mini_hashes["port"], tmp_path)
-    assert set(rmap["july_commit"]) == set(rmap["port_commit"]) == {commit}
-    assert set(rmap["july_src_dirty"].astype(str)) == set(rmap["port_src_dirty"].astype(str)) == {dirty}
+    assert "the July and port hashes record the same commit or src tree" in capsys.readouterr().out
+    code = pd.read_csv(tmp_path / "recording_map.csv", dtype=str, keep_default_na=False)
+    assert set(code["july_commit"]) == set(code["port_commit"]) == {commit}
+    assert set(code["july_src_dirty"]) == set(code["port_src_dirty"]) == {dirty}
+    assert set(code["july_src_tree"]) == set(code["port_src_tree"]) == {src_tree if dirty == "False" else ""}
     assert rmap.loc["F22__0", "july_n_files"] == 1 and rmap.loc["F22__0", "july_date_string"] == "May-10-2025"
     assert str(rmap.loc["F22__0", "port_positions_on_date"]) == "0"
     assert rmap.loc["F22__0", "port_n_fragments_on_date"] == 94
@@ -285,7 +301,7 @@ def test_scan_finds_a_shifted_recording(mini_hashes, mini_scan, tmp_path):
     port = pd.read_csv(mini_hashes["port"], dtype=str)
     both = port.merge(scan, on=KEY, suffixes=("_p", "_s"))
     assert len(both) == len(port)
-    for col in ["raw_sha256", "raw_rms", "raw_head_3", "column", "n_samples", "git_commit"]:
+    for col in ["raw_sha256", "raw_rms", "raw_head_3", "column", "n_samples", "git_commit", "src_tree"]:
         assert (both[f"{col}_p"] == both[f"{col}_s"]).all(), col
     checked = CW.read_scan(mini_scan, port=CW.read_hashes(mini_hashes["port"]))
     assert dict(checked["shared"]) == {"A10": 9, "F22": 9} and not checked["disagreements"]
@@ -324,6 +340,63 @@ def test_scan_finds_a_shifted_recording(mini_hashes, mini_scan, tmp_path):
 
     with pytest.raises(ValueError, match="--port-scan"):
         _compare(mini_hashes, mini_scan, tmp_path / "scan_as_port")
+
+
+@pytest.fixture
+def repo_worktree(tmp_path_factory):
+    """A worktree of this repository detached at its HEAD, made with git worktree add and removed afterwards."""
+    try:
+        top = _git("rev-parse", "--show-toplevel")
+    except (OSError, subprocess.CalledProcessError):
+        top = ""
+    if not top or Path(top).resolve() != REPO.resolve():
+        pytest.skip(f"{REPO} is not the top level of a git checkout")
+    base = tmp_path_factory.mktemp("worktree")
+    path = base / f"port-{base.name}-{os.getpid()}"     # git names the worktree after this, so it is unique
+    _git("-c", "core.hooksPath=/dev/null", "worktree", "add", "-q", "--detach", str(path), "HEAD")
+    yield path
+    _git("worktree", "remove", "--force", str(path))
+
+
+@pytest.mark.integration
+@pytest.mark.slow
+def test_a_run_in_a_worktree_of_this_repository_records_its_src_tree(mini_hashes, repo_worktree, tmp_path, capsys):
+    """A run from a worktree of this repository, as the runbook runs the July tree, records its commit and src tree.
+
+    The worktree is detached at this repository's HEAD and its own ``neurodent`` is imported, so its rows hash the
+    same samples and the map gets the src tree of both runs, which is the one a scoring run here records (for the
+    port run, when this repository's src is clean). The printout says that the July run did not use the July code.
+    """
+    import score_detectors as SDET
+
+    out = tmp_path / "hashes_worktree.csv"
+    cmd = [sys.executable, str(LABELING / "hash_labeled_windows.py"), "--tree", "july",
+           "--keymap", str(mini_hashes["keymap"]), "--manifest", str(mini_hashes["dir"] / "cohort_manifest.json"),
+           "--july-n-fragments", str(mini_hashes["july_n"]), "--out", str(out), "--temp-dir", str(tmp_path / "tmp")]
+    env = dict(os.environ, PYTHONPATH=str(repo_worktree / "src"))
+    res = subprocess.run(cmd, cwd=repo_worktree, env=env, capture_output=True, text=True)
+    assert res.returncode == 0, res.stderr[-4000:]
+    assert f"neurodent imported from {(repo_worktree / 'src' / 'neurodent').resolve()};" in res.stderr
+
+    head, src_tree = _git("rev-parse", "HEAD"), _git("rev-parse", "HEAD:src")
+    rows = pd.read_csv(out, dtype=str, keep_default_na=False)
+    assert set(zip(rows["git_commit"], rows["src_dirty"], rows["src_tree"])) == {(head, "False", src_tree)}
+    port = pd.read_csv(mini_hashes["port"], dtype=str, keep_default_na=False)
+    both = rows.merge(port, on=KEY, suffixes=("_w", "_p"))
+    assert len(both) == len(port) and (both["raw_sha256_w"] == both["raw_sha256_p"]).all()
+
+    rmap_path = tmp_path / "recording_map.csv"
+    capsys.readouterr()
+    rc = CW.main(["--july", str(out), "--port", str(mini_hashes["port"]), "--keymap", str(mini_hashes["keymap"]),
+                  "--july-n-fragments", str(mini_hashes["july_n"]), "--out", str(tmp_path / "cells.csv"),
+                  "--recording-map", str(rmap_path)])
+    assert rc == 0
+    assert ("the July and port hashes record the same commit or src tree, so the July run did not use the July "
+            "code") in capsys.readouterr().out
+    rmap = pd.read_csv(rmap_path, dtype=str, keep_default_na=False)
+    assert set(rmap["july_commit"]) == {head} and set(rmap["july_src_tree"]) == {src_tree}
+    clean = not _git("status", "--porcelain", "--", "src")
+    assert SDET.src_state()["src_tree"] == src_tree and set(rmap["port_src_tree"]) == {src_tree if clean else ""}
 
 
 # --------------------------------------------------------------------------- synthetic tables
@@ -443,6 +516,7 @@ def test_recording_map_reader(tmp_path):
     cells = CW.classify([("X__0", "X", 0, 20, "A"), ("Y__0", "Y", 0, 3, "A"), ("W__0", "W", 0, 8, "A")], july, port)
     path = tmp_path / "recording_map.csv"
     CW._write(path, CW.MAP_FIELDS, CW.recording_map(cells, july, port, _lengths("X__0", "Y__0", "W__0")))
+    assert b"\r" not in path.read_bytes(), "the committed map is LF only"
     rmap = SDET.RecordingMap(path)
     assert rmap.label("X", 1, "X WT day1") == "X__0"
     assert rmap.label("X", 0, "X WT day0") is None
@@ -516,7 +590,7 @@ def _scan_row(animal, position, window, channel, sha, rms=1.0, status="scan", da
     """A row of a port scan (``hash_labeled_windows.py --all-windows``) with the columns the comparison reads."""
     return {"tree": "port", "animal": animal, "position": str(position), "window": str(window), "channel": channel,
             "status": status, "raw_sha256": sha, "raw_rms": repr(rms), "date_string": date, "n_files": str(n_files),
-            "n_fragments": str(n), "git_commit": "", "src_dirty": ""}
+            "n_fragments": str(n), "git_commit": "", "src_dirty": "", "src_tree": ""}
 
 
 def test_port_scan_classifies_shifted_cells(tmp_path):
@@ -607,9 +681,9 @@ def test_scan_rows_and_hash_rows_are_not_interchangeable(tmp_path):
     assert CW.read_scan(scan)["matches"] == {("X", "s"): [(0, 1, "A", "1.0")]}
 
 
-def _stamped(row, status="ok", commit="", dirty=""):
+def _stamped(row, status="ok", commit="", dirty="", tree=""):
     """A hash row with the status and code columns, so that rows of every status share one header."""
-    return dict(row, status=status, git_commit=commit, src_dirty=dirty)
+    return dict(row, status=status, git_commit=commit, src_dirty=dirty, src_tree=tree)
 
 
 def test_a_shift_may_keep_the_window_index_in_another_recording(tmp_path):
@@ -725,23 +799,29 @@ def test_a_scan_never_writes_the_committed_map(tmp_path, monkeypatch, capsys):
 
 
 def test_map_names_the_code_of_each_hash_run(tmp_path, capsys):
-    """The commits and src states of the two hash outputs reach every map row; several of them are all named."""
-    def stamped(row, commit, dirty):
-        return dict(row, git_commit=commit, src_dirty=dirty)
+    """The code of the two hash outputs reaches every map row; several commits or src states are all named.
+
+    A port row whose src differed from its commit leaves the port's src trees unwritten.
+    """
+    def stamped(row, commit, dirty, tree):
+        return dict(row, git_commit=commit, src_dirty=dirty, src_tree=tree)
 
     cells = [("X__0", "X", 0, 20, "A"), ("Y__0", "Y", 0, 3, "A")]
-    july = [stamped(_hash_row("X", 0, 20, "A", "s"), "j1", "False"),
-            stamped(_hash_row("Y", 0, 3, "A", "t"), "j1", "False")]
-    port = [stamped(_hash_row("X", 0, 20, "A", "s"), "p2", "True"),
-            stamped(_hash_row("Y", 0, 3, "A", "t"), "p1", "False")]
+    july = [stamped(_hash_row("X", 0, 20, "A", "s"), "j1", "False", "tj"),
+            stamped(_hash_row("Y", 0, 3, "A", "t"), "j1", "False", "tj")]
+    port = [stamped(_hash_row("X", 0, 20, "A", "s"), "p2", "True", "tp2"),
+            stamped(_hash_row("Y", 0, 3, "A", "t"), "p1", "False", "tp1")]
     rc, rmap = _run_main(tmp_path / "run", cells, july, port, {"X__0": "100", "Y__0": "100"})
     assert rc == 0
     for row in rmap.values():
-        assert (row["july_commit"], row["july_src_dirty"]) == ("j1", "False")
-        assert (row["port_commit"], row["port_src_dirty"]) == ("p1;p2", "False;True")
+        assert (row["july_commit"], row["july_src_dirty"], row["july_src_tree"]) == ("j1", "False", "tj")
+        assert (row["port_commit"], row["port_src_dirty"], row["port_src_tree"]) == ("p1;p2", "False;True", "")
     out = capsys.readouterr().out
-    assert "port hashes: git commit p1;p2, src dirty False;True" in out
+    assert "july hashes: git commit j1, src dirty False, src tree tj\n" in out
+    assert "port hashes: git commit p1;p2, src dirty False;True, src tree not written\n" in out
     assert "the port hashes come from several commits" in out and "src differed from the commit in a port" in out
+    assert "several src trees" not in out and "the july hashes come from several" not in out
+    assert "port_src_tree names no single src tree, so extract_dev_features.py refuses this map" in out
 
     import score_detectors as SDET
     reader = SDET.RecordingMap(tmp_path / "run" / "recording_map.csv")
@@ -749,7 +829,110 @@ def test_map_names_the_code_of_each_hash_run(tmp_path, capsys):
 
     rc, rmap = _run_main(tmp_path / "unstamped", cells[:1], [_hash_row("X", 0, 20, "A", "s")],
                          [_hash_row("X", 0, 20, "A", "s")], {"X__0": "100"})
-    assert (rmap["X__0"]["july_commit"], rmap["X__0"]["port_commit"], rmap["X__0"]["port_src_dirty"]) == ("", "", "")
+    x = rmap["X__0"]
+    assert (x["july_commit"], x["port_commit"], x["port_src_dirty"], x["july_src_tree"], x["port_src_tree"]) == (
+        "", "", "", "", ""), "hash outputs without the code columns"
+
+
+def test_port_src_tree_is_written_only_when_every_port_row_records_one(tmp_path, capsys):
+    """One port src tree reaches every map row; a port row without one, or without a clean src, empties it.
+
+    A port output joined from two runs, one of which recorded no src tree, must not pass for the other run's tree,
+    although its commit is still named. Nor may a run whose src differed from its commit, or was not checked: its
+    rows record HEAD's src tree, which is not the code that ran, and once the change is reverted the extraction
+    runs under that very tree. So the extraction refuses every such map, and also one naming two trees. The src
+    tree changes neither the mapping nor the exit code. A port scan whose src tree is not the port hashes' is said
+    to record different code.
+    """
+    import score_detectors as SDET
+
+    cells = [("X__0", "X", 0, 20, "A"), ("Y__0", "Y", 0, 3, "A")]
+    july = [_stamped(_hash_row("X", 0, 20, "A", "s"), commit="j1", dirty="False", tree="tj"),
+            _stamped(_hash_row("Y", 0, 3, "A", "t"), commit="j1", dirty="False", tree="tj")]
+    lengths = {"X__0": "100", "Y__0": "100"}
+    cases = [   # name, (src_tree, src_dirty) of the two port rows, the map's port_src_dirty and port_src_tree
+        ("one", (("tp", "False"), ("tp", "False")), "False", "tp"),
+        ("one_without", (("tp", "False"), ("", "False")), "False", ""),
+        ("none", (("", "False"), ("", "False")), "False", ""),
+        ("one_dirty", (("tp", "False"), ("tp", "True")), "False;True", ""),
+        ("dirty", (("tp", "True"), ("tp", "True")), "True", ""),
+        ("one_unchecked", (("tp", "False"), ("tp", "")), "False", ""),
+        ("two", (("tp", "False"), ("tq", "False")), "False", "tp;tq"),
+    ]
+    for name, stamps, dirty, expected in cases:
+        port = [_stamped(_hash_row("X", 0, 20, "A", "s"), commit="p1", dirty=stamps[0][1], tree=stamps[0][0]),
+                _stamped(_hash_row("Y", 0, 3, "A", "t"), commit="p1", dirty=stamps[1][1], tree=stamps[1][0])]
+        capsys.readouterr()
+        rc, rmap = _run_main(tmp_path / name, cells, july, port, lengths)
+        out = capsys.readouterr().out
+        assert rc == 0, name
+        assert {(r["status"], r["port_commit"], r["port_src_dirty"], r["port_src_tree"], r["july_src_tree"])
+                for r in rmap.values()} == {("mapped", "p1", dirty, expected, "tj")}, name
+        assert f"port hashes: git commit p1, src dirty {dirty}, src tree {expected or 'not written'}\n" in out, name
+        assert ("src differed from the commit in a port hash run" in out) == ("True" in dirty), name
+        assert ("the port hash rows do not all record a src tree with src_dirty False" in out) == (
+            not expected and "True" not in dirty), name
+        assert ("the port hashes come from several src trees" in out) == (name == "two"), name
+        assert ("port_src_tree names no single src tree" in out) == (expected != "tp"), name
+        assert "the July and port hashes record the same" not in out, name
+        problems = SDET.RecordingMap(tmp_path / name / "recording_map.csv").port_src_tree_problems("tp")
+        assert bool(problems) == (expected != "tp"), (name, problems)
+    assert CW.code_of([]) == ("", "", "")
+    assert CW.code_of([{"git_commit": "p1", "src_dirty": False, "src_tree": "tp"}]) == ("p1", "False", "tp")
+
+    port = [_stamped(_hash_row("X", 0, 20, "A", "s"), commit="p1", dirty="False", tree="tp"),
+            _stamped(_hash_row("Y", 0, 3, "A", "t"), commit="p1", dirty="False", tree="tp")]
+    for scan_tree, differs in (("tp", False), ("tq", True)):
+        scan = [dict(_scan_row("X", 0, 20, "A", "s"), git_commit="p1", src_dirty="False", src_tree=scan_tree)]
+        capsys.readouterr()
+        _run_main(tmp_path / f"scan_{scan_tree}", cells, july, port, lengths, scan_rows=scan)
+        out = capsys.readouterr().out
+        assert f"git commit p1, src dirty False, src tree {scan_tree}; different or missing" in out
+        assert ("the scan and the port hashes record different code" in out) == differs, scan_tree
+
+
+def test_the_printout_names_a_july_run_made_under_the_port_code(tmp_path, capsys):
+    """A July hash output that shares a commit or src tree with the port's is named; nothing else changes.
+
+    That is what a July command run from the port's worktree gives, which the tree check accepts: the comparison
+    then checks the port against itself. A shared commit counts when a dirty src leaves no tree, a shared src
+    tree under another commit counts, and so does one shared value among several. The map and exit code are
+    those of a July run under the July code, apart from the July code columns.
+    """
+    cells = [("X__0", "X", 0, 20, "A"), ("Y__0", "Y", 0, 3, "A")]
+    port = [_stamped(_hash_row("X", 0, 20, "A", "s"), commit="p1", dirty="False", tree="tp"),
+            _stamped(_hash_row("Y", 0, 3, "A", "t"), commit="p1", dirty="False", tree="tp")]
+    lengths = {"X__0": "100", "Y__0": "100"}
+    line = ("  the July and port hashes record the same commit or src tree, so the July run did not use the July code "
+            "and the comparison checks the port against itself\n")
+    july_code = ("july_commit", "july_src_dirty", "july_src_tree")
+    cases = [   # name, (commit, src_dirty, src_tree) of the two July rows, whether the line is printed
+        ("july_code", (("j1", "False", "tj"), ("j1", "False", "tj")), False),
+        ("not_recorded", (("", "", ""), ("", "", "")), False),
+        ("port_code", (("p1", "False", "tp"), ("p1", "False", "tp")), True),
+        ("port_commit_dirty", (("p1", "True", "tp"), ("p1", "True", "tp")), True),
+        ("port_tree", (("j2", "False", "tp"), ("j2", "False", "tp")), True),
+        ("one_run_port", (("j1", "False", "tj"), ("p1", "False", "tp")), True),
+    ]
+    maps = {}
+    for name, stamps, named in cases:
+        july = [_stamped(_hash_row("X", 0, 20, "A", "s"), commit=stamps[0][0], dirty=stamps[0][1], tree=stamps[0][2]),
+                _stamped(_hash_row("Y", 0, 3, "A", "t"), commit=stamps[1][0], dirty=stamps[1][1], tree=stamps[1][2])]
+        capsys.readouterr()
+        rc, rmap = _run_main(tmp_path / name, cells, july, port, lengths)
+        out = capsys.readouterr().out
+        assert (line in out) == named, name
+        assert rc == 0, name
+        maps[name] = {label: {k: v for k, v in row.items() if k not in july_code} for label, row in rmap.items()}
+        assert maps[name] == maps["july_code"], name
+    assert {r["status"] for r in maps["port_code"].values()} == {"mapped"}
+    assert {r["port_src_tree"] for r in maps["port_code"].values()} == {"tp"}
+
+    code = dict.fromkeys(["july_commit", "port_commit", "july_src_tree", "port_src_tree"], "")
+    assert not CW.shared_code(code), "empty values match nothing"
+    assert CW.shared_code(dict(code, july_commit="a;b", port_commit="b"))
+    assert CW.shared_code(dict(code, july_src_tree="t", port_src_tree="s;t"))
+    assert not CW.shared_code(dict(code, july_commit="a", port_commit="b", july_src_tree="t", port_src_tree="s"))
 
 
 def test_unmapped_recording_lists_the_port_recordings_of_its_date(tmp_path, capsys):
@@ -1042,19 +1225,34 @@ def test_scan_hashes_every_window_and_column(fake_loader):
     assert rows[10]["error"] == "OSError: the recording cannot be opened" and rows[10]["animalday"] == "X WT day0"
 
 
-def test_main_writes_the_code_version_and_scans_on_request(tmp_path, monkeypatch, fake_loader):
+def test_main_writes_the_code_version_and_scans_on_request(tmp_path, monkeypatch, fake_loader, caplog):
     """Every row names the commit and src state of the working directory's tree; --all-windows writes scan rows.
 
     The tree whose code is read is the working directory, not this script's repository; a scan needs --animal.
+    A run whose src differs from its commit, or was not checked, warns that the map would be refused.
     """
-    code = {"git_commit": "c0ffee", "src_dirty": False}
+    code = {"git_commit": "c0ffee", "src_dirty": False, "src_tree": "7ree"}
     seen = []
     monkeypatch.setattr(HW, "code_version", lambda tree: seen.append(tree) or dict(code))
     monkeypatch.chdir(tmp_path)
     argv, _, out, _ = _fake_main(monkeypatch, tmp_path / "hash", {"X": ["ok", "ok"]})
+    caplog.clear()
     assert HW.main(argv) == 0
     assert seen == [tmp_path.resolve()] and tmp_path.resolve() != REPO
-    assert {(r["git_commit"], r["src_dirty"]) for r in _read_rows(out)[1]} == {("c0ffee", "False")}
+    stamps = {(r["git_commit"], r["src_dirty"], r["src_tree"]) for r in _read_rows(out)[1]}
+    assert stamps == {("c0ffee", "False", "7ree")}
+    assert "port_src_tree" not in caplog.text
+
+    refused = "a recording map made from these rows as the port hashes has an empty port_src_tree"
+    for dirty, said in ((True, f"src in {tmp_path.resolve()} differs from commit c0ffee, so neither"),
+                        ("", f"git could not tell whether src in {tmp_path.resolve()} differs from commit c0ffee")):
+        monkeypatch.setattr(HW, "code_version", lambda tree, dirty=dirty: dict(code, src_dirty=dirty))
+        argv, _, out, _ = _fake_main(monkeypatch, tmp_path / f"dirty_{dirty}", {"X": ["ok"]})
+        caplog.clear()
+        assert HW.main(argv) == 0
+        assert {r["src_tree"] for r in _read_rows(out)[1]} == {"7ree"}, "the rows keep the tree"
+        assert said in caplog.text and refused in caplog.text, dirty
+    monkeypatch.setattr(HW, "code_version", lambda tree: dict(code))
 
     fake_loader([_FakeLRO(_signal(2, 2, seed=0), ["A", "B"])])
     argv, _, out, partial = _fake_main(monkeypatch, tmp_path / "scan", {"X": ["ok"], "Y": ["ok"]})
@@ -1063,7 +1261,7 @@ def test_main_writes_the_code_version_and_scans_on_request(tmp_path, monkeypatch
     assert fields == HW.FIELDS and not partial.exists()
     assert [(r["animal"], r["window"], r["channel"], r["status"]) for r in rows] == [
         ("X", "0", "A", "scan"), ("X", "0", "B", "scan"), ("X", "1", "A", "scan"), ("X", "1", "B", "scan")]
-    assert {(r["git_commit"], r["src_dirty"]) for r in rows} == {("c0ffee", "False")}
+    assert {(r["git_commit"], r["src_dirty"], r["src_tree"]) for r in rows} == {("c0ffee", "False", "7ree")}
 
     fake_loader([_FakeLRO(_signal(2, 2, seed=0), ["A", "B"], bad_windows={0})])
     argv, _, out, _ = _fake_main(monkeypatch, tmp_path / "scan_error", {"X": ["ok"]})
@@ -1076,10 +1274,12 @@ def test_main_writes_the_code_version_and_scans_on_request(tmp_path, monkeypatch
 
 
 def test_code_version(tmp_path, monkeypatch, caplog):
-    """The commit is HEAD's, and src is dirty only for a change under src, tracked or not.
+    """The commit and src tree are HEAD's, and src is dirty only for a change under src, tracked or not.
 
-    A linked worktree, as the runbook makes for the July tree, and a symlink to a tree have the tree's commit; a
-    plain copy inside another repository, in an ignored directory or not, has none.
+    The src tree changes with a commit that changes src and with no other commit. A linked worktree, as the
+    runbook makes for the July tree, and a symlink to a tree have the tree's commit and src tree; a plain copy
+    inside another repository, in an ignored directory or not, has neither, and a repository without src has
+    no src tree.
     """
     monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
     repo = tmp_path / "tree"
@@ -1087,21 +1287,22 @@ def test_code_version(tmp_path, monkeypatch, caplog):
     (repo / "src" / "m.py").write_text("x = 1\n")
     (repo / "README").write_text("r\n")
 
-    def git(*args):
-        return subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@example.com",
+    def git(*args, at=repo):
+        return subprocess.run(["git", "-C", str(at), "-c", "user.name=t", "-c", "user.email=t@example.com",
                                "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null", *args],
                               capture_output=True, text=True, check=True).stdout.strip()
 
-    assert HW.code_version(repo) == {"git_commit": "", "src_dirty": ""}, "not a git tree yet"
+    unknown = {"git_commit": "", "src_dirty": "", "src_tree": ""}
+    assert HW.code_version(repo) == unknown, "not a git tree yet"
     git("init", "-q")
     git("add", "-A")
     git("commit", "-q", "-m", "first")
-    head = git("rev-parse", "HEAD")
-    assert HW.code_version(repo) == {"git_commit": head, "src_dirty": False}
+    head, first = git("rev-parse", "HEAD"), git("rev-parse", "HEAD:src")
+    assert HW.code_version(repo) == {"git_commit": head, "src_dirty": False, "src_tree": first}
     (repo / "README").write_text("changed\n")
     assert HW.code_version(repo)["src_dirty"] is False, "a change outside src does not count"
     (repo / "src" / "new.py").write_text("y = 2\n")
-    assert HW.code_version(repo) == {"git_commit": head, "src_dirty": True}
+    assert HW.code_version(repo) == {"git_commit": head, "src_dirty": True, "src_tree": first}, "HEAD's src tree"
     (repo / "src" / "new.py").unlink()
     (repo / "src" / "m.py").write_text("x = 2\n")
     assert HW.code_version(repo)["src_dirty"] is True
@@ -1109,18 +1310,104 @@ def test_code_version(tmp_path, monkeypatch, caplog):
     (repo / ".gitignore").write_text("copies/\n")
     git("add", "-A")
     git("commit", "-q", "-m", "second")
+    second = git("rev-parse", "HEAD:src")
+    assert second != first, "a commit that changes src changes its tree"
+    (repo / "README").write_text("map\n")
+    git("commit", "-q", "-am", "outside src")
     head = git("rev-parse", "HEAD")
+    clean = {"git_commit": head, "src_dirty": False, "src_tree": second}
+    assert HW.code_version(repo) == clean, "a commit outside src keeps the src tree"
     worktree, link = tmp_path / "july", tmp_path / "link"
     git("worktree", "add", "-q", "--detach", str(worktree), head)
     link.symlink_to(repo, target_is_directory=True)
-    assert HW.code_version(worktree) == HW.code_version(link) == {"git_commit": head, "src_dirty": False}
+    assert HW.code_version(worktree) == HW.code_version(link) == clean
     for copy in (repo / "copies" / "july", repo / "sub"):
         (copy / "src").mkdir(parents=True)
         (copy / "src" / "m.py").write_text("x = 'july'\n")
         caplog.clear()
-        assert HW.code_version(copy) == {"git_commit": "", "src_dirty": ""}, copy
+        assert HW.code_version(copy) == unknown, copy
         assert "is not the top level of a git checkout" in caplog.text
-    assert HW.code_version(repo) == {"git_commit": head, "src_dirty": False}
+    assert HW.code_version(repo) == clean
+
+    no_src = tmp_path / "no_src"
+    no_src.mkdir()
+    (no_src / "README").write_text("r\n")
+    git("init", "-q", at=no_src)
+    git("add", "-A", at=no_src)
+    git("commit", "-q", "-m", "first", at=no_src)
+    assert HW.code_version(no_src) == {"git_commit": git("rev-parse", "HEAD", at=no_src), "src_dirty": False,
+                                       "src_tree": ""}
+
+
+@pytest.mark.integration
+def test_a_worktree_of_this_repository_names_its_src_tree(repo_worktree, tmp_path, monkeypatch, fake_loader, caplog,
+                                                         capsys):
+    """A hash run in a worktree of this repository records the src tree a scoring run here records, on every row.
+
+    The worktree is detached at this repository's HEAD, so its ``git rev-parse HEAD:src`` is the tree
+    ``score_detectors.src_state`` gives the extraction. The loader is faked; the git calls are real. The same
+    run from a plain directory, outside any git worktree, records no code, and the map gives port_src_tree on
+    every row, mapped or not, and an empty july_src_tree; the extraction accepts it. A port run with an
+    uncommitted change under the worktree's src records the same src tree in its rows, but its map leaves
+    port_src_tree empty, so the extraction refuses it, also after the change is reverted.
+    """
+    import score_detectors as SDET
+
+    head, src_tree = _git("rev-parse", "HEAD"), _git("rev-parse", "HEAD:src")
+    assert src_tree and src_tree == SDET.src_state()["src_tree"]
+    assert HW.code_version(repo_worktree) == {"git_commit": head, "src_dirty": False, "src_tree": src_tree}
+
+    hash_animal, outputs = HW.hash_animal, {}
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    edited = repo_worktree / "src" / "neurodent" / "__init__.py"
+    original = edited.read_bytes()
+    runs = [("port", "port", repo_worktree, (head, "False", src_tree)), ("july", "july", plain, ("", "", "")),
+            ("dirty", "port", repo_worktree, (head, "True", src_tree))]
+    for name, tree, cwd, stamp in runs:
+        monkeypatch.chdir(cwd)
+        argv, _, outputs[name], _ = _fake_main(monkeypatch, tmp_path / name, {"X": ["ok"], "Y": ["ok"]})
+        argv[argv.index("--tree") + 1] = tree
+        monkeypatch.setattr(HW, "hash_animal", hash_animal)     # the real one, which loads the fake recordings
+        fake_loader([_FakeLRO(_signal(3, 1, seed=0), ["A"])])
+        caplog.clear()
+        if name == "dirty":
+            edited.write_bytes(original + b"\n# an uncommitted change\n")
+        try:
+            assert HW.main(argv) == 0, name
+        finally:
+            if name == "dirty":
+                edited.write_bytes(original)
+        assert {(r["git_commit"], r["src_dirty"], r["src_tree"]) for r in _read_rows(outputs[name])[1]} == {stamp}
+        assert ("no src tree of" in caplog.text) == (name == "july"), name
+        assert ("differs from commit" in caplog.text) == (name == "dirty"), name
+        refused = "an empty port_src_tree, which extract_dev_features.py refuses" in caplog.text
+        assert refused == (name != "port"), name
+    assert HW.code_version(repo_worktree) == {"git_commit": head, "src_dirty": False, "src_tree": src_tree}
+
+    table = tmp_path / "july_n_fragments.csv"
+    table.write_text("recording,matches\nX__0,3\n")
+    maps = {}
+    for name in ("port", "dirty"):
+        rmap_path = tmp_path / f"recording_map_{name}.csv"
+        capsys.readouterr()
+        rc = CW.main(["--july", str(outputs["july"]), "--port", str(outputs[name]),
+                      "--keymap", str(tmp_path / "port" / "keymap.csv"), "--july-n-fragments", str(table),
+                      "--out", str(tmp_path / f"cells_{name}.csv"), "--recording-map", str(rmap_path)])
+        out = capsys.readouterr().out
+        assert rc == 1, "Y__0 has no July draw length, so it stays unmapped"
+        assert ("src differed from the commit in a port hash run" in out) == (name == "dirty"), name
+        assert ("port_src_tree names no single src tree" in out) == (name == "dirty"), name
+        assert "the July and port hashes record the same" not in out, "the July run records no code"
+        maps[name] = pd.read_csv(rmap_path, dtype=str, keep_default_na=False).set_index("july_recording")
+        assert maps[name]["status"].to_dict() == {"X__0": "mapped", "Y__0": "unmapped"}, name
+        problems = SDET.RecordingMap(rmap_path).port_src_tree_problems(SDET.src_state()["src_tree"])
+        assert bool(problems) == (name == "dirty"), (name, problems)
+    for col, value in [("port_commit", head), ("port_src_dirty", "False"), ("port_src_tree", src_tree),
+                       ("july_commit", ""), ("july_src_dirty", ""), ("july_src_tree", "")]:
+        assert set(maps["port"][col]) == {value}, col
+    assert set(maps["dirty"]["port_src_dirty"]) == {"True"} and set(maps["dirty"]["port_src_tree"]) == {""}
+    assert SDET.RecordingMap(tmp_path / "recording_map_port.csv").label("X", 0, "X WT day0") == "X__0"
 
 
 # --------------------------------------------------------------------------- output written per animal

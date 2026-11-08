@@ -25,17 +25,26 @@ It refuses to run when:
   ``score_detectors.CODE_FILES``; and ``src_tree``, which both must record and share, with ``src_dirty`` false
   in each. The git commit is not compared;
 - the F, L or M settings in ``config/config.yaml`` (``--config``) differ from those the selection recorded,
-  each dataset's canonical channels included;
+  each dataset's canonical channels included, or the config files differ from those the test extraction
+  recorded (``select_detectors.config_problem``): by sha256, ``--config`` against ``config/config.yaml`` and the
+  dataset configs, ``config.local.yaml`` and samples files beside it against their ``config/`` entries, a
+  recorded file now missing, and a file the settings read without a record;
+- the test provenance lacks ``recording_channels`` or ``config_list_by_recording``, or they do not describe the
+  cells (``select_detectors.recorded_channels``);
 - the parquet holds an animal outside ``split.json``'s test list or a column of unknown role; lacks the
-  columns F, L and M read, y, a breakdown column or a rater category column; or holds a y other than 0 and 1.
+  columns F, L and M read, y, a breakdown column or a rater category column; holds a y other than 0 and 1, or
+  a y that is not the majority consensus of its ``cat_<rater>`` columns.
 
 Every check runs, and F, L, M and the combinations' rejections are computed, before the claim. Scored once on
-the test cells: today, replace(k), add(k), A(k) alone, F alone and M alone (on the cells with a config list),
-each with pooled precision, recall, F1, Cohen's kappa, tp, fp, fn, tn and flag rate, a 95 percent F1 interval
-from a bootstrap over test ``cv_group``, and the same metrics per dataset, cv_group, animal, isday and genotype;
-the paired F1 differences replace(k) minus today and add(k) minus today with their intervals; rejection rates
-per rater-category pattern for every combination; and the raters' pairwise agreement on the test cells. The
-output records the sha256 of the selection it applied and, in ``provenance.code``, of the scoring code it ran.
+the test cells: today (F or M), replace(k) (F or A(k)), add(k) (F or M or A(k)), lof_branch (F or L), A(k)
+alone, F alone and M alone (on the cells whose recording has a config list), each with pooled precision,
+recall, F1, Cohen's kappa, tp, fp, fn, tn and flag rate, a 95 percent F1 interval from a bootstrap over test
+``cv_group``, and the same metrics per dataset, cv_group, animal, isday and genotype; the paired F1 differences
+replace(k) minus today and add(k) minus today with their intervals. All of it is scored against the majority
+consensus, the primary rule, and again against the any and unanimous consensus of the cells' rater categories
+(``select_detectors.rule_labels``), under each combination's ``alongside``. Also reported: rejection rates per
+rater-category pattern for every combination, and the raters' pairwise agreement on the test cells. The output
+records the sha256 of the selection it applied and, in ``provenance.code``, of the scoring code it ran.
 
     uv run python scripts/labeling/score_test.py --features results/labeling/test_features.parquet \\
         --pick results/labeling/dev_selection.json --out results/labeling/test_score.json
@@ -223,6 +232,7 @@ def main(argv=None):
     problems = provenance_mismatches(selection["features"]["provenance"], test_prov)
     if problems:
         raise SystemExit("dev and test features were produced differently:\n  " + "\n  ".join(problems))
+    SD.require_recording_records(test_prov, "test")
 
     df = pd.read_parquet(args.features)
     check_split(set(df["animal"]), args.split, "test")
@@ -230,11 +240,17 @@ def main(argv=None):
     SD.require_member_columns(df)
     SD.require_scoring_columns(df)
     EV.category_columns(df)
-    settings = SD.load_settings(args.config, datasets=SD.settings_datasets(df, test_prov))
+    labels = SD.rule_labels(df)
+    SD.require_majority(df, labels, test_prov)
+    datasets = SD.settings_datasets(df, test_prov)
+    settings = SD.load_settings(args.config, datasets=datasets)
     changed = SD.settings_differences(selection["settings"], settings)
     if changed:
         raise SystemExit("the filter settings differ from those the selection recorded:\n  " + "\n  ".join(changed))
-    members, audits = SD.member_masks(df, settings, test_prov.get("config_list_unknown_channels"))
+    problem = SD.config_problem(args.config, test_prov, "test", datasets)
+    if problem:
+        raise SystemExit(problem)
+    members, audits = SD.member_masks(df, settings, test_prov)
     preds = SD.combination_preds(members, SD.mask_pred(df, k))
     cells = SD.combination_cells(df)
 
@@ -243,7 +259,8 @@ def main(argv=None):
     claim(args.out, markers, json.dumps({"out": str(args.out), "pick": str(args.pick), "pick_sha256": pick_sha,
                                          "features": str(args.features), "features_sha256": features_sha}))
 
-    combos = SD.score_combinations(df, preds, boot=args.boot)
+    combos = SD.score_combinations(df, preds, boot=args.boot,
+                                   alongside={rule: labels[rule].to_numpy() for rule in SD.ALONGSIDE})
     prov = provenance({"features": args.features, "pick": args.pick, "split": args.split, "config": args.config},
                       script="score_test", boot=args.boot)
     prov["code"] = {**(prov.get("code") or {}), **running_scoring_code()}  # the scoring code checked above

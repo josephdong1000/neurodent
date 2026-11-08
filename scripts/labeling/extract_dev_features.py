@@ -17,9 +17,16 @@ output has one row per labeled (recording, window, channel) with:
 
 ``config_list`` is 1 when the cell's channel is on the dataset config's ``bad_channels`` list for its
 recording, and ``config_list_defined`` says whether a list applies to the recording at all
-(:func:`match_config_lists`). Keys that apply to nothing and list entries that are not among the recording's
-channels are listed in the provenance. Beside the parquet, ``<out stem>.autoreject_scores.parquet`` holds,
-for every cell and configuration, the fragment score and the channel's cutoff from the fit.
+(:func:`match_config_lists`). A list-form entry applies to every recording of its animal. A dict-form key
+names a date and applies to each recording built from sessions whose names start with that date; the
+sessions of each recording are read from the loader as it builds them (:func:`load_animal`). Recordings left
+without a list and keys that apply to nothing are listed in the provenance with the reason, as are list
+entries that are not among the recording's channels. Per recording, the provenance also gives its own
+channels among those its dataset's WARs are standardized to, in that order, padded ones left out
+(``recording_channels``), the sessions it was built from (``recording_sessions``), and whether a list
+applies, with the listed channels it has and the listed standardized channels it lacks
+(``config_list_by_recording``). Beside the parquet, ``<out stem>.autoreject_scores.parquet`` holds, for every
+cell and configuration, the fragment score and the channel's cutoff from the fit.
 
 ``select_detectors.py`` then builds the pipeline's detector combinations from these cells and chooses the
 autoreject configuration offline, on identical cells for every detector.
@@ -30,12 +37,17 @@ cells every rater abstained on, so it is printed for dev only; for test only the
 recordings and configurations are printed.
 
 Recordings are matched to label keys through ``config/labeling/recording_map.csv`` (see
-``score_detectors.RecordingMap``). Before anything loads, labeled recordings the map leaves unmapped are
-refused unless ``--allow-unmapped``, which leaves them out and skips every animal with no mapped labeled
-recording; the provenance lists both. An animal whose load, features or grid fit fails (an unreadable file,
-or the detector refusing NaN samples) is logged with its traceback and the run goes on; if any failed,
-``<out>.errors.json`` lists them and the run exits 1 without writing the parquet. A mapped labeled recording
-that yields no cells is refused.
+``score_detectors.RecordingMap``). A map holds only for the code that made it, so before anything else is read
+the run refuses a map that lists a labeled recording on more than one row, or whose ``port_src_tree`` column
+is missing, is empty on a mapped row, or names another src tree than the run's own; the fix is to rerun
+runbook steps 2 and 3 with the current code. It then refuses to run while ``src`` has uncommitted changes, or
+when git cannot tell, since the code that loads the recordings may then differ from that tree; the fix is to
+remove the changes. ``--positional-recordings`` reads no map and skips these checks. Labeled recordings the
+map leaves unmapped are then refused unless ``--allow-unmapped``, which leaves them out and skips every animal
+with no mapped labeled recording; the provenance lists both. An animal whose load, features or grid fit fails
+(an unreadable file, or the detector refusing NaN samples) is logged with its traceback and the run goes on; if
+any failed, ``<out>.errors.json`` lists them and the run exits 1 without writing the parquet. A mapped labeled
+recording that yields no cells is refused.
 
 Each finished animal is written to ``<out>.parts/`` with the parameters, input and code hashes and
 ``src_tree`` it was computed under, and the shards are kept. With ``--resume``, an animal whose shard
@@ -73,8 +85,9 @@ import sys
 import traceback
 import warnings
 from collections import Counter
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
+from unittest import mock
 
 import numpy as np
 import pandas as pd
@@ -104,6 +117,7 @@ from score_detectors import (  # noqa: E402  (one consensus, split guard, record
 from neurodent.analysis import AnimalAnalyzer  # noqa: E402
 from neurodent.core.utils import resolve_channel  # noqa: E402
 from neurodent.core.utils.paths import set_temp_directory  # noqa: E402
+from neurodent.loading import AnimalOrganizer  # noqa: E402  (its session recordings, read as they are built)
 from neurodent.results import autoreject_detector as adr  # noqa: E402
 from neurodent.results.feature_utils import extract_linear_array  # noqa: E402
 from neurodent.results.scoring import RATER_CATEGORY_PREFIX  # noqa: E402
@@ -120,6 +134,8 @@ CELL_COLS = ["recording", "window", "channel", "t_start_s", "y",
 SCORE_COLS = ["recording", "window", "channel", "config", "score", "cutoff"]
 # The date format of an animalday ("{animal} {genotype} {date}") and of a dict-form bad_channels key.
 DATE_FORMAT = "%b-%d-%Y"
+# Provenance keys that map each extracted recording to a value; they must cover exactly the parquet's recordings.
+RECORDING_KEYS = ("recording_channels", "recording_sessions", "config_list_by_recording")
 
 
 def beta_prop_grid(df_stats):
@@ -273,58 +289,127 @@ def date_named(text):
         return None
 
 
-def match_config_lists(entry, recording_dates):
+def session_date(name):
+    """Return the date a session name starts with, or None.
+
+    sox5_bin names its sessions date first, as MMDDYY (``031922_cohort6_group1_MMUT(2)_files64-80`` is
+    2022-03-19), and a few as YYYY-MM-DD (``2022-06-21 F9_MUT_cohort10_cage3_files0-5``). A name that starts
+    with neither, or whose leading digits run on or make no date, gives None.
+    """
+    text = str(name)
+    iso = re.match(r"(\d{4})-(\d{2})-(\d{2})(?!\d)", text)
+    short = re.match(r"(\d{2})(\d{2})(\d{2})(?!\d)", text)
+    try:
+        if iso:
+            return date(int(iso[1]), int(iso[2]), int(iso[3]))
+        if short:
+            return date(2000 + int(short[3]), int(short[1]), int(short[2]))
+    except ValueError:
+        return None
+    return None
+
+
+def _day(d):
+    return None if d is None else d.strftime(DATE_FORMAT)
+
+
+def _unique(names):
+    return list(dict.fromkeys(names))
+
+
+def _no_list_reason(dated, days, by_date):
+    """Return why a recording whose sessions carry ``dated`` gets no list from the dated keys, or None."""
+    if not dated:
+        return "the loader recorded no session for this recording"
+    undated = [s for s, d in dated if d is None]
+    if undated:
+        return f"sessions {undated} start with no date"
+    keyless = [d for d in days if d not in by_date]
+    if keyless:
+        return (f"no key names {', '.join(_day(d) for d in keyless)}, the date of sessions "
+                f"{[s for s, d in dated if d in keyless]}")
+    for d in days:
+        if len({frozenset(channels) for _, channels in by_date[d]}) > 1:
+            return f"keys {[key for key, _ in by_date[d]]} name {_day(d)} with different lists"
+    if len({frozenset(by_date[d][0][1]) for d in days}) > 1:
+        return "its sessions carry dates with different lists: " + ", ".join(
+            f"{_day(d)} {by_date[d][0][1]}" for d in days)
+    return None
+
+
+def match_config_lists(entry, recording_sessions):
     """Return the dataset config's bad_channels list for each labeled recording of one animal.
 
     A list-form entry, ``{"_all": [...]}`` in the expanded samples config, applies to every recording. A
-    dict-form key such as ``"M3 MHet Jan-08-2022"`` has the animalday shape, but its id and genotype predate
-    the current ones, so only its date is read: it applies to the recording whose date is the same. A
-    recording's date is the one its animalday names, which the loader stamps from the start of the
-    recording's first file (``get_date_string``). sox5_bin configures session end times, which the loader
-    turns into starts with the loaded durations, so a session that runs past midnight is dated by the day it
-    started. A key that names no date, or whose date matches no recording or more than one, or any key while
-    a recording has no dated animalday, applies to nothing.
+    dict-form key such as ``"MMUT(2) MMut Mar-19-2022"`` has the animalday shape, but its id and genotype
+    predate the current ones, so only its date, the last word, is read. Session names start with their date
+    (:func:`session_date`), and a key applies to each recording built from sessions whose names carry that
+    date. So a recording gets a list only when each of its sessions names a date, each of those dates has a
+    key, and those keys carry one list (the same channels, as written); otherwise it gets none. Beside dated
+    keys, ``_all`` is added to the list a recording gets, as the pipeline merges it into every dated key.
+    Nothing is guessed: each recording left without a list and each key that applies to nothing comes back with
+    the reason.
 
     Args:
         entry: The animal's ``samples_config["bad_channels"]`` value, or None.
-        recording_dates: ``{recording: date or None}`` of the animal's labeled recordings.
+        recording_sessions: ``{recording: [session name, ...]}``, the sessions the loader built each labeled
+            recording from (:func:`load_animal`).
 
     Returns:
-        ``(lists, matches, unmatched)``: ``{recording: [channel name, ...]}`` for every recording a list
-        applies to, the ``{"key", "recording"}`` pairs applied, and ``{"key", "reason"}`` for each key that
-        applies to nothing.
+        ``(lists, matches, unmatched, uncovered)``: ``{recording: [channel name, ...]}`` for every recording a
+        list applies to; ``{"key", "recording", "sessions"}`` for each key applied, with the recording's
+        sessions that carry its date; ``{"key", "reason"}`` for each key that applies to nothing; and
+        ``{"recording", "reason", "sessions"}`` for each recording of a dict-form entry that gets no list,
+        with each session's date (``{"session", "date"}``, the date None when the name carries none).
     """
-    lists, matches, unmatched = {}, [], []
+    lists, matches, unmatched, uncovered = {}, [], [], []
     if not entry:
-        return lists, matches, unmatched
+        return lists, matches, unmatched, uncovered
+    common = list(entry.get("_all") or [])
+    keyed = {key: channels for key, channels in entry.items() if key != "_all"}
+    if not keyed:
+        for rec, sessions in recording_sessions.items():
+            lists[rec] = _unique(common)
+            matches.append({"key": "_all", "recording": rec, "sessions": list(sessions)})
+        return lists, matches, unmatched, uncovered
 
-    def add(recording, channels):
-        merged = lists.setdefault(recording, [])
-        merged.extend(c for c in (channels or []) if c not in merged)
-
-    if "_all" in entry:
-        for recording in recording_dates:
-            add(recording, entry["_all"])
-            matches.append({"key": "_all", "recording": recording})
-    undated = sorted(r for r, d in recording_dates.items() if d is None)
-    for key, channels in entry.items():
-        if key == "_all":
-            continue
-        date = date_named(key)
-        hits = sorted(r for r, d in recording_dates.items() if d is not None and d == date)
-        if date is None:
+    by_date = {}  # date: [(key, [channel name, ...])]
+    for key, channels in keyed.items():
+        d = date_named(key)
+        if d is None:
             unmatched.append({"key": key, "reason": f"names no date in the form {DATE_FORMAT}"})
-        elif undated:
-            unmatched.append({"key": key, "reason": f"labeled recordings with no dated animalday: {undated}"})
-        elif not hits:
-            unmatched.append({"key": key, "reason": f"no labeled recording on {date.strftime(DATE_FORMAT)}"})
-        elif len(hits) > 1:
-            unmatched.append({"key": key, "reason": f"{len(hits)} labeled recordings on "
-                                                    f"{date.strftime(DATE_FORMAT)}: {hits}"})
         else:
-            add(hits[0], channels)
-            matches.append({"key": key, "recording": hits[0]})
-    return lists, matches, unmatched
+            by_date.setdefault(d, []).append((key, list(channels or [])))
+
+    applied = set()
+    for rec, sessions in recording_sessions.items():
+        dated = [(s, session_date(s)) for s in sessions]
+        days = _unique(d for _, d in dated if d is not None)
+        reason = _no_list_reason(dated, days, by_date)
+        if reason:
+            uncovered.append({"recording": rec, "reason": reason,
+                              "sessions": [{"session": s, "date": _day(d)} for s, d in dated]})
+            continue
+        lists[rec] = _unique(by_date[days[0]][0][1] + common)
+        for d in days:
+            for key, _ in by_date[d]:
+                matches.append({"key": key, "recording": rec, "sessions": [s for s, sd in dated if sd == d]})
+                applied.add(key)
+        if "_all" in entry:
+            matches.append({"key": "_all", "recording": rec, "sessions": list(sessions)})
+
+    for d, keys in by_date.items():
+        holders = [rec for rec, sessions in recording_sessions.items() if d in {session_date(s) for s in sessions}]
+        for key, _ in keys:
+            if key in applied:
+                continue
+            reason = (f"the labeled recordings built from sessions named with {_day(d)} get no list: {holders}"
+                      if holders else f"no labeled recording is built from a session named with {_day(d)}")
+            unmatched.append({"key": key, "reason": reason})
+    if "_all" in entry and not lists:
+        unmatched.append({"key": "_all", "reason": "beside dated keys it joins only the lists recordings get, and no "
+                                                   "labeled recording gets one"})
+    return lists, matches, unmatched, uncovered
 
 
 def resolve_list(names, channels, resolve=None):
@@ -340,7 +425,8 @@ def resolve_list(names, channels, resolve=None):
 
     Returns:
         ``(found, unknown)``: a set of abbreviations, and ``{"channel", "reason"}`` per name left out, with the
-        name's ``abbrev`` when it resolves, which ``select_detectors.listed_absent`` reads.
+        name's ``abbrev`` when it resolves; :func:`animal_cells` lists a standardized one under
+        ``config_list_by_recording``'s ``absent``, which ``select_detectors.recorded_channels`` reads.
     """
     resolve = resolve or resolve_channel
     found, unknown = set(), []
@@ -358,23 +444,108 @@ def resolve_list(names, channels, resolve=None):
     return found, unknown
 
 
+def standardized_channels(config, samples_config):
+    """Return the channels the pipeline standardizes a dataset's WARs to, in order.
+
+    ``standardize_wars.py`` reorders and pads each WAR to ``analysis.standardization.channel_reorder`` when the
+    merged config sets it, and otherwise to the keys of the samples config's ``channels`` map
+    (``constants.CHANNEL_ABBREVS``), dropping channels outside them; ``select_detectors.canonical_channels``
+    reads the same.
+
+    Args:
+        config: The merged dataset config.
+        samples_config: Its expanded samples config.
+
+    Raises:
+        ValueError: If neither names a channel.
+    """
+    reorder = ((config.get("analysis") or {}).get("standardization") or {}).get("channel_reorder")
+    channels = list(reorder) if reorder is not None else list(samples_config.get("channels") or {})
+    if not channels:
+        raise ValueError("the dataset config names no channels, so the channels its WARs are standardized to are "
+                         "unknown")
+    return channels
+
+
+@contextlib.contextmanager
+def built_sessions():
+    """Record, while open, the session and start date of each recording the loader builds from one session.
+
+    An AnimalOrganizer groups the files it discovers by the ``{session}`` of its file pattern (the session
+    folders of sox5_bin, which its ``manual_datetime`` keys name) and builds one recording per session. The
+    cohort load then merges the session recordings that start on the same date (``get_date_string``) into one
+    recording of the animal (``AnimalOrganizer.from_lros``), and the merged recording keeps no session names,
+    so they are read here as each session recording is built.
+
+    Yields:
+        A list that fills with ``(session, date string)`` pairs; the date is None when the loader cannot date the
+        session recording, and the session None when it cannot name it.
+    """
+    built = []
+    build = AnimalOrganizer._create_long_recordings
+
+    def build_and_record(self, lro_kwargs):
+        build(self, lro_kwargs)
+        session_of = {label: session for session, label in self._session_to_animalday.items()}
+        for label, lro in zip(self.unique_animaldays, self.long_recordings):
+            try:
+                day = lro.get_date_string()
+            except ValueError:  # the cohort load refuses an undated recording itself
+                day = None
+            built.append((session_of.get(label), day))
+
+    with mock.patch.object(AnimalOrganizer, "_create_long_recordings", build_and_record):
+        yield built
+
+
+def recording_sessions(animaldays, built):
+    """Return ``{animalday: [session, ...]}``, the sessions each recording of an animal was built from.
+
+    ``from_lros`` merges the session recordings that start on one date into the recording whose animalday ends
+    with that date, so a recording's sessions are those whose own recording starts on its date. Each session is
+    listed once, in the order the loader built it.
+
+    Args:
+        animaldays: The loaded animal's animaldays.
+        built: The pairs :func:`built_sessions` recorded while it loaded.
+    """
+    by_date = {}
+    for session, day in built:
+        listed = by_date.setdefault(day, [])
+        if session not in listed:
+            listed.append(session)
+    return {ad: list(by_date.get(str(ad).rsplit(" ", 1)[-1], [])) for ad in animaldays}
+
+
+def load_animal(samples_config, config, animal_id):
+    """Load one animal through the cohort seam and name the sessions each of its recordings was built from.
+
+    Returns:
+        ``(ao, sessions)``: the AnimalOrganizer and ``{animalday: [session name, ...]}``
+        (:func:`recording_sessions`).
+    """
+    with built_sessions() as built:
+        ao = C.load_cohort_animal(samples_config, config, animal_id)
+    return ao, recording_sessions(ao.animaldays, built)
+
+
 def load_and_measure(samples_config, config, animal_id, *, lof_chunk_duration_s, chunk_duration_s):
     """Load one animal and compute its LOF scores and its WAR (FEATURES over notched FRAG_S windows).
 
     Returns:
-        ``(ao, war)``.
+        ``(ao, war, sessions)``, sessions as :func:`load_animal` gives them.
     """
-    ao = C.load_cohort_animal(samples_config, config, animal_id)
+    ao, sessions = load_animal(samples_config, config, animal_id)
     az = AnimalAnalyzer(ao)
     az.compute_bad_channels(lof_threshold=1.0, lof_chunk_duration_s=lof_chunk_duration_s)  # scores only
     war = az.compute_windowed_analysis(FEATURES, window_s=R.FRAG_S, apply_notch_filter=True,
                                        multiprocess_mode="dask", chunk_duration_s=chunk_duration_s)
-    return ao, war
+    return ao, war, sessions
 
 
 def animal_cells(ao, war, *, animal_id, dataset, cv_group, cons_animal, rmap, cat_cols, ar_cols, config_entry,
-                 max_fit_fragments, seed, resolve=None):
-    """Return one animal's labeled cells, its autoreject evidence and its config list report.
+                 max_fit_fragments, seed, standardized, sessions=None, resolve=None):
+    """Return one animal's labeled cells, its autoreject evidence and its report of channels and config lists.
 
     Each labeled recording is the WAR slice with its animalday; its cells take the filter and LOF scores
     from the WAR and the autoreject bits, scores and cutoffs from the grid fit on that recording.
@@ -392,15 +563,25 @@ def animal_cells(ao, war, *, animal_id, dataset, cv_group, cons_animal, rmap, ca
         config_entry: The animal's ``samples_config["bad_channels"]`` value, or None.
         max_fit_fragments: Fit-pool cap per recording; None uses the whole recording.
         seed: Seed of the fit-pool subsample.
+        standardized: The channels the pipeline standardizes the dataset's WARs to, in order
+            (:func:`standardized_channels`).
+        sessions: ``{animalday: [session name, ...]}`` from :func:`load_animal`; a recording missing from it
+            gets no list from dated keys.
         resolve: Channel name resolver for the bad_channels lists; defaults to ``resolve_channel``.
 
     Returns:
         ``(cells, scores, report)``: the cell DataFrame (``CELL_COLS``, ``cat_cols``, ``ar_cols``), the
         evidence DataFrame (``SCORE_COLS``, one row per cell and configuration, NaN where the cell is not in
-        the pool), and a dict of lists: ``config_list_matches`` (each key and the recording it applies to),
-        ``config_list_unmatched`` (keys that apply to nothing, with the reason), ``config_list_uncovered``
-        (recordings of an animal with a dict-form entry that no key applies to) and
-        ``config_list_unknown_channels`` (list entries that are not among the recording's channels).
+        the pool), and a dict. Keyed by the label key of each labeled recording that loaded, it holds
+        ``recording_channels`` (the WAR's channels that standardization keeps, in the standardized order),
+        ``recording_sessions`` (the sessions the recording was built from) and ``config_list_by_recording``
+        (``{"defined", "channels", "absent"}``: whether a list applies, its channels the recording has, and its
+        standardized channels the recording lacks, which the standardized WAR pads; both in the standardized
+        order). As lists, it holds ``config_list_matches`` (each key, the recording it applies to and the
+        sessions that carry its date), ``config_list_unmatched`` (keys that apply to nothing, with the reason),
+        ``config_list_uncovered`` (recordings of a dict-form entry that get no list, with the reason and the
+        dates of their sessions) and ``config_list_unknown_channels`` (list entries that are not among the
+        recording's channels).
 
     Raises:
         ValueError: If two loaded recordings map to one label key, or the detector refuses its input.
@@ -423,18 +604,28 @@ def animal_cells(ao, war, *, animal_id, dataset, cv_group, cons_animal, rmap, ca
         recordings.append((i, animalday, recording))
 
     animalday_of = {rec: ad for _, ad, rec in recordings}
-    lists, matches, unmatched = match_config_lists(
-        config_entry, {rec: date_named(ad) for _, ad, rec in recordings})
+    sessions_of = {rec: list((sessions or {}).get(ad, [])) for _, ad, rec in recordings}
+    lists, matches, unmatched, uncovered = match_config_lists(config_entry, sessions_of)
+    present = [c for c in standardized if c in set(ch_names)]  # the recording's columns in the standardized WAR
     tag = {"animal": animal_id, "dataset": dataset}
-    applied, unknown = {}, []
-    for rec, names in lists.items():
-        applied[rec], left_out = resolve_list(names, ch_names, resolve)
-        unknown += [{**tag, "recording": rec, "animalday": animalday_of[rec], **u} for u in left_out]
+    applied, unknown, by_recording = {}, [], {}
+    for _, ad, rec in recordings:
+        if rec not in lists:
+            by_recording[rec] = {"defined": False, "channels": [], "absent": []}
+            continue
+        applied[rec], left_out = resolve_list(lists[rec], present, resolve)
+        lacking = {u["abbrev"] for u in left_out if "abbrev" in u}
+        by_recording[rec] = {"defined": True, "channels": [c for c in present if c in applied[rec]],
+                             "absent": [c for c in standardized if c in lacking]}
+        unknown += [{**tag, "recording": rec, "animalday": ad, **u} for u in left_out]
     report = {
+        "recording_channels": {rec: list(present) for _, _, rec in recordings},
+        "recording_sessions": sessions_of,
+        "config_list_by_recording": by_recording,
         "config_list_matches": [{**tag, **m, "animalday": animalday_of[m["recording"]]} for m in matches],
         "config_list_unmatched": [{**tag, **u} for u in unmatched],
-        "config_list_uncovered": [{**tag, "recording": rec, "animalday": ad} for _, ad, rec in recordings
-                                  if config_entry and rec not in lists],
+        "config_list_uncovered": [{**tag, "recording": u["recording"], "animalday": animalday_of[u["recording"]],
+                                   "reason": u["reason"], "sessions": u["sessions"]} for u in uncovered],
         "config_list_unknown_channels": unknown,
     }
 
@@ -616,7 +807,8 @@ def main(argv=None):
         0 when the outputs were written, 1 when an animal failed (``<out>.errors.json`` lists them).
 
     Raises:
-        SystemExit: On inputs the run refuses, before or after extraction, and when an input file, a code file
+        SystemExit: On inputs the run refuses, before or after extraction (among them a recording map made under
+            another src tree, or read while ``src`` has uncommitted changes), and when an input file, a code file
             or the state of ``src`` changes during the run.
     """
     ap = argparse.ArgumentParser(
@@ -627,9 +819,10 @@ def main(argv=None):
     ap.add_argument("--split", type=Path, default=CONFIG_SPLIT)
     ap.add_argument("--which", choices=["dev", "test"], required=True)
     ap.add_argument("--recording-map", type=Path, default=CONFIG_RECORDING_MAP,
-                    help="labeled recording to current recording map from compare_window_hashes.py")
+                    help="labeled recording to current recording map from compare_window_hashes.py; its mapped rows "
+                         "must name this run's src tree in port_src_tree, and src must have no uncommitted changes")
     ap.add_argument("--positional-recordings", action="store_true",
-                    help="match recordings by position, only for a bundle rendered by this code")
+                    help="match recordings by position, only for a bundle rendered by this code (no map is read)")
     ap.add_argument("--allow-unmapped", action="store_true",
                     help="leave out labelled recordings the recording map leaves unmapped, and every animal "
                          "with no mapped labelled recording (both listed in the provenance), instead of refusing")
@@ -672,13 +865,32 @@ def main(argv=None):
             raise SystemExit(f"{', '.join(changed)} changed during the run; refusing. {consequence} Rerun once the "
                              "files are settled; with --resume, shards computed under that state are reused.")
 
+    # The map ties labels to recordings as the port code that made it loads them, so it holds only for that code.
+    rmap = RecordingMap(None if args.positional_recordings else args.recording_map,
+                        positional=args.positional_recordings)
+    stale = rmap.port_src_tree_problems(start["src_tree"])
+    if stale:
+        raise SystemExit(f"recording map {args.recording_map}: {'; '.join(stale)}. Refusing before loading anything, "
+                         "since the map holds only for the code that made it. Rerun runbook steps 2 and 3 (the "
+                         "sample-hash check and the map commit) with the current code.")
+    # Uncommitted changes under src leave HEAD:src equal to the map's tree while other loader code runs.
+    if not args.positional_recordings and start["src_dirty"] is not False:
+        if start["src_dirty"]:
+            why = "src has uncommitted changes (git status --porcelain -- src lists files)"
+            fix = ("Remove the changes under src. Committing them instead changes the src tree, and the map must "
+                   "then be made again with runbook steps 2 and 3.")
+        else:
+            why = "git cannot tell whether src has uncommitted changes (git status --porcelain -- src failed)"
+            fix = "Run where git can tell."
+        raise SystemExit(f"{why}, so the code that would load the recordings may not be src tree {start['src_tree']}, "
+                         f"the only code recording map {args.recording_map} holds for, and the selection refuses "
+                         f"features extracted from such a src. Refusing before loading anything. {fix}")
+
     cons = build_consensus(manifests, args.keymap, args.rule)
     labeled_recs = sorted(cons["recording"].unique())
     labeled_animals = {_animal_of(r) for r in labeled_recs}
     check_split(labeled_animals, args.split, args.which)
     print(f"split ok: {len(labeled_animals)} labelled animals within split['{args.which}']")
-    rmap = RecordingMap(None if args.positional_recordings else args.recording_map,
-                        positional=args.positional_recordings)
     cat_cols = sorted(c for c in cons.columns if c.startswith(RATER_CATEGORY_PREFIX))
     ar_cols = adr.grid_config_names()  # every configuration, always, on identical cells
 
@@ -756,16 +968,17 @@ def main(argv=None):
             if args.temp_dir is not None:
                 set_temp_directory(args.temp_dir)  # after _prepare, which set the config's directory
             try:
-                ao, war = load_and_measure(samples_config, config, animal_id,
-                                           lof_chunk_duration_s=args.lof_chunk_duration_s,
-                                           chunk_duration_s=args.chunk_duration_s)
+                standardized = standardized_channels(config, samples_config)
+                ao, war, sessions = load_and_measure(samples_config, config, animal_id,
+                                                     lof_chunk_duration_s=args.lof_chunk_duration_s,
+                                                     chunk_duration_s=args.chunk_duration_s)
                 cells, scores, report = animal_cells(
                     ao, war, animal_id=animal_id, dataset=ds,
                     cv_group=samples_config.get("_animal_groups", {}).get(animal_id, animal_id),
                     cons_animal=cons[cons["recording"].map(_animal_of) == animal_id], rmap=rmap,
                     cat_cols=cat_cols, ar_cols=ar_cols,
                     config_entry=samples_config.get("bad_channels", {}).get(animal_id),
-                    max_fit_fragments=max_fit, seed=args.seed)
+                    max_fit_fragments=max_fit, seed=args.seed, standardized=standardized, sessions=sessions)
                 # SystemExit passes the handler below, so the run stops before keying this animal's shard.
                 refuse_changes(f"{animal_id} was not saved; the animals finished before it are in {parts_dir}.")
                 write_shard(paths, key, cells, scores, report)
@@ -797,6 +1010,14 @@ def main(argv=None):
     if empty:
         raise SystemExit(f"mapped labelled recordings with no extracted cells: {empty}. Refusing to write a "
                          "parquet that drops them; check the recording map and the loaded recordings.")
+    by_recording = {name: {rec: value for r in reports for rec, value in r.get(name, {}).items()}
+                    for name in RECORDING_KEYS}
+    extracted = set(df["recording"])
+    uneven = [f"{name} {sorted(extracted ^ set(values))}" for name, values in by_recording.items()
+              if set(values) != extracted]
+    if uneven:
+        raise SystemExit(f"the per-recording reports do not cover exactly the extracted recordings "
+                         f"({'; '.join(uneven)}); refusing")
 
     prov = provenance(current_inputs(), script="extract_dev_features", which=args.which, rule=args.rule,
                       raters=sorted(manifests), positional_recordings=args.positional_recordings,
@@ -819,6 +1040,7 @@ def main(argv=None):
         unmapped_recordings=unmapped,
         dropped_animals=dropped_animals,
         resumed_animals=resumed,
+        **by_recording,
         **{name: [item for r in reports for item in r.get(name, [])]
            for name in ("config_list_matches", "config_list_unmatched", "config_list_uncovered",
                         "config_list_unknown_channels")},

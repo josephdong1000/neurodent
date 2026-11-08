@@ -38,9 +38,15 @@ position, and the positions, n_files and n_fragments of the port recordings of t
 For an unmapped recording, different counts point to files added or dropped, which moves the windows; with
 equal counts, a scan (below) tells windows moved some other way, such as files read in another order,
 from changed samples. A port recording in which no labeled window fits has no rows in a hash run, so it is
-listed only when a scan covers its animal. The map also names the code of each hash run
-(``july_commit``, ``port_commit``, and whether src differed from them), from the hash outputs' git_commit
-and src_dirty columns; several values are joined by semicolons.
+listed only when a scan covers its animal. The map also names the code of each hash run, from the hash
+outputs' git_commit, src_dirty and src_tree columns: ``july_commit`` and ``port_commit``, whether src
+differed from them (``july_src_dirty``, ``port_src_dirty``), and the git object ids of their ``src``
+(``july_src_tree``, ``port_src_tree``). Several values are joined by semicolons. ``extract_dev_features.py``
+refuses a map whose port_src_tree is empty or is not its own src tree, so a src tree is written only when it
+names the code of every row of its hash output: each row records it and records src_dirty False. Rows of a
+run that recorded no tree, or that ran with uncommitted changes under src, must not pass under a tree. The
+printout says when the July and port hashes record the same commit or src tree: the July run then did not use
+the July code, and the comparison checks the port against itself.
 
 ``--port-scan`` reads a port scan, written by ``hash_labeled_windows.py --all-windows`` for some animals. A
 scan is used for an animal only when it holds the port hashes' samples: it must share at least one row with
@@ -101,7 +107,7 @@ MAP_FIELDS = [
     "reason", "n_cells", "n_identical", "n_remapped", "july_n_fragments", "port_n_fragments",
     "recovered_n_fragments", "length_check", "july_n_files", "july_date_string", "port_positions_on_date",
     "port_n_files_on_date", "port_n_fragments_on_date", "july_commit", "july_src_dirty", "port_commit",
-    "port_src_dirty",
+    "port_src_dirty", "july_src_tree", "port_src_tree",
 ]
 
 
@@ -217,21 +223,48 @@ def _joined(values):
 
 
 def code_of(rows):
-    """Return the git commits and src states that hash rows record, each set of distinct values joined.
+    """Return the git commits, src states and src trees that hash rows record, each set of distinct values joined.
+
+    A row's src tree names the code it ran only when the row also records src_dirty False, and
+    ``extract_dev_features.py`` takes the port's trees for the code the whole map was made under. So the trees
+    are joined only when every row records one with src_dirty False: one row without a tree, or whose src
+    differed from its commit or was not checked, leaves them empty.
 
     Args:
-        rows (Iterable[dict]): Hash rows; a row without git_commit or src_dirty records nothing.
+        rows (Iterable[dict]): Hash rows; a row without git_commit, src_dirty or src_tree records nothing
+            there.
 
     Returns:
-        tuple[str, str]: The commits and the src_dirty values, each empty when no row records one and
-        joined by semicolons when the rows record several.
+        tuple[str, str, str]: The commits, the src_dirty values and the src trees, each joined by semicolons
+        when the rows record several. The commits and src_dirty values are empty when no row records one,
+        the src trees unless every row records one with src_dirty False.
     """
-    commits, dirty = set(), set()
+    commits, dirty, trees, clean = set(), set(), set(), True
     for r in rows:
         commits.add(r.get("git_commit") or "")
         value = r.get("src_dirty")
         dirty.add("" if value is None else str(value))
-    return _joined(commits), _joined(dirty)
+        tree = r.get("src_tree") or ""
+        trees.add(tree)
+        clean = clean and bool(tree) and str(value) == "False"
+    return _joined(commits), _joined(dirty), _joined(trees) if clean else ""
+
+
+def shared_code(row):
+    """Whether a map row's July and port hash runs record a commit or src tree in common.
+
+    Args:
+        row (dict): A row of :func:`recording_map`; its code columns may hold several values joined by
+            semicolons.
+
+    Returns:
+        bool: True when a commit, or a src tree, is among both runs' values. Empty values match nothing.
+    """
+    def values(column):
+        return {v for v in str(row[column]).split(";") if v}
+
+    return bool((values("july_commit") & values("port_commit"))
+                or (values("july_src_tree") & values("port_src_tree")))
 
 
 def recordings_on_date(recordings, animal, date):
@@ -269,8 +302,8 @@ def read_scan(path, wanted=None, port=None):
         holding it; ``recordings``, (animal, position) to one row of that recording, for its
         recording-level columns; ``rows`` and ``errors``, animal to its number of scan and scan_read_error
         rows; ``shared`` and ``disagreements``, animal to its number of scan rows compared with a port row
-        and of those with another raw sha256; ``trees``, the tree labels; and ``code``, the commits and src
-        states as :func:`code_of` gives them.
+        and of those with another raw sha256; ``trees``, the tree labels; and ``code``, the commits, src
+        states and src trees as :func:`code_of` gives them.
 
     Raises:
         ValueError: If a row is not a scan row.
@@ -549,8 +582,8 @@ def recording_map(cell_rows, july, port, draw_lengths, scan=None):
     if scan is not None:
         for key, r in scan["recordings"].items():
             listed.setdefault(key, r)
-    july_commit, july_dirty = code_of(july.values())
-    port_commit, port_dirty = code_of(port.values())
+    july_commit, july_dirty, july_tree = code_of(july.values())
+    port_commit, port_dirty, port_tree = code_of(port.values())
     by_rec = defaultdict(list)
     for c in cell_rows:
         by_rec[c["july_recording"]].append(c)
@@ -570,7 +603,7 @@ def recording_map(cell_rows, july, port, draw_lengths, scan=None):
                    july_n_files=j.get("n_files", ""), july_date_string=j.get("date_string", ""),
                    **recordings_on_date(listed, animal, j.get("date_string", "")),
                    july_commit=july_commit, july_src_dirty=july_dirty, port_commit=port_commit,
-                   port_src_dirty=port_dirty)
+                   port_src_dirty=port_dirty, july_src_tree=july_tree, port_src_tree=port_tree)
         other = {k: v for k, v in counts.items() if k not in MAPPABLE}
         reasons, q = [], None
         if other:
@@ -619,7 +652,7 @@ def _write(path, fields, rows):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=fields)
+        w = csv.DictWriter(fh, fieldnames=fields, lineterminator="\n")  # LF, as git stores the committed map
         w.writeheader()
         w.writerows(rows)
 
@@ -640,6 +673,10 @@ def day_text(r):
 
 def summarize(cell_rows, map_rows, scan=None):
     """Print counts per class and per animal, the code of each hash run, the port scan, and the recording map.
+
+    The code lines warn when a run's code is not named by one commit and one src tree, when the July and port
+    runs share a commit or src tree (:func:`shared_code`), and when the map's port_src_tree is empty or names
+    several trees, which ``extract_dev_features.py`` refuses. They change neither the map nor the exit code.
 
     Args:
         cell_rows (list[dict]): Output of :func:`classify`, and of :func:`find_shifts` with a scan.
@@ -665,18 +702,34 @@ def summarize(cell_rows, map_rows, scan=None):
     if map_rows:
         print()
         for tree in ("july", "port"):
-            commit, dirty = str(map_rows[0][f"{tree}_commit"]), str(map_rows[0][f"{tree}_src_dirty"])
-            print(f"{tree} hashes: git commit {commit or 'not recorded'}, src dirty {dirty or 'not recorded'}")
+            commit, dirty, src = (str(map_rows[0][f"{tree}_{k}"]) for k in ("commit", "src_dirty", "src_tree"))
+            print(f"{tree} hashes: git commit {commit or 'not recorded'}, src dirty {dirty or 'not recorded'}, "
+                  f"src tree {src or 'not written'}")
             if ";" in commit:
                 print(f"  the {tree} hashes come from several commits")
+            if ";" in src:
+                print(f"  the {tree} hashes come from several src trees")
             if "True" in dirty.split(";"):
-                print(f"  src differed from the commit in a {tree} hash run, so the commit does not name the code")
+                print(f"  src differed from the commit in a {tree} hash run, so neither the commit nor the src tree "
+                      "names the code")
+            elif not src:
+                print(f"  the {tree} hash rows do not all record a src tree with src_dirty False")
+        if shared_code(map_rows[0]):
+            print("  the July and port hashes record the same commit or src tree, so the July run did not use the "
+                  "July code and the comparison checks the port against itself")
+        port_tree = str(map_rows[0]["port_src_tree"])
+        if not port_tree or ";" in port_tree:
+            print("  port_src_tree names no single src tree, so extract_dev_features.py refuses this map; rerun the "
+                  "port hash run with the current code, committed and with src clean, from the root of the port's "
+                  "git worktree, then this comparison")
     if scan is not None:
         n_shifted = sum(1 for c in cell_rows if c["class"] == "shifted")
         print(f"\nport scan: {sum(scan['rows'].values())} scan rows of {len(scan['rows'])} animal(s), tree "
               f"{scan['trees'] or 'not recorded'}, git commit {scan['code'][0] or 'not recorded'}, src dirty "
-              f"{scan['code'][1] or 'not recorded'}; different or missing cells found at another window: {n_shifted}")
-        port_code = (str(map_rows[0]["port_commit"]), str(map_rows[0]["port_src_dirty"])) if map_rows else ("", "")
+              f"{scan['code'][1] or 'not recorded'}, src tree {scan['code'][2] or 'not recorded'}; different or "
+              f"missing cells found at another window: {n_shifted}")
+        port_code = (tuple(str(map_rows[0][f"port_{k}"]) for k in ("commit", "src_dirty", "src_tree"))
+                     if map_rows else ("", "", ""))
         if scan["code"] != port_code:
             print("  the scan and the port hashes record different code, so a shift found in the scan may not hold "
                   "for the port hashes")

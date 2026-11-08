@@ -147,9 +147,11 @@ class RecordingMap:
 
     With a map file, a recording is identified by its animalday, falling back to (animal, current
     position) only when the map row has no animalday; recordings missing from the map are not scored. When
-    the map has a ``status`` column, only rows whose status is ``mapped`` map anything. Other columns are
-    ignored. Without a map (``positional``), the current position is assumed to equal the labeled one, which
-    holds only for bundles rendered by this code.
+    the map has a ``status`` column, only rows whose status is ``mapped`` map anything. ``port_src_tree`` is
+    kept for :meth:`port_src_tree_problems`; other columns are ignored. Each labeled recording has one row, as
+    compare_window_hashes.py writes it; a map that repeats one is refused, since a later row would hide an
+    earlier one. Without a map (``positional``), the current position is assumed to equal the labeled one,
+    which holds only for bundles rendered by this code.
 
     Args:
         path: ``recording_map.csv`` with columns july_recording, animal, animalday and port_position, or
@@ -157,12 +159,15 @@ class RecordingMap:
         positional: Use positions directly.
 
     Raises:
-        SystemExit: If neither a readable map nor ``positional`` is given.
+        SystemExit: If neither a readable map nor ``positional`` is given, a column is missing, or a
+            july_recording is on more than one row.
     """
 
     def __init__(self, path=None, positional=False):
         self.positional = positional
+        self.path = path
         self.by_animalday, self.by_position, self.rows = {}, {}, {}
+        self.has_port_src_tree = False
         if positional:
             return
         if path is None or not Path(path).exists():
@@ -175,17 +180,56 @@ class RecordingMap:
         missing = {"july_recording", "animal", "animalday", "port_position"} - set(rmap.columns)
         if missing:
             raise SystemExit(f"{path}: missing columns {sorted(missing)}")
+        repeated = sorted(set(rmap.loc[rmap["july_recording"].duplicated(), "july_recording"]))
+        if repeated:
+            raise SystemExit(f"{path}: july_recording repeated on several rows: {repeated}. "
+                             "compare_window_hashes.py writes one row per labeled recording; use the map it writes "
+                             "(runbook steps 2 and 3), not an edited or joined one.")
         has_status = "status" in rmap.columns
+        self.has_port_src_tree = "port_src_tree" in rmap.columns
         for r in rmap.to_dict("records"):
             label, animal = r["july_recording"], r["animal"]
             status = r["status"] if has_status else "mapped"
-            self.rows[label] = {"status": status, "reason": r.get("reason", "")}
+            self.rows[label] = {"status": status, "reason": r.get("reason", ""),
+                                "port_src_tree": r.get("port_src_tree", "").strip()}
             if status != "mapped":
                 continue
             if r["animalday"]:
                 self.by_animalday[(animal, r["animalday"])] = label
             elif r["port_position"]:
                 self.by_position[(animal, int(float(r["port_position"])))] = label
+
+    def port_src_tree_problems(self, src_tree):
+        """Return why the map cannot be used under the src tree ``src_tree``, or an empty list.
+
+        The map ties labels to recordings as the port tree hashed in the sample-hash check loaded them, and
+        ``port_src_tree`` names that tree's ``git rev-parse HEAD:src``. So every mapped row must name
+        ``src_tree``: the column missing, a mapped row leaving it empty, or a mapped row naming another tree
+        (several trees joined by semicolons included) each count. Unmapped rows map nothing and are not read.
+        A positional map has no rows and no problems.
+
+        Args:
+            src_tree: The src tree the caller runs under, or None when git cannot tell.
+
+        Returns:
+            One sentence fragment per problem.
+        """
+        if self.positional:
+            return []
+        if not self.has_port_src_tree:
+            return ["it has no port_src_tree column, so the code it was made under is unknown"]
+        mapped = {label: row["port_src_tree"] for label, row in self.rows.items() if row["status"] == "mapped"}
+        problems = []
+        if not src_tree:
+            problems.append("git cannot tell this run's src tree (git rev-parse HEAD:src failed)")
+        empty = sorted(label for label, tree in mapped.items() if not tree)
+        if empty:
+            problems.append(f"port_src_tree is empty on mapped rows {empty}")
+        other = sorted({tree for tree in mapped.values() if tree and tree != src_tree})
+        if other and src_tree:
+            problems.append(f"its mapped rows were made under src tree {', '.join(other)}, and this run's src tree "
+                            f"is {src_tree}")
+        return problems
 
     def label(self, animal_id, position, animalday=None):
         """Return the label key of the recording at ``position`` with ``animalday``, or None if unmapped."""
