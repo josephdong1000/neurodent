@@ -9,7 +9,57 @@ version: 1
 drafted: 2026-11-05
 status: locked
 locked_on: 2026-11-06
-amendments: []           # dated changes after locking, each with its reason; earlier results stay reported
+amendments:              # dated changes after locking, each with its reason; earlier results stay reported
+  - date: 2026-11-07
+    approved_by: >-
+      the owner, on 2026-11-06 and 2026-11-07, before any detector was scored against the labels in this
+      evaluation; the facts under already_exposed, which include config bad_channels scored on four ArxRosa
+      animals, were seen earlier
+    reason: >-
+      Detectors run together in the pipeline, so the decision is which combination to run, not which single
+      detector agrees best with the raters. The pipeline has two channel-filter branches: manual (the fragment
+      filters, then the config bad_channels lists), which zeitgeber, relfreq and the figures use, and LOF (the
+      fragment filters, then LOF), which feeds only the LOF flattening and comparison outputs. The original
+      handoff also asked for rejection rates by day and night and by genotype on the labeled cells, for scores
+      per animal, and for the filters at their config settings. The config bad_channels reference listed under
+      detectors had no script.
+    combinations: >-
+      F is the fragment filters at their settings in config/config.yaml (fragment_filter_config), applied as
+      the pipeline applies them. L is LOF at channel_filter_config.lof.reject_lof_threshold. M is the dataset
+      configs' bad_channels lists. A(k) is autoreject configuration k. A combination rejects a cell when any
+      of its members rejects it. Scored: today = F or M, the manual branch; replace(k) = F or A(k); add(k) = F
+      or M or A(k); lof_branch = F or L, as a reference; A(k) alone; F alone; and M alone, on the cells whose
+      recording has a list. F, L and M come from the stored per-cell scores and the configs at the locked
+      commit, with no tuning. A test checks that F, L and M match the pipeline's own decisions.
+    selection: >-
+      Replaces the rule under selection. On dev, k is the autoreject configuration with the highest F1 of
+      replace(k), to 4 decimals; ties go to the earlier configuration in grid order. Nothing else is tuned.
+      Nested leave-one-group-out and leave-one-dataset-out repeat this choice inside each outer training part.
+      The ranking of the 43 single detectors (filters with dev-tuned thresholds) is still reported as a
+      diagnostic and decides nothing. The frozen pick is k, and the label-free checks use it.
+    test: >-
+      Replaces the frozen-pick scoring under test. score_test.py scores today, replace(k), add(k),
+      lof_branch, A(k), F and M once, each with its interval, plus the paired differences replace(k) minus
+      today and add(k) minus today, with bootstrap intervals over cv_groups.
+    breakdowns: >-
+      Every scored combination is also reported per dataset, per cv_group, per animal, by isday and by
+      genotype, on dev and on test, with the metrics above, and under the any and unanimous rules alongside
+      majority, as ground_truth says. Event-cell patterns cover the combinations.
+    config_lists: >-
+      A list-form bad_channels applies to every recording of its animal. A dict-form key names a date, and
+      session names start with their date (MMDDYY in sox5_bin). The key applies to each labeled recording of
+      that animal built from sessions whose names carry that date. A recording whose sessions carry dates with
+      different lists, or a date with no key, and a key that matches no labeled recording, are listed in the
+      provenance and not guessed.
+    sample_check: >-
+      Two rules the comparison applies, stated here. When several current positions hold every cell of a July
+      recording, it maps to its July position. When two July recordings land on one current position, only the
+      one whose July position it is stays mapped. An optional scan may label a different or missing cell as
+      shifted when its July samples appear at another window; a shifted recording stays unmapped.
+    procedure: >-
+      After the lock, a change is a dated entry in this list, approved by the owner before the step it
+      affects. This replaces the header's "a new pre-registration with its own date". Results made under
+      earlier entries stay reported.
 
 labels:
   bundle: cohort4strains           # 500 windows, 4 datasets x 5 animals x 25 windows, 4500 channel cells
