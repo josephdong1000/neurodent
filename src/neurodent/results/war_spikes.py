@@ -113,13 +113,14 @@ class WARSpikeMixin:
         """
         Extract spike features from MNE RawArray objects with spike annotations.
 
-        This method extracts spike timing from MNE annotations (where spikes are marked
-        with channel-specific event labels) and bins them into WAR time windows.
+        This method reads the spike annotations of each raw, ``Spike_Ch{i}`` for the channel
+        at index i as ``write_spike_annotations`` writes them, and bins the spikes into WAR
+        time windows. It used to look annotations up by channel name, which the spike
+        results do not use, so it found none and gave every window zero spikes.
 
         Args:
             raws: List of MNE RawArray objects with spike annotations. One per recording
-                  session (animalday). Each should have annotations with channel names
-                  as event labels (e.g., 'LMot', 'RMot', etc.).
+                  session (animalday), with the WAR's channels in the WAR's order.
             inplace: If True, modifies self.result and returns self.
                     If False, returns a new WindowAnalysisResult.
             animaldays: The animalday each raw belongs to, in the same order. Strongly
@@ -129,32 +130,24 @@ class WARSpikeMixin:
             WindowAnalysisResult: WAR object with added spike features (nspike, lognspike).
 
         Notes:
-            - Expects MNE annotations with channel names as event descriptions
-            - Spike times are extracted from event onsets and binned to WAR windows
-            - Channels not found in annotations will have empty spike arrays
+            - Spike times are the annotated samples divided by the sampling rate. A FIF
+              stores annotation times as float32, so spikes read from a long saved
+              recording can be several samples off; ``read_sars_spikes`` with
+              ``read_mode="sa"`` uses the exact indices.
+            - Channels with no spike annotations get empty spike arrays.
             - Delegates to _read_from_spikes_all() for the actual binning logic
 
         Example:
             >>> # From MNE spike annotations
             >>> enhanced_war = war.read_mnes_spikes([mne_raw1, mne_raw2], inplace=False)
         """
+        from .frequency_domain_results import read_spike_annotations
+
         spikes_all = []
         for raw in raws:
             # each mne is a contiguous recording session
-            events, event_id = mne.events_from_annotations(raw)
-            event_id = {k.item(): v for k, v in event_id.items()}
-
-            spikes_channel = []
-            for channel in raw.ch_names:
-                if channel not in event_id.keys():
-                    logging.warning(f"Channel {channel} not found in event_id")
-                    spikes_channel.append([])
-                    continue
-                event_id_channel = event_id[channel]
-                spike_times = events[events[:, 2] == event_id_channel, 0]
-                spike_times = spike_times / raw.info["sfreq"]
-                spikes_channel.append(spike_times)
-            spikes_all.append(spikes_channel)
+            sfreq = raw.info["sfreq"]
+            spikes_all.append([indices / sfreq for indices in read_spike_annotations(raw)])
         return self._read_from_spikes_all(spikes_all, inplace=inplace, animaldays=animaldays)
 
     def _read_from_spikes_all(

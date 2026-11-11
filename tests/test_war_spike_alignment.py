@@ -196,3 +196,41 @@ def test_results_named_in_another_format_still_land_on_their_own_rows(caplog):
 
     assert _channel0(war) == EXPECTED_CH0
     assert "Pairing them with the animaldays in sorted order" in caplog.text
+
+
+def _annotated_raw(spikes_per_channel, n_samples=15000):
+    """A RawArray with the spikes annotated as the spike results write them, Spike_Ch{i}."""
+    import mne
+
+    from neurodent.results.frequency_domain_results import write_spike_annotations
+
+    info = mne.create_info(["LMot", "RMot"], sfreq=1000.0, ch_types="eeg")
+    raw = mne.io.RawArray(np.zeros((2, n_samples)), info, verbose=False)
+    indices = [np.round(np.asarray(t) * 1000).astype(int) for t in spikes_per_channel]
+    return write_spike_annotations(raw, indices)
+
+
+def test_read_mnes_spikes_reads_annotations_by_channel_index():
+    """It looked annotations up by channel name, which the spike results never use, so every
+    window got zero spikes."""
+    war = _war()
+    raws = [_annotated_raw(SPIKES[FEB01]), _annotated_raw(SPIKES[JAN31])]
+
+    war.read_mnes_spikes(raws, inplace=True, animaldays=[FEB01, JAN31])
+
+    assert _channel0(war) == EXPECTED_CH0
+    assert [int(np.asarray(v)[1]) for v in war.result["nspike"]] == [0] * 5
+
+
+def test_read_sars_spikes_in_mne_mode_matches_sa_mode():
+    """Both read modes give the same counts from the same spike results."""
+    sars = []
+    for day in (JAN31, FEB01):
+        sar = _fake_sar(day, SPIKES[day])
+        sar.result_mne = _annotated_raw(SPIKES[day])
+        sars.append(sar)
+
+    from_sa = _war().read_sars_spikes(sars, read_mode="sa", inplace=True)
+    from_mne = _war().read_sars_spikes(sars, read_mode="mne", inplace=True)
+
+    assert _channel0(from_mne) == _channel0(from_sa) == EXPECTED_CH0
