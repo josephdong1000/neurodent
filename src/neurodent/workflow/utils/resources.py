@@ -262,6 +262,11 @@ def one_war_at_a_time_time(block):
 _TIME_RATES = ("seconds_per_value", "seconds_per_window")
 
 
+def _attempt(wildcards, attempt):
+    """The job's attempt number, 1 on its first run, as a resource the job can read."""
+    return attempt
+
+
 def rule_resources(block, war_loading=None):
     """Return a rule's Snakemake resources, from its block of the ``cluster`` config.
 
@@ -277,6 +282,9 @@ def rule_resources(block, war_loading=None):
     - ``mem_mb`` is the block's ``mem_mb``, doubled on each retry, for a rule whose memory does
       not depend on WARs. A rule that reads WARs passes ``war_loading`` and asks for at least
       that, more when its input WARs need it (war_input_mem_mb).
+    - ``attempt`` is the job's attempt number, 1 on its first run, which setup_snakemake_logging
+      and rule_log write into the rule's logs. Snakemake does not rerun a job when its
+      resources change, so it never triggers a rerun.
 
     Before, each rule wrote out its resources from the block itself, and every rule except
     war_zeitgeber and war_relfreq_plots asked for the block's ``mem_mb`` whatever its input.
@@ -312,4 +320,4 @@ def rule_resources(block, war_loading=None):
         time = one_war_at_a_time_time(block)
     else:
         time = block["time"]
-    return {"time": time, "mem_mb": mem_mb, "nodes": block["nodes"]}
+    return {"time": time, "mem_mb": mem_mb, "nodes": block["nodes"], "attempt": _attempt}

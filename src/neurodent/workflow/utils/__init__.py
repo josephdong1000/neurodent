@@ -26,6 +26,7 @@ from .quality_filter import (
 )
 from .logging import (
     setup_snakemake_logging,
+    rule_log,
     increment_memory,
 )
 from .resources import (
@@ -63,6 +64,7 @@ __all__ = [
     "quality_filter_outcome",
     "format_exclusion_summary",
     "setup_snakemake_logging",
+    "rule_log",
     "increment_memory",
     "count_war_values",
     "war_stream_bytes",
