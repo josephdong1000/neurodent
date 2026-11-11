@@ -760,3 +760,94 @@ def test_convert_sas_to_mne_refuses_channels_of_different_lengths():
     ]
     with pytest.raises(ValueError, match="same number of samples"):
         FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(sas)
+
+
+def _late_raw(n_channels, n_samples=5000):
+    """A short recording whose first sample is 80,000 s after its measurement date.
+
+    Its annotation onsets are about 80,000 s, as they are late in a day-long recording, where
+    float32 holds a time only to 1/128 s, about 8 samples at 1000 Hz.
+    """
+    import datetime
+
+    raw = _raw(n_channels, n_samples)
+    raw = mne.io.RawArray(raw.get_data(), raw.info, first_samp=80_000_000, verbose=False)
+    raw.set_meas_date(datetime.datetime(2020, 1, 1, tzinfo=datetime.timezone.utc))
+    return raw
+
+
+LATE_SPIKES = {
+    2: [np.arange(1, 4999, 37), np.array([0, 4999])],
+    4: [np.array([], dtype=int), np.arange(3, 4990, 101), np.array([2500]), np.arange(0, 5000, 499)],
+}
+
+
+@pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
+class TestSidecarSpikeIndices:
+    """The JSON sidecar keeps exact spike indices, which the FIF annotations cannot."""
+
+    def _saved(self, tmp_path, n_channels, spike_indices="given"):
+        spikes = LATE_SPIKES[n_channels]
+        raw = write_spike_annotations(_late_raw(n_channels), spikes)
+        fdsar = FrequencyDomainSpikeAnalysisResult(
+            result_mne=raw,
+            spike_indices=spikes if spike_indices == "given" else None,
+            detection_params={"bp": (3.0, 40.0)},
+            animal_id="A1",
+            genotype="WT",
+            animal_day="A1 WT Jan-01-2020",
+            channel_names=raw.ch_names,
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            fdsar.save_fif_and_json(tmp_path)
+        (json_path,) = tmp_path.glob("*.json")
+        return spikes, json_path
+
+    @pytest.mark.parametrize("n_channels", list(LATE_SPIKES))
+    def test_save_and_load_keep_exact_indices(self, tmp_path, n_channels):
+        spikes, json_path = self._saved(tmp_path, n_channels)
+
+        data = json.loads(json_path.read_text())
+        assert data["spike_indices_per_channel"] == [s.tolist() for s in spikes]
+        assert data["spike_counts_per_channel"] == [len(s) for s in spikes]
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)  # no fallback warning
+            warnings.filterwarnings("ignore", message=".*could not be mapped.*")
+            loaded = FrequencyDomainSpikeAnalysisResult.load_fif_and_json(tmp_path)
+
+        for got, want in zip(loaded.spike_indices, spikes):
+            np.testing.assert_array_equal(got, want)
+            assert got.dtype == np.int64
+        # The FIF annotations alone are several samples off, which is why the sidecar keeps them
+        from_fif = read_spike_annotations(loaded.result_mne)
+        assert any(not np.array_equal(a, b) for a, b in zip(from_fif, spikes))
+
+    def test_an_old_sidecar_loads_from_the_annotations_with_a_warning(self, tmp_path):
+        _, json_path = self._saved(tmp_path, 2)
+        data = json.loads(json_path.read_text())
+        del data["spike_indices_per_channel"]
+        json_path.write_text(json.dumps(data))
+
+        with pytest.warns(UserWarning, match="has no spike_indices_per_channel"):
+            loaded = FrequencyDomainSpikeAnalysisResult.load_fif_and_json(tmp_path)
+
+        for got, want in zip(loaded.spike_indices, read_spike_annotations(loaded.result_mne)):
+            np.testing.assert_array_equal(got, want)
+
+    def test_a_sidecar_with_the_wrong_channel_count_raises(self, tmp_path):
+        _, json_path = self._saved(tmp_path, 2)
+        data = json.loads(json_path.read_text())
+        data["spike_indices_per_channel"] = data["spike_indices_per_channel"][:1]
+        json_path.write_text(json.dumps(data))
+
+        with pytest.raises(ValueError, match="spike indices for 1 channels"):
+            FrequencyDomainSpikeAnalysisResult.load_fif_and_json(tmp_path)
+
+    def test_without_spike_indices_the_sidecar_takes_them_from_the_annotations(self, tmp_path):
+        """The in-memory annotations are exact; the counts used to be left empty here."""
+        spikes, json_path = self._saved(tmp_path, 4, spike_indices=None)
+
+        data = json.loads(json_path.read_text())
+        assert data["spike_indices_per_channel"] == [s.tolist() for s in spikes]
+        assert data["spike_counts_per_channel"] == [len(s) for s in spikes]

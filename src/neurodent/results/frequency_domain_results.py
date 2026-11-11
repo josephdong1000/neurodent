@@ -379,6 +379,13 @@ class FrequencyDomainSpikeAnalysisResult:
         kwarg was removed — the unsafe (un-slugified) form was never the right
         answer for any real caller.
 
+        The JSON sidecar keeps every spike's exact 0-based sample index under
+        ``spike_indices_per_channel``, one list per channel, which ``load_fif_and_json``
+        prefers to the FIF annotations: a FIF stores annotation times as float32, which
+        rounds spikes in long recordings to several samples. Sidecars used to hold only
+        ``spike_counts_per_channel``. Without ``spike_indices``, both keys now come from
+        the spike annotations of the raw being saved; the counts used to be left empty.
+
         Args:
             folder: Destination folder to save results
             convert_to_mne: If True, convert to MNE if needed
@@ -429,7 +436,8 @@ class FrequencyDomainSpikeAnalysisResult:
         # Save MNE data
         result_mne.save(filebase + "-raw.fif", overwrite=overwrite)
 
-        # Save metadata as JSON
+        # Save metadata as JSON, with the exact spike indices the FIF cannot hold
+        spike_indices = self.spike_indices or read_spike_annotations(result_mne)
         json_dict = {
             "animal_id": self.animal_id,
             "genotype": self.genotype,
@@ -438,7 +446,10 @@ class FrequencyDomainSpikeAnalysisResult:
             "metadata": self.metadata.metadata_path if self.metadata else None,
             "channel_names": self.channel_abbrevs if save_abbrevs else self.channel_names,
             "detection_params": self.detection_params,
-            "spike_counts_per_channel": [len(spikes) for spikes in self.spike_indices] if self.spike_indices else [],
+            "spike_counts_per_channel": [len(spikes) for spikes in spike_indices],
+            "spike_indices_per_channel": [
+                np.asarray(spikes, dtype=np.int64).tolist() for spikes in spike_indices
+            ],
         }
 
         with open(filebase + ".json", "w") as f:
@@ -452,11 +463,21 @@ class FrequencyDomainSpikeAnalysisResult:
         Load FrequencyDomainSpikeAnalysisResult from fif and json files.
         Mirrors the SpikeAnalysisResult.load_fif_and_json interface.
 
+        Spike indices come from the sidecar's ``spike_indices_per_channel``, exact 0-based
+        sample indices. A sidecar written before that key existed still loads: its indices
+        are read from the FIF annotations, with a warning, because those put each spike one
+        sample late and, stored as float32, round spikes in long recordings to several
+        samples. Indices always used to be read from the annotations.
+
         Args:
             folder: Folder containing the saved files
 
         Returns:
             FrequencyDomainSpikeAnalysisResult: Loaded result object
+
+        Raises:
+            ValueError: If the sidecar's spike indices do not have one list per channel of
+                the FIF.
         """
         folder = Path(folder)
         if not folder.exists():
@@ -479,8 +500,23 @@ class FrequencyDomainSpikeAnalysisResult:
         # Load MNE data
         result_mne = mne.io.read_raw_fif(fif_path, preload=False)
 
-        # Extract spike indices from MNE annotations
-        spike_indices = read_spike_annotations(result_mne)
+        if "spike_indices_per_channel" in data:
+            spike_indices = [
+                np.asarray(spikes, dtype=np.int64) for spikes in data["spike_indices_per_channel"]
+            ]
+            if len(spike_indices) != len(result_mne.ch_names):
+                raise ValueError(
+                    f"{json_path.name} has spike indices for {len(spike_indices)} channels, but "
+                    f"{fif_path.name} has {len(result_mne.ch_names)}"
+                )
+        else:
+            warnings.warn(
+                f"{json_path.name} has no spike_indices_per_channel, so spike indices are read from "
+                f"the annotations of {fif_path.name}. Those put each spike one sample late, and "
+                f"a FIF stores their times as float32, which rounds spikes in long recordings to "
+                f"several samples. Regenerate the result for exact indices."
+            )
+            spike_indices = read_spike_annotations(result_mne)
 
         # Fix detection params: convert lists back to tuples for specific parameters
         detection_params = data.get("detection_params", {})
