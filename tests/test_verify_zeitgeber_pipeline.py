@@ -25,7 +25,7 @@ def test_verify_pipeline():
                 "timestamp": date,
                 "genotype": "WT" if animal == "A1" else "Mut",
                 "sex": "Male" if animal == "A1" else "Female",
-                "feature1": np.sin(i / 24 * 2 * np.pi) + 10, # Sine wave
+                "logrms": np.sin(i / 24 * 2 * np.pi) + 10, # Sine wave
                 "animal": animal,
                 "animalday": f"{animal}_Day1",
                 "day": "Day1",
@@ -78,7 +78,7 @@ def test_verify_pipeline():
     logger.info("ZT shift passed")
 
     # 4. Baseline Subtraction
-    assert "feature1_nobase" in df_processed.columns
+    assert "logrms_nobase" in df_processed.columns
     logger.info("Baseline subtraction passed")
     
     # 5. Check NO 48h expansion (shift_for_48h=False)
@@ -86,7 +86,7 @@ def test_verify_pipeline():
     logger.info("No 48h expansion passed")
 
     # Aggregation
-    feature_cols = ["feature1", "feature1_nobase"]
+    feature_cols = ["logrms", "logrms_nobase"]
     numeric_feature_cols = df_processed[feature_cols].select_dtypes(include=[int, float]).columns.tolist()
     agg_dict = {feature: "mean" for feature in numeric_feature_cols}
     
@@ -104,9 +104,9 @@ def test_verify_pipeline():
     # Verify Metadata Helpers
     logger.info("--- Testing Metadata Helpers ---")
     # Mock config features
-    config_features = ["feature1"]
+    config_features = ["logrms"]
     expanded_features = get_expanded_feature_names(config_features)
-    assert "feature1" in expanded_features
+    assert "logrms" in expanded_features
     
     # Test expansion logic with known constants (mocking if needed, but we can just test the function)
     # We'll test with a fake band feature if we can, or just trust the function works as tested by unit tests
@@ -117,8 +117,8 @@ def test_verify_pipeline():
     expected_features = set(expanded_features + expanded_features_nobase)
     feature_cols = [col for col in df_processed.columns if col in expected_features]
     
-    assert "feature1" in feature_cols
-    assert "feature1_nobase" in feature_cols
+    assert "logrms" in feature_cols
+    assert "logrms_nobase" in feature_cols
     assert "zt_minutes" not in feature_cols
     
     logger.info("Metadata helpers passed")

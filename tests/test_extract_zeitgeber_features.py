@@ -24,7 +24,8 @@ SCRIPT = REPO / "workflow" / "scripts" / "extract_zeitgeber_features.py"
 # Together they cover the ways datasets differ: channel count, recording days, a single
 # window, features a WAR lacks, a channel dead throughout, genotypes outside the default plot
 # order, and more genotypes than the fixed palette. Input order is not sorted, and the folders
-# are not the ids, as on disk, where folder iqsec2_80 holds IQSEC2_80.
+# are not the ids, as on disk, where folder iqsec2_80 holds IQSEC2_80. A5 lacks features the
+# zeitgeber config does not ask for; lacking one it asks for raises (see below).
 ANIMALS = [
     ("a2", "A2", "KO", "Female", {}),
     ("a1", "A1", "WT", "Male", {"channels": [
@@ -32,7 +33,7 @@ ANIMALS = [
     ]}),
     ("a3", "A3", "x/y", "Female", {"channels": ["LMot", "RMot"], "days": 3}),
     ("a6", "A6", "HET", "Male", {"windows": 1}),
-    ("a5", "A5", "WT", "Female", {"drop": ["nspike", "lognspike", "psdslope"]}),
+    ("a5", "A5", "WT", "Female", {"drop": ["nspike", "cohere", "psd"]}),
     ("a4", "A4", "KO", "Male", {"dead_channel": 0}),
 ]
 
@@ -102,6 +103,63 @@ def test_output_does_not_depend_on_input_order(zeitgeber, create_war_files, tmp_
 
     pd.testing.assert_frame_equal(forward, backward, check_exact=True)
     assert (tmp_path / "forward.pkl").read_bytes() == (tmp_path / "backward.pkl").read_bytes()
+
+
+@pytest.mark.mutates_constants
+def test_every_configured_feature_reaches_the_output(zeitgeber, create_war_files, tmp_path):
+    """psdslope's two columns used to be left out, by a naming rule that kept psdslope whole."""
+    from neurodent.core.utils import channel_averaged_columns
+
+    result = _run_main(zeitgeber, create_war_files(ANIMALS), tmp_path / "zeitgeber_features.pkl")
+
+    columns = [c for f in _shipped_zeitgeber_config()["features"] for c in channel_averaged_columns(f)]
+    assert {"psdslope_slope", "psdslope_intercept"} <= set(columns)
+    assert set(result.columns) == (
+        {"animal", "genotype", "sex", "zt_minutes", "daynight"}
+        | set(columns)
+        | {f"{c}_nobase" for c in columns}
+    )
+    assert not result[columns].isna().all().any()
+
+
+@pytest.mark.mutates_constants
+@pytest.mark.parametrize("dropped", [["lognspike"], ["psdslope"], ["zcohere", "zimcoh"]])
+def test_a_war_without_a_configured_feature_raises(zeitgeber, create_war_files, tmp_path, dropped):
+    """A missing column used to be left out of the output without a word."""
+    animals = [a for a in ANIMALS if a[0] != "a5"] + [("a5", "A5", "WT", "Female", {"drop": dropped})]
+
+    with pytest.raises(RuntimeError, match="Failed to process animal a5") as excinfo:
+        _run_main(zeitgeber, create_war_files(animals), tmp_path / "zeitgeber_features.pkl")
+
+    assert isinstance(excinfo.value.__cause__, ValueError)
+    assert dropped[0] in str(excinfo.value.__cause__)
+
+
+def test_bins_match_averaging_every_animal_together(create_war_files):
+    """Averaging each animal's windows into bins on its own gives the bins that averaging all
+    animals' windows together gave, as the script did before."""
+    from neurodent import constants
+    from neurodent.results import WindowAnalysisResult
+    from neurodent.results.zeitgeber import ZeitgeberAnalysisResult, aggregate_zeitgeber_bins
+
+    features = ["logrms", "logpsdband", "psdslope", "zpcorr"]
+    animals = [ANIMALS[0], ANIMALS[2], ANIMALS[5]]
+    config = {"baseline_hours": 12, "animal_metadata": {
+        a[1]: {"genotype": a[2], "sex": a[3]} for a in animals
+    }}
+    frames, bins = [], []
+    for (folder, *_), (parquet, _) in zip(animals, create_war_files(animals)):
+        war = WindowAnalysisResult.load_parquet_and_json(parquet.parent)
+        frame = ZeitgeberAnalysisResult(war, **config).get_channel_averaged_result(features=features)
+        frame["animal"] = folder
+        frames.append(frame)
+        bins.append(aggregate_zeitgeber_bins(frame, features))
+
+    together = pd.concat(frames, ignore_index=True)
+    columns = [c for c in together.columns if c in set(bins[0].columns) - {"animal", "genotype", "sex", "zt_minutes", "daynight"}]
+    expected = together.groupby(["animal", "genotype", "sex", "zt_minutes", "daynight"])[columns].mean().reset_index()
+
+    pd.testing.assert_frame_equal(pd.concat(bins, ignore_index=True), expected, check_exact=True)
 
 
 def test_extraction_errors_name_the_animal():

@@ -434,10 +434,16 @@ def test_get_expanded_feature_names():
     assert "zpcorr" in expanded_mixed  # Simple matrix feature - NOT expanded
     assert "zpcorr_delta" not in expanded_mixed  # Should NOT be expanded
     
-    # Test 6: Unknown features pass through
-    unknown = ["my_custom_feature"]
-    expanded_unknown = zeitgeber.get_expanded_feature_names(unknown)
-    assert expanded_unknown == ["my_custom_feature"]
+    # Test 6: Unknown features and psd raise; they used to pass through as one column
+    with pytest.raises(ValueError, match="Unknown feature"):
+        zeitgeber.get_expanded_feature_names(["my_custom_feature"])
+    with pytest.raises(ValueError, match="spectrum"):
+        zeitgeber.get_expanded_feature_names(["psd"])
+
+    # Test 6b: psdslope splits into its components; it used to stay whole, which dropped it
+    assert zeitgeber.get_expanded_feature_names(["psdslope", "logrms"]) == [
+        "psdslope_slope", "psdslope_intercept", "logrms"
+    ]
     
     # Test 7: Verify constants are correctly defined
     assert "pcorr" in constants.SIMPLE_MATRIX_FEATURES

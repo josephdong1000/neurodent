@@ -63,11 +63,16 @@ class ZeitgeberPlotter:
         """
         Aggregate multiple ZARs into a single plotting-ready DataFrame.
 
-        Mirrors logic from extract_zeitgeber_features.py.
+        Each ZAR's channel-averaged frame is averaged per zeitgeber bin by
+        :func:`neurodent.results.zeitgeber.aggregate_zeitgeber_bins`, the aggregation the
+        pipeline's extract_zeitgeber_features.py uses, so the columns are those
+        ``channel_averaged_columns`` names for ``features`` and a missing one raises. This
+        used to average every numeric column, whatever its name, and did not group by
+        daynight.
 
         Args:
             zars: List of ZeitgeberAnalysisResult objects.
-            features: List of features to extract.
+            features: List of features to extract. Required.
             config: Optional config dict (currently unused, for future expansion).
 
         Returns:
@@ -75,30 +80,26 @@ class ZeitgeberPlotter:
                 Multi-day expansion (e.g. 48h) is deferred to
                 :meth:`plot_feature` so the same internal df can serve any
                 requested ``n_days`` view without leftover duplicates.
+
+        Raises:
+            ValueError: If ``zars`` is empty, ``features`` is not given, or a ZAR lacks a
+                column of a requested feature.
         """
+        # Lazy import, as in plot_feature
+        from neurodent.results.zeitgeber import aggregate_zeitgeber_bins
+
         if not zars:
             raise ValueError("zars list cannot be empty")
+        if features is None:
+            raise ValueError("features must be given to aggregate ZeitgeberAnalysisResult objects")
 
         dfs = []
         for zar in zars:
             df = zar.get_channel_averaged_result(features=features)
             df["animal"] = zar.animal_id  # Delegated via __getattr__
-            dfs.append(df)
+            dfs.append(aggregate_zeitgeber_bins(df, features))
 
-        df = pd.concat(dfs, ignore_index=True)
-
-        # Aggregate by time bins
-        group_cols = ["animal", "genotype", "sex", "zt_minutes"]
-        group_cols = [c for c in group_cols if c in df.columns]
-
-        feature_cols = [c for c in df.select_dtypes(include=[np.number]).columns
-                        if c not in group_cols]
-        agg_dict = {f: "mean" for f in feature_cols}
-
-        if group_cols and agg_dict:
-            df = df.groupby(group_cols).agg(agg_dict).reset_index()
-
-        return df
+        return pd.concat(dfs, ignore_index=True)
 
     def plot_feature(self, feature, output_path, figsize, dpi=300, n_days=2):
         """

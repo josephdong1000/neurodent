@@ -87,10 +87,11 @@ def test_zeitgeber_plotter_from_zars():
     mock_zar1 = MagicMock()
     mock_zar1.animal_id = "Animal1"
     mock_zar1.get_channel_averaged_result.return_value = pd.DataFrame({
-        "zt_minutes": [0, 60, 120],
-        "genotype": ["WT", "WT", "WT"],
-        "sex": ["Male", "Male", "Male"],
-        "feature1": [1.0, 2.0, 3.0]
+        "zt_minutes": [0, 60, 120, 120],
+        "genotype": ["WT", "WT", "WT", "WT"],
+        "sex": ["Male", "Male", "Male", "Male"],
+        "logrms": [1.0, 2.0, 3.0, 5.0],
+        "duration": [5.0, 5.0, 5.0, 5.0],
     })
     
     mock_zar2 = MagicMock()
@@ -99,14 +100,19 @@ def test_zeitgeber_plotter_from_zars():
         "zt_minutes": [0, 60, 120],
         "genotype": ["Mut", "Mut", "Mut"],
         "sex": ["Female", "Female", "Female"],
-        "feature1": [4.0, 5.0, 6.0]
+        "logrms": [4.0, 5.0, 6.0],
+        "duration": [5.0, 5.0, 5.0],
     })
     
-    plotter = ZeitgeberPlotter([mock_zar1, mock_zar2], features=["feature1"])
+    plotter = ZeitgeberPlotter([mock_zar1, mock_zar2], features=["logrms"])
 
     # Verify aggregation happened — both animals end up in the plotter's df.
     assert "animal" in plotter.df.columns
     assert set(plotter.df["animal"].unique()) == {"Animal1", "Animal2"}
+    # One row per animal and bin; only the requested feature is averaged
+    assert len(plotter.df) == 6
+    assert plotter.df.loc[plotter.df["animal"] == "Animal1", "logrms"].tolist() == [1.0, 2.0, 4.0]
+    assert "duration" not in plotter.df.columns
 
     # Post-refactor: _aggregate_zars returns a 24h df (no row duplication).
     # Multi-day expansion is deferred to plot_feature via expand_zt_axis().
@@ -154,3 +160,16 @@ def test_no_circular_import_with_transform_time_axis():
     result = transform_time_axis(df, time_range=(0, 24))
     assert len(result) == 3
     assert "sex" in result.columns
+
+
+def test_zeitgeber_plotter_from_zars_needs_features_and_their_columns():
+    zar = MagicMock()
+    zar.animal_id = "Animal1"
+    zar.get_channel_averaged_result.return_value = pd.DataFrame({
+        "zt_minutes": [0, 60], "genotype": ["WT", "WT"], "sex": ["Male", "Male"], "logrms": [1.0, 2.0],
+    })
+
+    with pytest.raises(ValueError, match="features must be given"):
+        ZeitgeberPlotter([zar])
+    with pytest.raises(ValueError, match="psdslope_slope"):
+        ZeitgeberPlotter([zar], features=["logrms", "psdslope"])

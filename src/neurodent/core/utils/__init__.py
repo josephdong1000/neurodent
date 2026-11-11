@@ -17,6 +17,7 @@ from .naming import (
     normalize_value_from_aliases,
     rename_mne_channels,
     slugify,
+    channel_averaged_columns,
     get_feature_label,
 )
 from .paths import (
@@ -70,6 +71,7 @@ __all__ = [
     "normalize_value_from_aliases",
     "rename_mne_channels",
     "slugify",
+    "channel_averaged_columns",
     "get_feature_label",
     "set_temp_directory",
     "get_temp_directory",

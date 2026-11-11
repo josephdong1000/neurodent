@@ -8,10 +8,17 @@ It processes the manually channel-filtered WARs to extract features with zeitgeb
 information and creates a single concatenated dataframe across all animals.
 
 Memory: each WAR is loaded in full exactly once, one animal at a time in sorted animal
-order, through neurodent.workflow.iter_wars, and only its channel-averaged frame is kept.
-This replaced a pool that loaded up to `threads` WARs at once, which on IQSEC2 peaked at
-270 of the 293 GiB the rule had. The rule's threads setting is no longer used. The order
-is sorted, so the output does not depend on the order of the inputs.
+order, through neurodent.workflow.iter_wars, and only its zeitgeber bins are kept: its
+channel-averaged windows, averaged per bin by aggregate_zeitgeber_bins. This replaced a pool
+that loaded up to `threads` WARs at once, which on IQSEC2 peaked at 270 of the 293 GiB the
+rule had. The rule's threads setting is no longer used. The order is sorted, so the output
+does not depend on the order of the inputs.
+
+Every configured feature must be in every WAR: a missing column raises, naming the animal.
+The columns are named by channel_averaged_columns, so psdslope gives psdslope_slope and
+psdslope_intercept. Every animal's windows used to be kept and averaged together at the end,
+with columns picked by a rule that left out psdslope's two, and columns it did not find were
+left out without a word.
 
 Based on: notebooks/examples/pipeline-alphadelta.py
 """
@@ -20,8 +27,6 @@ import logging
 from pathlib import Path
 import pandas as pd
 
-# Import the new zeitgeber module
-from neurodent.results import get_expanded_feature_names
 from neurodent.results.zeitgeber import _extract_zeitgeber_frame
 from neurodent.workflow import setup_snakemake_logging, apply_samples_config, iter_wars
 
@@ -98,7 +103,7 @@ def main():
     pipeline_config["animal_metadata"] = constants.ANIMAL_METADATA
 
     # Load each WAR once, one animal at a time, in sorted animal order, and keep only its
-    # channel-averaged frame
+    # zeitgeber bins
     animals = sorted(parquet_animal_set)
     dfs = []
     for parquet_path, war in iter_wars(
@@ -118,66 +123,10 @@ def main():
 
     logger.info(f"Successfully processed {len(dfs)} WARs")
 
-    # Concatenate all dataframes (already channel-averaged by get_channel_averaged_result())
+    # Each animal's frame is already averaged per bin, by aggregate_zeitgeber_bins
     df = pd.concat(dfs, ignore_index=True)
-    logger.info(f"Combined dataframe shape: {df.shape}")
-
-    
-    # Expand features (e.g. logpsdband -> logpsdband_delta, etc.)
-    expanded_features = get_expanded_feature_names(features_to_extract)
-    
-    # Also include baseline-subtracted versions
-    expanded_features_nobase = [f"{f}_nobase" for f in expanded_features]
-    
-    # Combine and intersect with actual dataframe columns
-    expected_features = set(expanded_features + expanded_features_nobase)
-    feature_cols = [col for col in df.columns if col in expected_features]
-    
-    # Identify metadata columns as everything else
-    metadata_cols = [col for col in df.columns if col not in feature_cols]
-
-    logger.info(f"Total columns: {len(df.columns)}")
-    logger.info(f"Metadata columns ({len(metadata_cols)}): {metadata_cols}")
-    logger.info(f"Feature columns ({len(feature_cols)}): {feature_cols}")
-
-    # Log column dtypes to catch any non-numeric issues
-    logger.info("Column dtypes before aggregation:")
-    for col in feature_cols:
-        if col in df.columns:
-            logger.info(f"  {col}: {df[col].dtype}")
-
-    # Select final columns (only keep those that exist in dataframe)
-    final_columns = [col for col in metadata_cols + feature_cols if col in df.columns]
-    df = df[final_columns]
-
-    # Aggregate by time windows (following alphadelta pipeline)
-    logger.info("Aggregating by time windows")
-    
-    # Only aggregate numeric feature columns (double check)
-    numeric_feature_cols = df[feature_cols].select_dtypes(include=[int, float]).columns.tolist()
-    agg_dict = {feature: "mean" for feature in numeric_feature_cols}
-
-    try:
-        # Group by all metadata columns present (except those that vary per row like timestamp/minute if we are binning)
-        # We want to group by: animal, genotype, sex, gene, zt_minutes
-        # And potentially other static metadata.
-        # However, 'zt_minutes' is the binning key.
-
-        # Define grouping columns based on what's available and what should be grouped
-        # We want to keep animal-level metadata and the time bin.
-        potential_group_cols = ["animal", "genotype", "sex", "zt_minutes", "daynight"]
-        group_cols = [c for c in potential_group_cols if c in df.columns]
-        
-        df = df.groupby(group_cols).agg(agg_dict).reset_index()
-        logger.info(f"✓ Aggregation successful! Aggregated dataframe shape: {df.shape}")
-    except Exception as e:
-        logger.error(f"✗ Aggregation failed with error: {str(e)}")
-        logger.error(f"Feature columns being aggregated: {numeric_feature_cols}")
-        logger.error("Sample values from first row:")
-        for col in numeric_feature_cols:
-            if col in df.columns:
-                logger.error(f"  {col}: {df[col].iloc[0]} (type: {type(df[col].iloc[0])})")
-        raise
+    logger.info(f"Aggregated dataframe shape: {df.shape}")
+    logger.info(f"Columns: {list(df.columns)}")
 
     # Create output directory
     output_dir = Path(output_pkl).parent
