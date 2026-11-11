@@ -18,7 +18,8 @@ worker, the default memory limit and dashboard):
 
 Instruments, all under --out:
 
-- stacks.txt: every thread's stack, each minute (faulthandler, which needs no GIL).
+- stacks.txt: every thread's stack, each minute and on a fatal signal such as a segfault
+  (faulthandler, which needs no GIL).
 - events.jsonl: each dask.compute call's start and end, garbage collections over 0.5 s,
   event-loop lag over 1 s on the cluster's loop, and log records from distributed about
   gathers, unresponsive loops, failed transfers and lost workers.
@@ -267,6 +268,7 @@ def main(argv=None):
 
     recorder = Recorder(out / "events.jsonl")
     stacks = open(out / "stacks.txt", "a", buffering=1, encoding="utf-8")
+    faulthandler.enable(file=stacks, all_threads=True)
     faulthandler.dump_traceback_later(60, repeat=True, file=stacks)
     state = {"in_compute": False, "computes": [], "max_loop_lag": 0.0, "max_gc": 0.0, "status": "running"}
     summary_path = out / "summary.json"
