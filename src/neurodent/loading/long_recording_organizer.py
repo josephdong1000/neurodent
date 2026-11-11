@@ -7,7 +7,6 @@ this module keeps the base methods (including the name-mangled index helpers and
 their fragment-accessor callers), the class declaration, and ``split_recording``.
 """
 
-import math
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Literal, Union
@@ -230,18 +229,65 @@ class LongRecordingOrganizer(
             return str(Path(str(self.item)).name)
         return "unknown"
 
-    def get_num_fragments(self, fragment_len_s):
-        frag_len_idx = self.__time_to_idx(fragment_len_s)
-        duration_idx = self.LongRecording.get_num_frames()
-        return math.ceil(duration_idx / frag_len_idx)
+    def get_fragment_num_samples(self, fragment_len_s) -> int:
+        """Number of samples in one window of ``fragment_len_s`` seconds.
 
-    def __time_to_idx(self, time_s):
-        return self.LongRecording.time_to_sample_index(time_s)
+        This one count sets both the number of windows (:meth:`get_num_fragments`) and where
+        each window starts and ends (:meth:`get_fragment`), and the Dask path of
+        ``AnimalAnalyzer.compute_windowed_analysis`` cuts the recording with it too, so serial
+        and Dask analyse the same samples. It is ``round(fragment_len_s * sampling rate)``.
+        The window count and the slicing used to convert the length with the recording's
+        ``time_to_sample_index``, which also subtracts the recording's start time, and the
+        Dask path computed ``int(window_s * f_s)`` separately.
+
+        Args:
+            fragment_len_s (float): Window length in seconds.
+
+        Returns:
+            int: Samples per window.
+
+        Raises:
+            ValueError: If the window is shorter than one sample.
+        """
+        f_s = self.LongRecording.get_sampling_frequency()
+        n_samples = int(round(fragment_len_s * f_s))
+        if n_samples < 1:
+            raise ValueError(f"A window of {fragment_len_s} s holds no samples at {f_s} Hz")
+        return n_samples
+
+    def get_num_fragments(self, fragment_len_s):
+        """Number of complete windows of ``fragment_len_s`` seconds in the recording.
+
+        This is floor(samples / samples per window). The samples after the last complete
+        window form no window. It used to be the ceiling, which counted a partial last
+        window: the serial analysis kept it, interpolating its PSD, and the Dask analysis
+        dropped the last window whatever its length, so it lost a complete one whenever the
+        recording was an exact multiple of the window.
+
+        Args:
+            fragment_len_s (float): Window length in seconds.
+
+        Returns:
+            int: Number of complete windows, 0 for a recording shorter than one window.
+        """
+        return self.LongRecording.get_num_frames() // self.get_fragment_num_samples(fragment_len_s)
 
     def __idx_to_time(self, idx):
         return self.LongRecording.sample_index_to_time(idx)
 
     def get_fragment(self, fragment_len_s, fragment_idx):
+        """The recording of one complete window.
+
+        Args:
+            fragment_len_s (float): Window length in seconds.
+            fragment_idx (int): Index of the window, from 0 to ``get_num_fragments() - 1``.
+
+        Returns:
+            si.BaseRecording: The window's samples.
+
+        Raises:
+            IndexError: If fragment_idx is not one of the complete windows.
+        """
         startidx, endidx = self.__fragidx_to_startendind(fragment_len_s, fragment_idx)
         return self.LongRecording.frame_slice(startidx, endidx)
 
@@ -257,14 +303,22 @@ class LongRecordingOrganizer(
             fragment_idx (int): Index of the fragment to get indices for
 
         Returns:
-            tuple[int, int]: Start and end sample indices for the fragment. The end index is capped at the recording length.
+            tuple[int, int]: Start and end sample indices of the window, always
+            :meth:`get_fragment_num_samples` apart.
+
+        Raises:
+            IndexError: If fragment_idx is not one of the complete windows. The end index used
+                to be capped at the recording length, so the index after the last complete
+                window gave the partial samples that remained.
         """
-        frag_len_idx = self.__time_to_idx(fragment_len_s)
-        startidx = frag_len_idx * fragment_idx
-        endidx = min(
-            frag_len_idx * (fragment_idx + 1), self.LongRecording.get_num_frames()
-        )
-        return startidx, endidx
+        n_samples = self.get_fragment_num_samples(fragment_len_s)
+        n_fragments = self.LongRecording.get_num_frames() // n_samples
+        if not 0 <= fragment_idx < n_fragments:
+            raise IndexError(
+                f"Window {fragment_idx} is not one of the {n_fragments} complete windows of "
+                f"{fragment_len_s} s in this recording"
+            )
+        return n_samples * fragment_idx, n_samples * (fragment_idx + 1)
 
     def __str__(self):
         """Return a string representation of critical long recording features."""

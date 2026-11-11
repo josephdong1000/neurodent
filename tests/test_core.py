@@ -58,41 +58,68 @@ class TestLongRecordingOrganizer:
         with pytest.raises(ValueError, match="does not truncate"):
             LongRecordingOrganizer(temp_dir, mode=None, truncate=truncate)
 
-    def test_time_conversion_methods(self, temp_dir):
-        """Test __time_to_idx and __idx_to_time methods."""
+    def test_idx_to_time(self, temp_dir):
+        """Test the __idx_to_time method."""
         organizer = LongRecordingOrganizer(temp_dir, mode=None)
 
         # Mock LongRecording
         mock_recording = Mock()
-        mock_recording.time_to_sample_index.return_value = 1000
         mock_recording.sample_index_to_time.return_value = 1.0
         organizer.LongRecording = mock_recording
 
-        # Test time to index conversion
-        idx = organizer._LongRecordingOrganizer__time_to_idx(1.0)
-        assert idx == 1000
-        mock_recording.time_to_sample_index.assert_called_once_with(1.0)
-
-        # Test index to time conversion
         time_s = organizer._LongRecordingOrganizer__idx_to_time(1000)
         assert time_s == 1.0
         mock_recording.sample_index_to_time.assert_called_once_with(1000)
 
-    def test_get_num_fragments(self, temp_dir):
-        """Test get_num_fragments calculation."""
+    @pytest.mark.parametrize(
+        "fragment_len_s, f_s, expected",
+        [(1.0, 1000.0, 1000), (5, 1000.0, 5000), (0.5, 1000.0, 500), (2.5, 250.0, 625), (1.0, 999.6, 1000)],
+    )
+    def test_get_fragment_num_samples(self, temp_dir, fragment_len_s, f_s, expected):
+        """Samples per window are round(window length * sampling rate)."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        mock_recording = Mock()
+        mock_recording.get_sampling_frequency.return_value = f_s
+        organizer.LongRecording = mock_recording
+
+        assert organizer.get_fragment_num_samples(fragment_len_s) == expected
+
+    def test_get_fragment_num_samples_ignores_the_start_time(self, temp_dir):
+        """A recording that starts at a later time still has 1000-sample windows of 1 s at 1000 Hz.
+
+        The count used to come from time_to_sample_index, which subtracts the start time.
+        """
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        rec = si.NumpyRecording(
+            np.zeros((3500, 2), dtype=np.float32), sampling_frequency=1000.0, t_starts=[100.0]
+        )
+        assert rec.time_to_sample_index(1.0) < 0  # what the count used to be built from
+        organizer.LongRecording = rec
+
+        assert organizer.get_fragment_num_samples(1.0) == 1000
+        assert organizer.get_num_fragments(1.0) == 3
+
+    def test_get_fragment_num_samples_shorter_than_a_sample_raises(self, temp_dir):
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        mock_recording = Mock()
+        mock_recording.get_sampling_frequency.return_value = 1000.0
+        organizer.LongRecording = mock_recording
+
+        with pytest.raises(ValueError, match="holds no samples"):
+            organizer.get_fragment_num_samples(0.0001)
+
+    @pytest.mark.parametrize("n_frames, expected", [(5500, 5), (5000, 5), (4999, 4), (999, 0), (1000, 1)])
+    def test_get_num_fragments(self, temp_dir, n_frames, expected):
+        """Only complete windows count: floor(samples / window), not the ceiling it used to be."""
         organizer = LongRecordingOrganizer(temp_dir, mode=None)
 
         # Mock LongRecording
         mock_recording = Mock()
-        mock_recording.time_to_sample_index.return_value = (
-            1000  # 1 second = 1000 samples
-        )
-        mock_recording.get_num_frames.return_value = 5500  # 5.5 seconds total
+        mock_recording.get_sampling_frequency.return_value = 1000.0  # 1 second = 1000 samples
+        mock_recording.get_num_frames.return_value = n_frames
         organizer.LongRecording = mock_recording
 
-        # Should return ceil(5500 / 1000) = 6 fragments
-        num_fragments = organizer.get_num_fragments(fragment_len_s=1.0)
-        assert num_fragments == 6
+        assert organizer.get_num_fragments(fragment_len_s=1.0) == expected
 
     def test_fragidx_to_startendind(self, temp_dir):
         """Test __fragidx_to_startendind method."""
@@ -100,9 +127,7 @@ class TestLongRecordingOrganizer:
 
         # Mock LongRecording
         mock_recording = Mock()
-        mock_recording.time_to_sample_index.return_value = (
-            1000  # 1 second = 1000 samples
-        )
+        mock_recording.get_sampling_frequency.return_value = 1000.0  # 1 second = 1000 samples
         mock_recording.get_num_frames.return_value = 3500  # Total frames
         organizer.LongRecording = mock_recording
 
@@ -116,10 +141,16 @@ class TestLongRecordingOrganizer:
         assert start == 1000
         assert end == 2000
 
-        # Test last fragment (should be capped at total frames)
-        start, end = organizer._LongRecordingOrganizer__fragidx_to_startendind(1.0, 3)
-        assert start == 3000
-        assert end == 3500  # Capped at total frames
+        # The last complete window
+        start, end = organizer._LongRecordingOrganizer__fragidx_to_startendind(1.0, 2)
+        assert (start, end) == (2000, 3000)
+
+        # The 500 samples after it are not a window. They used to come back as one, capped at
+        # the total frames.
+        with pytest.raises(IndexError, match="not one of the 3 complete windows"):
+            organizer._LongRecordingOrganizer__fragidx_to_startendind(1.0, 3)
+        with pytest.raises(IndexError):
+            organizer._LongRecordingOrganizer__fragidx_to_startendind(1.0, -1)
 
     def test_get_fragment(self, temp_dir):
         """Test get_fragment method."""
@@ -127,7 +158,7 @@ class TestLongRecordingOrganizer:
 
         # Mock LongRecording
         mock_recording = Mock()
-        mock_recording.time_to_sample_index.return_value = 1000
+        mock_recording.get_sampling_frequency.return_value = 1000.0
         mock_recording.get_num_frames.return_value = 5000
         mock_fragment = Mock()
         mock_recording.frame_slice.return_value = mock_fragment
@@ -145,7 +176,7 @@ class TestLongRecordingOrganizer:
 
         # Mock LongRecording
         mock_recording = Mock()
-        mock_recording.time_to_sample_index.return_value = 1000
+        mock_recording.get_sampling_frequency.return_value = 1000.0
         mock_recording.get_num_frames.return_value = 5000
         mock_recording.sample_index_to_time.side_effect = lambda x: x / 1000.0
         organizer.LongRecording = mock_recording

@@ -135,8 +135,11 @@ class AnimalAnalyzer:
             exclude (list[str], optional): List of features to ignore. Will override the features parameter. Defaults to [].
             window_s (int, optional): Length of each window in seconds. Note that some features break with very short window times. Defaults to 5.
             multiprocess_mode (Literal["dask", "serial"], optional): Whether to compute windows in parallel with Dask, one task per window, or serially.
-                Process-level parallelism requires an active ``dask.distributed`` Client. The Dask path drops the last fragment unconditionally, even when it is a
-                full window, so it yields one fewer window than "serial". Defaults to "serial".
+                Process-level parallelism requires an active ``dask.distributed`` Client. Both modes analyse the same windows, the complete
+                windows of each recording, floor(samples / window). The samples after the last complete window are logged and not analysed,
+                and a recording shorter than one window gives no rows and a warning. Before, the Dask path dropped the last window
+                unconditionally, so it gave one window fewer than "serial" when a recording was an exact multiple of the window length, and
+                "serial" kept a partial last window whose PSD it interpolated. Defaults to "serial".
             suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps in resulting WindowAnalysisResult. Useful for aggregated WARs. Defaults to False.
             apply_notch_filter (bool, optional): Whether to apply notch filtering to remove line noise. Uses constants.LINE_FREQ. Defaults to True.
             chunk_duration_s (float, optional): Duration in seconds of data to hold
@@ -162,6 +165,7 @@ class AnimalAnalyzer:
 
         Raises:
             AttributeError: If a feature's ``compute_...()`` function was not implemented, this error will be raised.
+            ValueError: If no recording of the animal is as long as one window.
 
         Returns:
             WindowAnalysisResult: A WindowAnalysisResult object containing extracted features for all recordings
@@ -176,21 +180,29 @@ class AnimalAnalyzer:
             lan = LongRecordingAnalyzer(
                 lrec, fragment_len_s=window_s, apply_notch_filter=apply_notch_filter
             )
+            # Both modes analyse the same complete windows, cut at this sample count.
+            n_samples_per_frag = lrec.get_fragment_num_samples(window_s)
+            n_leftover = lrec.LongRecording.get_num_frames() - lan.n_fragments * n_samples_per_frag
             if lan.n_fragments == 0:
                 logging.warning(
-                    f"No fragments found for {lrec.display_name}. Skipping."
+                    f"{lrec.display_name} has {n_leftover} samples, fewer than one {window_s} s "
+                    f"window of {n_samples_per_frag}, so it gives no rows."
                 )
                 continue
+            if n_leftover:
+                logging.info(
+                    f"{lrec.display_name}: {lan.n_fragments} windows of {window_s} s. The last "
+                    f"{n_leftover} samples ({n_leftover / lan.f_s:.3f} s) are less than a window "
+                    f"and are not analysed."
+                )
 
             logging.debug(f"Processing {lan.n_fragments} fragments")
             miniters = int(lan.n_fragments / 100)
             match multiprocess_mode:
                 case "dask":
-                    # The last fragment is not included because it makes the dask array ragged
                     logging.debug("Converting LongRecording to numpy array")
 
-                    n_fragments_war = max(lan.n_fragments - 1, 1)
-                    n_samples_per_frag = int(window_s * lan.f_s)
+                    n_fragments_war = lan.n_fragments
 
                     # Apply notch filter once to the entire recording (lazy SI wrapper)
                     rec = lrec.LongRecording
@@ -293,6 +305,11 @@ class AnimalAnalyzer:
             self.long_analyzers.append(lan)
             dataframes.append(lan_df)
 
+        if not dataframes:
+            raise ValueError(
+                f"No recording of {self.ao.animal_id} is as long as one {window_s} s window, so "
+                f"there is no window to analyse."
+            )
         self.features_df = pd.concat(dataframes)
 
         # Collect LOF scores from long recordings

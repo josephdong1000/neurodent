@@ -38,6 +38,7 @@ class TestLongRecordingAnalyzer:
         """Create a mock LongRecordingOrganizer for testing."""
         mock = MagicMock(spec=LongRecordingOrganizer)
         mock.get_num_fragments.return_value = 10
+        mock.get_fragment_num_samples.return_value = 10000  # 10 s windows at 1000 Hz
         mock.channel_names = ["ch1", "ch2", "ch3", "ch4", "ch5", "ch6", "ch7", "ch8"]
         # Add a mock meta object
         mock.meta = MagicMock()
@@ -722,10 +723,13 @@ class TestLongRecordingAnalyzer:
     def test_convert_idx_to_timebound(self, analyzer):
         """Test index to time boundary conversion - verify actual implementation logic."""
         # Test implementation: convert_idx_to_timebound(index)
-        # frag_len_idx = round(fragment_len_s * f_s) = round(10 * 1000) = 10000
+        # frag_len_idx = LongRecording.get_fragment_num_samples(fragment_len_s) = 10000
         # startidx = frag_len_idx * index
-        # endidx = min(frag_len_idx * (index + 1), get_num_frames())
+        # endidx = frag_len_idx * (index + 1), every window being complete
         # return (startidx / f_s, endidx / f_s)
+        analyzer.LongRecording.get_fragment_num_samples.assert_not_called()
+        analyzer.convert_idx_to_timebound(0)
+        analyzer.LongRecording.get_fragment_num_samples.assert_called_with(analyzer.fragment_len_s)
 
         # Test parameters from fixture: fragment_len_s=10, f_s=1000, get_num_frames()=100000
         expected_frag_len_idx = round(analyzer.fragment_len_s * analyzer.f_s)
