@@ -20,7 +20,7 @@ rule diagnostic_figures_unfiltered:
         animal_folder=get_animal_folder,
         animal_id=get_animal_id,
         samples_config=samples_config,
-        config=config,
+        config=analysis_config(config),
     threads: config["cluster"]["diagnostic_figures"]["threads"]
     retries:
         config["cluster"]["diagnostic_figures"]["retries"]
@@ -48,7 +48,7 @@ rule diagnostic_figures_filtered:
         animal_folder=get_animal_folder,
         animal_id=get_animal_id,
         samples_config=samples_config,
-        config=config,
+        config=analysis_config(config),
     threads: config["cluster"]["diagnostic_figures"]["threads"]
     retries:
         config["cluster"]["diagnostic_figures"]["retries"]

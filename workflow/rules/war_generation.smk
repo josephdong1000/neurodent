@@ -26,7 +26,7 @@ rule war_generation:
         animal_id=get_animal_id,
         is_split_recording=lambda wc: get_joint_session_channels(wc) is not None,
         channel_subset=get_joint_session_channels,  # None for regular animals, list for joint sessions
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
     threads: config["cluster"]["war_generation"]["threads"]
     retries:

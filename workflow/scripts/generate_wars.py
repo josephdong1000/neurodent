@@ -24,7 +24,12 @@ from neurodent.workflow.utils import load_animal_recordings
 
 
 def load_samples_and_config():
-    """Load sample configuration and pipeline config"""
+    """Load the samples config and the analysis config from the rule's params.
+
+    ``config`` is the rule's analysis config, without the execution-only keys (see
+    ``neurodent.workflow.utils.analysis_config``). The scratch directory and the Dask settings
+    are read from ``snakemake.config`` where they are used.
+    """
     # Get parameters from Snakemake
     samples_config = snakemake.params.samples_config
     config = snakemake.params.config
@@ -39,12 +44,16 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
     """Generate WAR for a specific animal, aggregating across multiple folders/sessions.
     
     Args:
+        config: The rule's analysis config. The scratch directory (``temp_directory``) and the
+            Dask interface (``cluster.war_generation.interface``) are read from
+            ``snakemake.config`` instead, because the analysis config leaves them out so that
+            changing them does not rerun the job.
         animal_folders: List of (folder_path, source_animal_id, session_key) tuples.
         channel_subset: Global channel subset for this animal if it is part of a joint session.
     """
 
     # Set temp directory
-    core.utils.set_temp_directory(config["temp_directory"])
+    core.utils.set_temp_directory(snakemake.config["temp_directory"])
 
     # Set aliases
     apply_samples_config(samples_config)
@@ -57,7 +66,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             LocalCluster(
                 n_workers=snakemake.threads,
                 threads_per_worker=1,
-                interface=config["cluster"]["war_generation"]["interface"],
+                interface=snakemake.config["cluster"]["war_generation"]["interface"],
             ) as cluster,
             Client(cluster) as client,
         ):

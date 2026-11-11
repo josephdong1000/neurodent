@@ -31,7 +31,7 @@ checkpoint war_flattening:
     retries:
         config["cluster"]["war_flattening"]["retries"]
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
     resources:
         time=config["cluster"]["war_flattening"]["time"],
@@ -58,7 +58,7 @@ rule war_flattening_manual:
     retries:
         config["cluster"]["war_flattening"]["retries"]
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
     resources:
         time=config["cluster"]["war_flattening"]["time"],
@@ -85,7 +85,7 @@ rule war_flattening_lof:
     retries:
         config["cluster"]["war_flattening"]["retries"]
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
     resources:
         time=config["cluster"]["war_flattening"]["time"],

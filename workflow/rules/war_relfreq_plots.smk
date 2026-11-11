@@ -30,7 +30,7 @@ rule war_relfreq_plots:
         figure_dir=directory("results/relfreq_plots/"),
         data_dir=directory("results/relfreq_plot_data/"),
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
     threads:
         config["cluster"]["relfreq_plots"]["threads"]

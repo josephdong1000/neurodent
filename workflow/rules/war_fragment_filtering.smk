@@ -23,7 +23,7 @@ checkpoint war_fragment_filtering:
     retries:
         config["cluster"]["war_fragment_filter"]["retries"]
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
         animal_folder=get_animal_folder,
         animal_id=get_animal_id,

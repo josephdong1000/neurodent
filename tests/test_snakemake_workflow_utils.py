@@ -1,10 +1,18 @@
 """Tests for Snakemake workflow utility functions.
 
-Tests the deep_merge_dict function used in Snakefile for dataset configuration merging.
+Tests the deep_merge_dict function used in Snakefile for dataset configuration merging, and
+analysis_config, the copy of the config that every rule passes to its job as a param.
 """
 
+import copy
+from pathlib import Path
+
 import pytest
-from neurodent.workflow.utils import deep_merge_dict
+from neurodent.workflow.utils import analysis_config, deep_merge_dict
+from neurodent.workflow.utils.config import EXECUTION_ONLY_KEYS, load_dataset_config
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DATASETS = sorted(p.stem for p in (REPO_ROOT / "config" / "datasets").glob("*.yaml"))
 
 
 class TestDeepMergeDict:
@@ -242,3 +250,74 @@ class TestTruncateAnimalsSlicing:
         assert result == ["a", "b", "c"]
         # Ensure existing samples keys are preserved
         assert merged["samples"]["quality_filter"]["exclude_unknown_genotypes"] is True
+
+
+class TestAnalysisConfig:
+    """analysis_config leaves out what decides how and where a job runs.
+
+    Snakemake compares each job's params by their repr, so a key in the analysis config that
+    only sizes or places the job would rerun every job whenever it changed.
+    """
+
+    @staticmethod
+    def _config():
+        return {
+            "active_dataset": "sox5_bin",
+            "temp_directory": "/scratch/user",
+            "samples": {"truncate_animals": None},
+            "analysis": {"zeitgeber": {"features": ["logrms"]}},
+            "cluster": {"war_generation": {"time": "12h", "mem_mb": 80_000}},
+            "samples_data": {"animals": [{"id": "A1"}]},
+        }
+
+    def test_leaves_out_the_execution_only_keys(self):
+        result = analysis_config(self._config())
+        assert set(EXECUTION_ONLY_KEYS) == {"cluster", "temp_directory", "active_dataset"}
+        assert not set(EXECUTION_ONLY_KEYS) & set(result)
+
+    def test_keeps_every_other_key_in_its_order(self):
+        config = self._config()
+        result = analysis_config(config)
+        assert list(result) == [key for key in config if key not in EXECUTION_ONLY_KEYS]
+        assert result == {key: config[key] for key in result}
+
+    def test_is_a_copy(self):
+        config = self._config()
+        before = copy.deepcopy(config)
+        result = analysis_config(config)
+        result["analysis"]["zeitgeber"]["features"].append("lognspike")
+        assert config == before
+
+    def test_a_config_without_execution_keys_passes_through(self):
+        config = {"analysis": {"a": 1}}
+        assert analysis_config(config) == config
+
+    @pytest.mark.parametrize("dataset", DATASETS)
+    def test_editing_job_sizes_does_not_change_a_jobs_params(self, dataset, tmp_path):
+        config = load_dataset_config(
+            dataset,
+            config_path=REPO_ROOT / "config" / "config.yaml",
+            local_path=tmp_path / "no_local_override.yaml",
+            datasets_dir=REPO_ROOT / "config" / "datasets",
+        )
+        edited = copy.deepcopy(config)
+        for block in edited["cluster"].values():
+            block["mem_mb"] = 2 * block["mem_mb"]
+            block["time"] = "48h"
+        edited["temp_directory"] = "/somewhere/else"
+        edited["active_dataset"] = "another_dataset"
+
+        assert repr(analysis_config(edited)) == repr(analysis_config(config))
+
+    @pytest.mark.parametrize("dataset", DATASETS)
+    def test_editing_an_analysis_setting_still_changes_them(self, dataset, tmp_path):
+        config = load_dataset_config(
+            dataset,
+            config_path=REPO_ROOT / "config" / "config.yaml",
+            local_path=tmp_path / "no_local_override.yaml",
+            datasets_dir=REPO_ROOT / "config" / "datasets",
+        )
+        edited = copy.deepcopy(config)
+        edited["analysis"]["fragment_filter_config"]["high_rms"]["max_rms"] += 1
+
+        assert repr(analysis_config(edited)) != repr(analysis_config(config))

@@ -32,7 +32,7 @@ rule war_zeitgeber:
     retries:
         config["cluster"]["war_zeitgeber"]["retries"]
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
     resources:
         time=one_war_at_a_time_time(config["cluster"]["war_zeitgeber"]),

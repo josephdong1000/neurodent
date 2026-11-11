@@ -20,7 +20,10 @@ def generate_wars(monkeypatch):
     spec = importlib.util.spec_from_file_location("generate_wars_under_test", SCRIPT)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)  # main() is guarded by __name__, so nothing runs
-    module.snakemake = SimpleNamespace(threads=1)
+    module.snakemake = SimpleNamespace(
+        threads=1,
+        config={"temp_directory": "/unused", "cluster": {"war_generation": {"interface": None}}},
+    )
     monkeypatch.setattr(module.core.utils, "set_temp_directory", lambda *_: None)
     monkeypatch.setattr(module, "apply_samples_config", lambda *_: None)
     return module
@@ -34,11 +37,10 @@ def test_cluster_startup_failure_is_reported_as_itself(generate_wars, monkeypatc
         raise StartupFailure("no free port for the scheduler")
 
     monkeypatch.setattr(generate_wars, "LocalCluster", failing_cluster)
-    config = {"temp_directory": "/unused", "cluster": {"war_generation": {"interface": None}}}
 
     with pytest.raises(StartupFailure, match="no free port"):
         generate_wars.generate_war_for_animal(
-            samples_config={}, config=config, animal_folders=[("", "A1", "")],
+            samples_config={}, config={}, animal_folders=[("", "A1", "")],
             animal_id="A1", channel_subset=None,
             logger=SimpleNamespace(info=lambda *_: None, error=lambda *_: None),
         )

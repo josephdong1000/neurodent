@@ -18,7 +18,7 @@ rule zeitgeber_plots:
         figure_dir=directory("results/zeitgeber_plots/"),
         data_dir=directory("results/zeitgeber_plot_data/"),
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
     threads:
         config["cluster"]["zeitgeber_plots"]["threads"]

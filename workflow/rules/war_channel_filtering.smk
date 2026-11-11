@@ -31,7 +31,7 @@ rule war_channel_filtering_manual:
     retries:
         config["cluster"]["war_channel_filtering"]["retries"]
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
         animal_folder=get_animal_folder,
         animal_id=get_animal_id,
@@ -61,7 +61,7 @@ rule war_channel_filtering_lof:
     retries:
         config["cluster"]["war_channel_filtering"]["retries"]
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
         animal_folder=get_animal_folder,
         animal_id=get_animal_id,

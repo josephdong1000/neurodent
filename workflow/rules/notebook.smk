@@ -27,8 +27,7 @@ rule notebook:
     retries:
         config["cluster"]["notebook"]["retries"]
     params:
-        # Pass configuration for resource allocation
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
     resources:
         time=config["cluster"]["notebook"]["time"],

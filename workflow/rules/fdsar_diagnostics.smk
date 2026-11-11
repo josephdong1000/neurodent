@@ -25,7 +25,7 @@ rule fdsar_diagnostics:
     output:
         diagnostics_dir=directory("results/fdsar_diagnostics/{animal}"),
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
         fdsar_dir="results/fdsars/{animal}",
     threads: config["cluster"]["spike_averaged_traces"]["threads"]

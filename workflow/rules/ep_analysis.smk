@@ -19,7 +19,7 @@ rule ep_figures:
         figure_dir=directory("results/ep_figures/"),
         data_dir=directory("results/ep_data/"),
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
     threads:
         config["cluster"]["ep_figures"]["threads"]
@@ -49,7 +49,7 @@ rule ep_heatmaps:
         heatmap_dir=directory("results/ep_heatmaps/"),
         heatmap_data_dir=directory("results/ep_heatmap_data/"),
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
     threads:
         config["cluster"]["ep_heatmaps"]["threads"]

@@ -382,8 +382,3 @@ cluster:
     threads: 4
     interface: null
     retries: 0
-
-# Logging configuration
-logging:
-  level: "DEBUG"
-  format: "%(asctime)s - %(levelname)s - %(message)s"

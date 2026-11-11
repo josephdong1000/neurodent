@@ -19,7 +19,7 @@ rule filtering_comparison:
         comparison_dir=directory("results/filtering_comparison_plots/"),
         comparison_data=directory("results/filtering_comparison_data/"),
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
     threads: config["cluster"]["filtering_comparison"]["threads"]
     retries:
