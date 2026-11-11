@@ -916,8 +916,9 @@ class TestWindowAnalysisResultFiltering:
 
     def test_filter_reject_channels_by_session(self, filtering_war):
         """Test rejecting channels by recording session."""
-        # Use the bad_channels_dict from fixture
-        filtered = filtering_war.filter_reject_channels_by_session()
+        filtered = filtering_war.filter_reject_channels_by_session(
+            {"A1_20230101": ["LMot"], "A1_20230102": ["RMot"]}
+        )
 
         assert isinstance(filtered, WindowAnalysisResult)
 
@@ -959,7 +960,8 @@ class TestWindowAnalysisResultFiltering:
             mock_high_rms.assert_called_once_with(max_rms=500)
             mock_low_rms.assert_called_once_with(min_rms=50)
             mock_high_beta.assert_called_once_with(max_beta_prop=0.4)
-            mock_reject_session.assert_called_once_with()
+            # The stored bad_channels_dict is no longer masked by default
+            mock_reject_session.assert_not_called()
 
             assert isinstance(filtered, WindowAnalysisResult)
 
@@ -1032,7 +1034,7 @@ class TestWindowAnalysisResultFiltering:
             ("filter_low_rms", {"min_rms": 50}),
             ("filter_high_beta", {"max_beta_prop": 0.4}),
             ("filter_reject_channels", {"bad_channels": ["LMot"]}),
-            ("filter_reject_channels_by_session", {}),
+            ("filter_reject_channels_by_session", {"bad_channels_dict": {"A1_20230101": ["LMot"], "A1_20230102": []}}),
         ]
 
         for method_name, params in methods_and_params:
@@ -1091,8 +1093,8 @@ class TestWindowAnalysisResultFiltering:
             result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"], bad_channels_dict={}
         )
 
-        # Empty bad_channels_dict should mean "no bad channels" and not raise an error
-        filtered = war.filter_reject_channels_by_session()
+        # An empty bad_channels_dict means "no bad channels" and does not raise
+        filtered = war.filter_reject_channels_by_session({})
 
         # Should return a new instance with no filtering applied (all data preserved)
         assert isinstance(filtered, WindowAnalysisResult)
@@ -1128,8 +1130,8 @@ class TestWindowAnalysisResultFiltering:
         assert "A1_20230102" in war.bad_channels_dict
         assert war.bad_channels_dict["A1_20230102"] == []
 
-        # filter_reject_channels_by_session should work without error
-        result = war.filter_reject_channels_by_session()
+        # filter_reject_channels_by_session works with the populated dict
+        result = war.filter_reject_channels_by_session(war.bad_channels_dict)
         assert result is not None
 
     def test_edge_case_no_duration_column(self):

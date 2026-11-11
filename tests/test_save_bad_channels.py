@@ -154,9 +154,16 @@ class TestSaveBadChannels:
 
     @staticmethod
     def _channel_filter_config(bad_channels, save_bad_channels):
-        """Just the channel-rejection filters, so tests don't need rms/psd data."""
+        """Just the channel-rejection filters, so tests don't need rms/psd data.
+
+        The session filter is given the same channels the fixture stores; it no longer falls
+        back to the stored dict.
+        """
         return {
-            "reject_channels_by_session": {"save_bad_channels": save_bad_channels},
+            "reject_channels_by_session": {
+                "bad_channels_dict": {"A1_20230101": ["LMot"], "A1_20230102": ["RMot"]},
+                "save_bad_channels": save_bad_channels,
+            },
             "reject_channels": {
                 "bad_channels": bad_channels,
                 "save_bad_channels": save_bad_channels,

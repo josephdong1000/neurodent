@@ -156,7 +156,8 @@ class WARFilterMixin:
         Args:
             bad_channels_dict (dict[str, list[str]]): Dictionary of list of channels to reject for each recording session.
                 Can be either full channel names or abbreviations. The method will automatically detect which format is being used.
-                If None, the method will use the bad_channels_dict passed to the constructor.
+                Required: only the channels given here are masked, and None raises. None used to mean the WAR's stored
+                bad_channels_dict, which held LOF's picks from WAR generation, while the streaming filter masked nothing.
             use_abbrevs (bool, optional): Override automatic detection. If True, channels are assumed to be channel abbreviations. If False, channels are assumed to be channel names.
                 If None, channels are parsed to abbreviations and matched against self.channel_abbrevs.
             save_bad_channels (Literal["overwrite", "union", None], optional): How to save bad channels to self.bad_channels_dict.
@@ -168,9 +169,10 @@ class WARFilterMixin:
 
         Returns:
             np.ndarray: Boolean array of shape (M fragments, N channels). True = keep window, False = remove window
+
+        Raises:
+            ValueError: If no bad_channels_dict is given.
         """
-        if bad_channels_dict is None:
-            bad_channels_dict = self.bad_channels_dict.copy()
         channel_info = self._channel_info()
         mask = FILTER_REGISTRY["reject_channels_by_session"].apply(
             self.result,
@@ -226,6 +228,12 @@ class WARFilterMixin:
     ) -> "WindowAnalysisResult":
         """Apply the default filter suite. Thin wrapper around :meth:`apply_filters`.
 
+        The suite is logrms_range, high_rms, low_rms and high_beta, plus reject_channels when
+        ``bad_channels`` is given. It used to also reject the channels of the WAR's stored
+        ``bad_channels_dict`` per session, which held LOF's picks from WAR generation. To
+        reject channels per session, pass a dict to :meth:`filter_reject_channels_by_session`
+        or to the reject_channels_by_session filter of :meth:`apply_filters`.
+
         Args:
             df: Deprecated; ignored (kept for signature backward compat).
             inplace: If True, mutate ``self.result`` with the filtered output.
@@ -236,7 +244,7 @@ class WARFilterMixin:
             morphological_smoothing_seconds: If provided, smooths the combined
                 mask along the time axis with this window in seconds.
             bad_channels: If provided, adds a ``reject_channels`` filter with this list.
-            save_bad_channels: How to merge into ``self.bad_channels_dict``.
+            save_bad_channels: How to merge ``bad_channels`` into ``self.bad_channels_dict``.
             **kwargs: Per-filter overrides — currently consumed:
                 ``z_range`` (default 3), ``max_rms`` (500), ``min_rms`` (50),
                 ``max_beta_prop`` (0.4).  Any other keys are silently ignored.
@@ -254,7 +262,6 @@ class WARFilterMixin:
             "high_rms":     {"max_rms": kwargs.pop("max_rms", 500)},
             "low_rms":      {"min_rms": kwargs.pop("min_rms", DEFAULT_MIN_RMS)},
             "high_beta":    {"max_beta_prop": kwargs.pop("max_beta_prop", 0.4)},
-            "reject_channels_by_session": {"save_bad_channels": save_bad_channels},
         }
         if bad_channels is not None:
             filter_config["reject_channels"] = {
@@ -364,11 +371,12 @@ class WARFilterMixin:
         """Filter out bad channels by recording session.
 
         Args:
-            bad_channels_dict (dict[str, list[str]], optional): Dictionary mapping recording session
+            bad_channels_dict (dict[str, list[str]]): Dictionary mapping recording session
                 identifiers to lists of bad channel names to reject. Session identifiers are in the
                 format "{animal_id} {genotype} {day}" (e.g., "A10 WT Apr-01-2023"). Channel names
                 can be either full names (e.g., "Left Auditory") or abbreviations (e.g., "LAud").
-                If None, uses the bad_channels_dict from the constructor. Defaults to None.
+                Required; pass {} to reject none. None raises; it used to mean the bad_channels_dict
+                from the constructor, which held LOF's picks from WAR generation.
             use_abbrevs (bool, optional): Override automatic channel name format detection. If True,
                 channels are assumed to be abbreviations. If False, channels are assumed to be full
                 names. If None, automatically detects format and converts to abbreviations for matching.
@@ -377,6 +385,9 @@ class WARFilterMixin:
         Returns:
             WindowAnalysisResult: New filtered instance with bad channels masked as NaN for their
                 respective recording sessions
+
+        Raises:
+            ValueError: If no bad_channels_dict is given.
 
         Examples:
             Filter specific channels per session using abbreviations:
@@ -423,12 +434,21 @@ class WARFilterMixin:
         Args:
             filter_config (dict, optional): Dictionary of filter names and parameters.
                 Available filters: 'logrms_range', 'high_rms', 'low_rms', 'high_beta',
-                'reject_channels', 'reject_channels_by_session', 'morphological_smoothing'
+                'reject_channels', 'reject_channels_by_session', 'morphological_smoothing'.
+                'reject_channels_by_session' needs a ``bad_channels_dict`` and masks only
+                those channels. Defaults to logrms_range, high_rms, low_rms and high_beta. The
+                default used to include 'reject_channels_by_session' with no dict, which masked
+                the WAR's stored bad_channels_dict here and nothing in
+                ``LazyWindowAnalysisResult.apply_filters``.
             min_valid_channels (int): Minimum valid channels per window. Defaults to 3.
             morphological_smoothing_seconds (float, optional): Temporal smoothing window (deprecated, use config instead)
 
         Returns:
             WindowAnalysisResult: New filtered instance
+
+        Raises:
+            ValueError: For an unknown filter, or 'reject_channels_by_session' with no
+                ``bad_channels_dict``.
 
         Examples:
             >>> config = {
@@ -445,7 +465,6 @@ class WARFilterMixin:
                 "high_rms": {"max_rms": 500},
                 "low_rms": {"min_rms": DEFAULT_MIN_RMS},
                 "high_beta": {"max_beta_prop": 0.4},
-                "reject_channels_by_session": {},
             }
 
         # Translate the legacy morphological_smoothing_seconds kwarg into the registry-driven form.

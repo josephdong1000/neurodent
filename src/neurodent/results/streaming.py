@@ -45,6 +45,7 @@ from .filters import (
     ChannelInfo,
     FilterScope,
     compute_filter_mask,
+    require_bad_channels_dict,
     update_bad_channels_dict_from_config,
 )
 
@@ -260,6 +261,10 @@ class ApplyFilters(Transform):
         # animalday is required for the bad_channels_dict bookkeeping after either reject_channels* filter.
         if "reject_channels" in self.filter_config or "reject_channels_by_session" in self.filter_config:
             cols.add("animalday")
+        if "reject_channels_by_session" in self.filter_config:
+            require_bad_channels_dict(
+                (self.filter_config["reject_channels_by_session"] or {}).get("bad_channels_dict")
+            )
         self.required_columns_pass1 = tuple(sorted(cols))
         self._mask: np.ndarray | None = None
         self._row_offset = 0
@@ -551,13 +556,28 @@ class LazyWindowAnalysisResult:
     def apply_filters(
         self, filter_config: dict | None = None, min_valid_channels: int = 3
     ) -> "LazyWindowAnalysisResult":
+        """Record the filters of :meth:`WindowAnalysisResult.apply_filters`, which agree with it.
+
+        Args:
+            filter_config (dict, optional): Filter names and parameters, as for the eager
+                method. Defaults to logrms_range, high_rms, low_rms and high_beta. The default
+                used to include reject_channels_by_session with no dict, which masked nothing
+                here and the stored bad_channels_dict in the eager method.
+            min_valid_channels (int): Minimum valid channels per window. Defaults to 3.
+
+        Returns:
+            LazyWindowAnalysisResult: self, for chaining.
+
+        Raises:
+            ValueError: For an unknown filter, or reject_channels_by_session with no
+                ``bad_channels_dict``, here rather than when the chain runs.
+        """
         if filter_config is None:
             filter_config = {
                 "logrms_range": {"z_range": 3},
                 "high_rms": {"max_rms": 500},
                 "low_rms": {"min_rms": DEFAULT_MIN_RMS},
                 "high_beta": {"max_beta_prop": 0.4},
-                "reject_channels_by_session": {},
             }
         self._pending.append(ApplyFilters(filter_config, min_valid_channels))
         return self
