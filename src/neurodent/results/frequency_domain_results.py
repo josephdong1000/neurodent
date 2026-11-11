@@ -31,6 +31,96 @@ if TYPE_CHECKING:
 from neurodent.core.utils import resolve_channels, slugify
 
 
+SPIKE_ANNOTATION_PREFIX = "Spike_Ch"
+"""Spike annotations are named ``Spike_Ch{i}``, i being the index of the spike's channel."""
+
+
+def write_spike_annotations(raw: mne.io.BaseRaw, spike_indices_per_channel) -> mne.io.BaseRaw:
+    """Mark every detected spike on ``raw`` as an annotation, replacing its annotations.
+
+    Each spike becomes a zero-length annotation named ``Spike_Ch{i}``, i being the index of
+    its channel in ``spike_indices_per_channel``, with onset ``index / sfreq`` seconds from
+    the first sample, so it falls on the detected sample. This is the only writer of spike
+    annotations; :func:`read_spike_annotations` reads them back. Onsets used to be written
+    at ``(index + 1) / sfreq``, one sample late, and :meth:`FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne`
+    wrote a second kind, named after the channel, which the export then replaced.
+
+    Args:
+        raw (mne.io.BaseRaw): The recording the spikes were detected in.
+        spike_indices_per_channel (list[np.ndarray]): 0-based sample indices of the spikes
+            on each channel.
+
+    Returns:
+        mne.io.BaseRaw: ``raw``, annotated in place.
+
+    Raises:
+        ValueError: If an index is outside the recording.
+    """
+    sfreq = raw.info["sfreq"]
+    onsets, names = [], []
+    for ch_idx, indices in enumerate(spike_indices_per_channel):
+        indices = np.asarray(indices, dtype=np.int64)
+        if indices.size and (indices.min() < 0 or indices.max() >= raw.n_times):
+            raise ValueError(
+                f"Spike indices of channel {ch_idx} run from {indices.min()} to {indices.max()}, "
+                f"outside the recording's {raw.n_times} samples"
+            )
+        onsets.append(indices / sfreq)
+        names.extend([f"{SPIKE_ANNOTATION_PREFIX}{ch_idx}"] * indices.size)
+    onsets = np.concatenate(onsets) if onsets else np.array([], dtype=float)
+    order = np.argsort(onsets, kind="stable")
+    raw.set_annotations(
+        mne.Annotations(
+            onset=onsets[order],
+            duration=np.zeros(len(order)),
+            description=np.asarray(names, dtype=str)[order],
+        )
+    )
+    return raw
+
+
+def read_spike_annotations(raw: mne.io.BaseRaw) -> list[np.ndarray]:
+    """The sample index of each spike annotation on ``raw``, one sorted array per channel.
+
+    Reads the ``Spike_Ch{i}`` annotations that :func:`write_spike_annotations` writes.
+    Indices are 0-based, counted from the first sample of ``raw``, and onsets are rounded to
+    the nearest sample. Annotations written before onsets moved to the detected sample give
+    indices one sample late. A FIF stores onsets as float32, which rounds them to several
+    samples in long recordings (to 8 ms past 18 hours), so a saved result's exact indices
+    come from its JSON sidecar instead (see ``load_fif_and_json``).
+
+    Args:
+        raw (mne.io.BaseRaw): A recording with spike annotations.
+
+    Returns:
+        list[np.ndarray]: One int64 array of sample indices per channel of ``raw``.
+
+    Raises:
+        ValueError: If an annotation names a channel index that ``raw`` does not have.
+    """
+    n_channels = len(raw.ch_names)
+    annotations = raw.annotations
+    onsets_per_channel = [[] for _ in range(n_channels)]
+    for onset, description in zip(annotations.onset, annotations.description):
+        if not description.startswith(SPIKE_ANNOTATION_PREFIX):
+            continue
+        ch_idx = int(description[len(SPIKE_ANNOTATION_PREFIX):])
+        if not 0 <= ch_idx < n_channels:
+            raise ValueError(
+                f"Spike annotation {description!r} names a channel the recording's "
+                f"{n_channels} channels do not include"
+            )
+        onsets_per_channel[ch_idx].append(onset)
+    return [
+        np.sort(
+            raw.time_as_index(onsets, use_rounding=True, origin=annotations.orig_time).astype(np.int64)
+        )
+        if onsets
+        else np.array([], dtype=np.int64)
+        for onsets in onsets_per_channel
+    ]
+
+
 class FrequencyDomainSpikeAnalysisResult:
     """
     Wrapper for frequency-domain spike detection results.
@@ -253,18 +343,14 @@ class FrequencyDomainSpikeAnalysisResult:
                 Defaults to "serial".
 
         Returns:
-            mne.io.RawArray: MNE RawArray with spike annotations
+            mne.io.RawArray: MNE RawArray with spike annotations, written by
+            :func:`write_spike_annotations` on the detected samples. They used to be
+            written one sample late.
         """
         if self.result_mne is None:
             if self.result_sas:
                 result_mne = FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(
                     self.result_sas, chunk_duration_s, multiprocess_mode=multiprocess_mode,
-                )
-                from neurodent.analysis import (
-                    FrequencyDomainSpikeDetector,
-                )
-                FrequencyDomainSpikeDetector._add_spike_annotations(
-                    result_mne, self.spike_indices, result_mne.info['sfreq']
                 )
                 if save_raw:
                     self.result_mne = result_mne
@@ -394,7 +480,7 @@ class FrequencyDomainSpikeAnalysisResult:
         result_mne = mne.io.read_raw_fif(fif_path, preload=False)
 
         # Extract spike indices from MNE annotations
-        spike_indices = cls._extract_spike_indices_from_mne(result_mne)
+        spike_indices = read_spike_annotations(result_mne)
 
         # Fix detection params: convert lists back to tuples for specific parameters
         detection_params = data.get("detection_params", {})
@@ -517,32 +603,6 @@ class FrequencyDomainSpikeAnalysisResult:
 
         return event_counts
 
-    @staticmethod
-    def _extract_spike_indices_from_mne(mne_raw: mne.io.RawArray) -> list[np.ndarray]:
-        """
-        Extract spike sample indices from MNE annotations.
-
-        Args:
-            mne_raw: MNE RawArray with spike annotations
-
-        Returns:
-            list[np.ndarray]: Spike indices per channel
-        """
-        events, event_id = mne.events_from_annotations(mne_raw)
-        spike_event_id = {k: v for k, v in event_id.items() if k.startswith("Spike_Ch")}
-
-        n_channels = len(mne_raw.ch_names)
-        spike_indices = [np.array([], dtype=int) for _ in range(n_channels)]
-
-        for event_name, code in spike_event_id.items():
-            ch_idx = int(event_name.split("_Ch")[-1])
-            if ch_idx < n_channels:
-                # Extract sample indices from events array (column 0)
-                channel_spike_samples = events[events[:, 2] == code, 0]
-                spike_indices[ch_idx] = channel_spike_samples
-
-        return spike_indices
-
     def get_spike_counts_per_channel(self) -> list[int]:
         """
         Get spike counts per channel.
@@ -554,7 +614,7 @@ class FrequencyDomainSpikeAnalysisResult:
             return [len(spikes) for spikes in self.spike_indices]
         elif self.result_mne:
             # Extract from MNE annotations if spike_indices not available
-            spike_indices = self._extract_spike_indices_from_mne(self.result_mne)
+            spike_indices = read_spike_annotations(self.result_mne)
             return [len(spikes) for spikes in spike_indices]
         else:
             return []
@@ -578,7 +638,9 @@ class FrequencyDomainSpikeAnalysisResult:
                 per-channel conversion. Defaults to "serial".
 
         Returns:
-            mne.io.RawArray: The converted RawArray, with spikes labeled as annotations
+            mne.io.RawArray: The converted RawArray, with each channel's spikes annotated by
+            :func:`write_spike_annotations` as ``Spike_Ch{i}``. The annotations used to be
+            named after the channel, a form nothing else wrote or read.
         """
         if len(sas) == 0:
             return None
@@ -615,28 +677,19 @@ class FrequencyDomainSpikeAnalysisResult:
         logging.debug(f"Channel names: {channel_names}")
         sfreq = sfreqs[0]
 
-        # Extract spike times for each unit and create annotations
-        onset = []
-        description = []
-        for sa in sas:
-            for unit_id in sa.sorting.get_unit_ids():
-                spike_train = sa.sorting.get_unit_spike_train(unit_id)
-                # Convert to seconds and filter to recording duration
-                spike_times = spike_train / sa.sorting.get_sampling_frequency()
-                mask = spike_times < sa.recording.get_duration()
-                spike_times = spike_times[mask]
-
-                # Create annotation for each spike
-                onset.extend(spike_times)
-                description.extend(
-                    [sa.recording.get_channel_ids().item()] * len(spike_times)
-                )  # collapse all units into 1 spike train
-        annotations = mne.Annotations(onset, duration=0, description=description)
+        # Each channel's spike train, all units collapsed into one
+        spike_indices_per_channel = [
+            np.sort(np.concatenate(
+                [np.asarray(sa.sorting.get_unit_spike_train(unit_id), dtype=np.int64)
+                 for unit_id in sa.sorting.get_unit_ids()]
+                or [np.array([], dtype=np.int64)]
+            ))
+            for sa in sas
+        ]
 
         info = mne.create_info(ch_names=channel_names, sfreq=sfreq, ch_types="eeg")
         raw = mne.io.RawArray(data=data, info=info)
-        raw = raw.set_annotations(annotations)
-        return raw
+        return write_spike_annotations(raw, spike_indices_per_channel)
 
     @staticmethod
     def convert_sa_to_np(

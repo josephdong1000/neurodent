@@ -20,7 +20,11 @@ except ImportError:
 
 import mne
 
-from neurodent.results.frequency_domain_results import FrequencyDomainSpikeAnalysisResult
+from neurodent.results.frequency_domain_results import (
+    FrequencyDomainSpikeAnalysisResult,
+    read_spike_annotations,
+    write_spike_annotations,
+)
 from neurodent import core
 
 
@@ -626,3 +630,96 @@ class TestFrequencyDomainSpikeAnalysisResultUtils:
             ]
 
             assert len(fdsar.channel_abbrevs) == 2
+
+
+def _raw(n_channels, n_samples, sfreq=1000.0):
+    info = mne.create_info(ch_names=[f"ch{i}" for i in range(n_channels)], sfreq=sfreq, ch_types="eeg")
+    return mne.io.RawArray(np.zeros((n_channels, n_samples)), info, verbose=False)
+
+
+# Spike indices per channel, with an empty channel and spikes on the first and last samples
+SPIKES_BY_SHAPE = {
+    (3, 5000): [np.array([0, 500, 1500, 3000]), np.array([800, 2200, 4999]), np.array([], dtype=int)],
+    (5, 1001): [np.array([1000]), np.array([], dtype=int), np.array([3, 4, 5]), np.array([1]), np.array([999])],
+}
+
+
+@pytest.mark.unit
+class TestSpikeAnnotations:
+    """write_spike_annotations and read_spike_annotations, the one writer and the one reader."""
+
+    @pytest.mark.parametrize("shape", list(SPIKES_BY_SHAPE))
+    def test_each_spike_is_written_on_its_sample(self, shape):
+        """Onsets are index / sfreq. They used to be (index + 1) / sfreq, one sample late."""
+        spikes = SPIKES_BY_SHAPE[shape]
+        raw = write_spike_annotations(_raw(*shape), spikes)
+
+        expected = sorted(
+            (index / 1000.0, f"Spike_Ch{ch}") for ch, indices in enumerate(spikes) for index in indices
+        )
+        assert list(zip(raw.annotations.onset, raw.annotations.description)) == expected
+        assert np.all(raw.annotations.duration == 0)
+
+    @pytest.mark.parametrize("shape", list(SPIKES_BY_SHAPE))
+    def test_read_gives_back_the_written_indices(self, shape):
+        spikes = SPIKES_BY_SHAPE[shape]
+        read = read_spike_annotations(write_spike_annotations(_raw(*shape), spikes))
+
+        assert len(read) == shape[0]
+        for got, want in zip(read, spikes):
+            np.testing.assert_array_equal(got, want)
+            assert got.dtype == np.int64
+
+    def test_round_trip_through_a_fif(self, tmp_path):
+        spikes = SPIKES_BY_SHAPE[(3, 5000)]
+        write_spike_annotations(_raw(3, 5000), spikes).save(tmp_path / "x-raw.fif", verbose=False)
+
+        read = read_spike_annotations(mne.io.read_raw_fif(tmp_path / "x-raw.fif", verbose=False))
+
+        for got, want in zip(read, spikes):
+            np.testing.assert_array_equal(got, want)
+
+    def test_writing_replaces_earlier_annotations(self):
+        raw = _raw(2, 1000)
+        raw.set_annotations(mne.Annotations([0.1], [0.0], ["ch0"]))
+
+        write_spike_annotations(raw, [np.array([], dtype=int), np.array([10])])
+
+        assert list(raw.annotations.description) == ["Spike_Ch1"]
+
+    def test_an_index_outside_the_recording_raises(self):
+        with pytest.raises(ValueError, match="outside the recording's 1000 samples"):
+            write_spike_annotations(_raw(2, 1000), [np.array([10]), np.array([1000])])
+
+    def test_an_annotation_for_a_missing_channel_raises(self):
+        raw = _raw(2, 1000)
+        raw.set_annotations(mne.Annotations([0.1], [0.0], ["Spike_Ch2"]))
+
+        with pytest.raises(ValueError, match="Spike_Ch2"):
+            read_spike_annotations(raw)
+
+    def test_other_annotations_are_not_read(self):
+        raw = _raw(2, 1000)
+        raw.set_annotations(mne.Annotations([0.1, 0.2], [0.0, 0.0], ["Spike_Ch1", "BAD_artifact"]))
+
+        read = read_spike_annotations(raw)
+
+        assert [r.tolist() for r in read] == [[], [100]]
+
+    @pytest.mark.parametrize("n_channels", [1, 3])
+    def test_convert_sas_to_mne_annotates_with_the_writer(self, n_channels):
+        """The export used to annotate spikes by channel name and then rewrite them as
+        Spike_Ch{i} one sample late; now there is one form, on the detected sample."""
+        rng = np.random.default_rng(3)
+        n_samples = 4000
+        trains = [np.sort(rng.choice(n_samples, size=5 + ch, replace=False)) for ch in range(n_channels)]
+        sas = [
+            _make_mock_sorting_analyzer(rng.standard_normal(n_samples), 1000.0, f"ch{ch}", train)
+            for ch, train in enumerate(trains)
+        ]
+
+        raw = FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(sas, multiprocess_mode="serial")
+
+        assert {d[: len("Spike_Ch")] for d in raw.annotations.description} == {"Spike_Ch"}
+        for got, want in zip(read_spike_annotations(raw), trains):
+            np.testing.assert_array_equal(got, want)
