@@ -165,8 +165,44 @@ class ReorderAndPadChannels(Transform):
         return metadata
 
 
+def rename_animalday(animalday: str, old_animal_id: str, new_animal_id: str) -> str:
+    """Give an animalday a new animal id in place of the one it starts with.
+
+    Animaldays are named ``{animal_id} {genotype} {day}``, so only the leading id changes.
+    :class:`AddUniqueHash` used to replace the id wherever it occurred in the name, so an id
+    that also occurs later in it, such as animal 1 in ``1 WT Jan-01-2021``, changed the day too.
+
+    Args:
+        animalday (str): The animalday to rename.
+        old_animal_id (str): The animal id it starts with.
+        new_animal_id (str): The animal id to put in its place.
+
+    Returns:
+        str: The renamed animalday.
+
+    Raises:
+        ValueError: If ``animalday`` does not start with ``old_animal_id``.
+    """
+    if not animalday.startswith(old_animal_id):
+        raise ValueError(
+            f"Animalday {animalday!r} does not start with the animal id {old_animal_id!r}"
+        )
+    return new_animal_id + animalday[len(old_animal_id):]
+
+
 class AddUniqueHash(Transform):
-    """Append a random hex suffix to ``animal_id`` (and rewrite ``animal`` / ``animalday`` cells)."""
+    """Append a random hex suffix to ``animal_id``, and rename what is named after it.
+
+    The ``animal`` cells take the new id, and the ``animalday`` cells and the keys of
+    ``bad_channels_dict`` and ``lof_scores_dict`` take it in place of the old one, through
+    :func:`rename_animalday`. The dict keys used to keep the old name, so every animalday
+    looked as if it had no entry and was given an empty one, with a warning each.
+    ``WindowAnalysisResult.add_unique_hash`` runs this transform too.
+
+    Args:
+        nbytes (int, optional): Random bytes in the suffix, passed to ``secrets.token_hex``,
+            which writes two hex characters per byte. None uses its default of 32 bytes.
+    """
 
     def __init__(self, nbytes: int | None = None):
         self.nbytes = nbytes
@@ -178,18 +214,25 @@ class AddUniqueHash(Transform):
         self.original_animal_id = ctx.metadata.get("animal_id", "") or ""
         self.new_animal_id = f"{self.original_animal_id}_{secrets.token_hex(self.nbytes)}"
 
+    def _rename(self, animalday):
+        # A WAR aggregated without animalday in its groupby has None there
+        if not isinstance(animalday, str):
+            return animalday
+        return rename_animalday(animalday, self.original_animal_id, self.new_animal_id)
+
     def apply(self, batch_df):
         if "animal" in batch_df.columns:
             batch_df["animal"] = self.new_animal_id
         if "animalday" in batch_df.columns:
-            batch_df["animalday"] = batch_df["animalday"].str.replace(
-                self.original_animal_id, self.new_animal_id
-            )
+            batch_df["animalday"] = batch_df["animalday"].map(self._rename)
         return batch_df
 
     def update_metadata(self, metadata):
         metadata = dict(metadata)
         metadata["animal_id"] = self.new_animal_id
+        for key in ("bad_channels_dict", "lof_scores_dict"):
+            if metadata.get(key):
+                metadata[key] = {self._rename(day): value for day, value in metadata[key].items()}
         return metadata
 
 

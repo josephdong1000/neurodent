@@ -118,6 +118,9 @@ class WindowAnalysisResult(
             they appear in the data). Defaults to None.
         bad_channels_dict (dict[str, list[str]], optional): Dictionary of channels to reject for each recording session. Defaults to {}.
         suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps. Useful for aggregated WARs with large window sizes. Defaults to False.
+        lof_scores_dict (dict[str, dict], optional): LOF scores and channel names for each recording session. Copied,
+            like bad_channels_dict. It used to be kept as given, so every WAR made without one shared the default dict,
+            and each added its own animaldays to it. Defaults to {}.
 
     Attributes:
         result (pd.DataFrame): DataFrame containing the windowed analysis results.
@@ -150,7 +153,7 @@ class WindowAnalysisResult(
         self.channel_names = channel_names
         self.bad_channels_dict = bad_channels_dict.copy()
         self.suppress_short_interval_error = suppress_short_interval_error
-        self.lof_scores_dict = lof_scores_dict
+        self.lof_scores_dict = lof_scores_dict.copy()
 
         self._update_instance_vars()
 
@@ -579,20 +582,40 @@ class WindowAnalysisResult(
     def add_unique_hash(self, nbytes: int | None = None):
         """Adds a hex hash to the animal ID to ensure uniqueness. This prevents collisions when, for example, multiple animals in ExperimentPlotter have the same animal ID.
 
+        Runs the streaming :class:`~neurodent.results.streaming.AddUniqueHash` transform, so
+        eager and streaming results rename alike: the ``animal`` column takes the new id, and
+        the animaldays and the keys of ``bad_channels_dict`` and ``lof_scores_dict`` take it
+        in place of the old id at their start. The dict keys used to keep the old names, and
+        the id was replaced wherever it occurred in an animalday.
+
         Args:
-            nbytes (int, optional): Number of bytes to generate. This is passed directly to secrets.token_hex(). Defaults to None, which generates 16 hex characters (8 bytes).
+            nbytes (int, optional): Random bytes in the suffix, passed to
+                ``secrets.token_hex``, which writes two hex characters per byte, so 4 gives 8.
+                Defaults to None, which uses its default of 32 bytes, 64 hex characters. This
+                said 8 bytes, 16 characters.
+
+        Raises:
+            ValueError: If an animalday does not start with the animal id.
         """
-        import secrets
+        from .streaming import AddUniqueHash, StreamContext
 
-        hash_suffix = secrets.token_hex(nbytes)
-        new_animal_id = f"{self.animal_id}_{hash_suffix}"
-
-        if "animal" in self.result.columns:
-            self.result["animal"] = new_animal_id
-        if "animalday" in self.result.columns:
-            self.result["animalday"] = self.result["animalday"].str.replace(
-                self.animal_id, new_animal_id
+        transform = AddUniqueHash(nbytes)
+        metadata = {
+            "animal_id": self.animal_id,
+            "bad_channels_dict": self.bad_channels_dict,
+            "lof_scores_dict": self.lof_scores_dict,
+        }
+        transform.bind(
+            StreamContext(
+                channel_info=self._channel_info(),
+                metadata=metadata,
+                n_rows_total=len(self.result),
             )
-        self.animal_id = new_animal_id
+        )
+        self.result = transform.apply(self.result)
+        metadata = transform.update_metadata(metadata)
+        self.animal_id = metadata["animal_id"]
+        self.bad_channels_dict = metadata["bad_channels_dict"]
+        self.lof_scores_dict = metadata["lof_scores_dict"]
 
         self._update_instance_vars()
