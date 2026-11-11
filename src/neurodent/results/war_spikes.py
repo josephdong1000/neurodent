@@ -90,16 +90,21 @@ class WARSpikeMixin:
     def _spike_animaldays(self, sars):
         """The animalday names to match spike results by, or None to pair them in sorted order.
 
-        Names are used when every one is an animalday of this WAR. Spike results computed by
-        AnimalAnalyzer carry exactly the WAR's names. Ones saved by an earlier version may not,
-        and those fall back to the old pairing, in sorted animalday order, with a warning.
+        Names are used when every animalday of this WAR has a spike result of that name.
+        Spike results computed by AnimalAnalyzer carry the WAR's names, plus one for each
+        recording too short to give a single window, and _read_from_spikes_all drops those
+        with a warning. Names used to be required to all be animaldays of the WAR, so one
+        such recording sent every result to the sorted-order pairing, which then raised
+        because there were more results than animaldays. Results saved by an earlier version
+        can carry names the WAR does not use at all, and those still fall back to the old
+        pairing, in sorted animalday order, with a warning.
         """
         names = [getattr(sar, "animal_day", None) for sar in sars]
         in_war = set(self.result["animalday"])
-        if all(name in in_war for name in names):
+        if in_war.issubset(names):
             return names
         logging.warning(
-            f"Spike results are named {names}, which are not all animaldays of this WAR "
+            f"Spike results are named {names}, which do not cover the animaldays of this WAR "
             f"({sorted(in_war)}). Pairing them with the animaldays in sorted order instead."
         )
         return None
@@ -180,10 +185,12 @@ class WARSpikeMixin:
             WindowAnalysisResult: WAR object with spike features added to result DataFrame.
 
         Raises:
-            ValueError: If the number of names and spike sets differ, or an animalday in the
-                result has no spike set.
+            ValueError: If the number of names and spike sets differ, a name is given twice,
+                or an animalday in the result has no spike set.
 
         Notes:
+            - Spike sets named for an animalday with no rows, such as a recording shorter
+              than one window, are dropped with a warning.
             - Each animalday's counts are written to that animalday's own rows. They used to
               be concatenated in sorted name order and assigned to the rows by position, but
               rows are sorted by timestamp, and names sort differently from dates across some
@@ -206,6 +213,9 @@ class WARSpikeMixin:
             raise ValueError(
                 f"{len(spikes_all)} spike sets were given for {len(animaldays)} animaldays"
             )
+        repeated = sorted({str(day) for day in animaldays if animaldays.count(day) > 1})
+        if repeated:
+            raise ValueError(f"More than one spike set is named for animalday(s) {repeated}")
         spikes_by_day = dict(zip(animaldays, spikes_all))
         missing = [day for day in days_in_rows if day not in spikes_by_day]
         if missing:
