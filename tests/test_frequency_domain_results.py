@@ -451,6 +451,7 @@ def _make_mock_sorting_analyzer(traces_uv, sfreq, channel_id, spike_samples):
     rec = MagicMock()
     rec.get_sampling_frequency.return_value = sfreq
     rec.get_duration.return_value = duration
+    rec.get_num_samples.return_value = n_samples
     rec.get_channel_ids.return_value = np.array([channel_id])
 
     def _get_traces(start_frame=0, end_frame=None, return_scaled=True):
@@ -723,3 +724,39 @@ class TestSpikeAnnotations:
         assert {d[: len("Spike_Ch")] for d in raw.annotations.description} == {"Spike_Ch"}
         for got, want in zip(read_spike_annotations(raw), trains):
             np.testing.assert_array_equal(got, want)
+
+
+@pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
+@pytest.mark.parametrize("n_samples, n_channels", [(1001, 2), (4004, 3), (5000, 1)])
+def test_the_fif_holds_every_sample(tmp_path, n_samples, n_channels):
+    """The export's length used to be int(duration * sfreq), one short for 1001 or 4004 samples
+    at 1000 Hz, which lost the last sample and any spike on it."""
+    if n_samples != 5000:
+        assert int(n_samples / 1000.0 * 1000.0) == n_samples - 1  # the old count
+    rng = np.random.default_rng(n_samples)
+    traces = rng.standard_normal((n_samples, n_channels)).astype(np.float32) * 50
+    recording = si.NumpyRecording(traces, sampling_frequency=1000.0)
+    spikes = [np.array([0, n_samples // 2, n_samples - 1])] + [
+        np.array([10 + ch]) for ch in range(1, n_channels)
+    ]
+    fdsar = FrequencyDomainSpikeAnalysisResult.from_detection_results(
+        spike_indices_per_channel=spikes, recording=recording, detection_params={},
+        animal_id="A1", genotype="WT", animal_day="A1 WT Jan-01-2020",
+    )
+
+    raw = fdsar.convert_to_mne(save_raw=False)
+
+    assert raw.n_times == n_samples
+    np.testing.assert_allclose(raw.get_data(), traces.T * 1e-6, rtol=1e-6)
+    for got, want in zip(read_spike_annotations(raw), spikes):
+        np.testing.assert_array_equal(got, want)
+
+
+@pytest.mark.unit
+def test_convert_sas_to_mne_refuses_channels_of_different_lengths():
+    sas = [
+        _make_mock_sorting_analyzer(np.zeros(1000), 1000.0, "ch0", np.array([1])),
+        _make_mock_sorting_analyzer(np.zeros(999), 1000.0, "ch1", np.array([1])),
+    ]
+    with pytest.raises(ValueError, match="same number of samples"):
+        FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(sas)

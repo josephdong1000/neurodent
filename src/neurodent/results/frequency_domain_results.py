@@ -637,8 +637,13 @@ class FrequencyDomainSpikeAnalysisResult:
             multiprocess_mode (Literal["dask", "serial"], optional): Whether to use Dask for parallel
                 per-channel conversion. Defaults to "serial".
 
+        Raises:
+            ValueError: If the SortingAnalyzers differ in sampling frequency or in number of
+                samples.
+
         Returns:
-            mne.io.RawArray: The converted RawArray, with each channel's spikes annotated by
+            mne.io.RawArray: The converted RawArray, holding every sample of the recording,
+            with each channel's spikes annotated by
             :func:`write_spike_annotations` as ``Spike_Ch{i}``. The annotations used to be
             named after the channel, a form nothing else wrote or read.
         """
@@ -652,8 +657,15 @@ class FrequencyDomainSpikeAnalysisResult:
                 f"All SortingAnalyzers must have the same sampling frequency. Got frequencies: {sfreqs}"
             )
 
-        # Preallocate data array
-        total_frames = int(sas[0].recording.get_duration() * sfreqs[0])
+        # Preallocate data array, one column per sample. The length used to be
+        # int(duration * sfreq), which drops the last sample when the float product falls
+        # just short of the count (1001 samples at 1000 Hz, for example).
+        n_samples = [sa.recording.get_num_samples() for sa in sas]
+        if len(set(n_samples)) != 1:
+            raise ValueError(
+                f"All SortingAnalyzers must have the same number of samples. Got: {n_samples}"
+            )
+        total_frames = n_samples[0]
         n_channels = len(sas)
         data = np.empty((n_channels, total_frames))
         logging.debug(f"Data shape: {data.shape}")
@@ -707,7 +719,8 @@ class FrequencyDomainSpikeAnalysisResult:
                 already called from ``convert_sas_to_mne`` in Dask mode, as that parallelizes across
                 channels and nested Dask may not improve performance.
         Returns:
-            np.ndarray: The converted traces
+            np.ndarray: The converted traces, one value per sample of the recording. The
+            last sample used to be lost for about one length in 200.
         """
         # Check that SortingAnalyzer only has 1 channel
         if len(sa.recording.get_channel_ids()) != 1:
@@ -718,8 +731,9 @@ class FrequencyDomainSpikeAnalysisResult:
         rec = sa.recording
         logging.debug(f"Recording info: {rec}")
 
-        # Calculate total number of frames and chunks
-        total_frames = int(rec.get_duration() * rec.get_sampling_frequency())
+        # Calculate total number of frames and chunks. The count used to be
+        # int(duration * sfreq), which can drop the last sample.
+        total_frames = rec.get_num_samples()
         fs = rec.get_sampling_frequency()
         frames_per_chunk = max(1, int(round(chunk_duration_s * fs)))
         n_chunks = max(1, total_frames // frames_per_chunk)
