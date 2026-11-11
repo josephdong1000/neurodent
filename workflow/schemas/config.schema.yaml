@@ -104,6 +104,71 @@ properties:
               dpi:
                 type: integer
                 description: Figure resolution in dots per inch
+      zeitgeber:
+        type: object
+        description: >-
+          Zeitgeber feature extraction (war_zeitgeber). Every key is read, and any other key
+          is refused, as ZeitgeberAnalysisResult refuses a setting it does not read.
+        additionalProperties: false
+        required: ["features"]
+        properties:
+          features:
+            type: array
+            description: Features to extract. Every one must be in every WAR.
+            items:
+              type: string
+          interval_minutes:
+            type: integer
+            minimum: 1
+            maximum: 1440
+            description: Width of each zeitgeber bin in minutes. Must divide 1440.
+          baseline_hours:
+            type: number
+            description: Hours from ZT0 averaged as the baseline that the _nobase columns subtract.
+          baseline_window:
+            description: >-
+              Baseline window overriding baseline_hours: "day", "night", or
+              [start_hour, end_hour].
+            oneOf:
+              - type: string
+                enum: ["day", "night"]
+              - type: array
+                items:
+                  type: number
+                minItems: 2
+                maxItems: 2
+          exclude_from_baseline:
+            type: array
+            description: Channel-averaged columns given no _nobase version.
+            items:
+              type: string
+          zeitgeber_shift_hours:
+            type: number
+            description: Clock hour of lights on, which becomes ZT0. Defaults to 6.
+      zeitgeber_plots:
+        type: object
+        description: >-
+          Zeitgeber plots (zeitgeber_plots). Every feature column the zeitgeber step writes is
+          plotted. Any other key is refused.
+        additionalProperties: false
+        properties:
+          figure_format:
+            type: string
+            description: Figure output format, such as png, tif, pdf or svg.
+          data_format:
+            type: string
+            enum: ["csv", "pkl"]
+            description: Format of the exported plot data.
+          dpi:
+            type: integer
+            description: Figure resolution in dots per inch.
+          figsize:
+            type: array
+            description: Figure size, [width, height].
+            items:
+              type: number
+            minItems: 2
+            maxItems: 2
       channel_filter_config:
         type: object
         description: Channel filtering configurations

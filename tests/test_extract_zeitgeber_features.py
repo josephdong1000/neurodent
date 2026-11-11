@@ -11,6 +11,7 @@ import logging
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 import pandas as pd
 import pytest
 import yaml
@@ -65,7 +66,7 @@ def zeitgeber(monkeypatch):
     return module
 
 
-def _run_main(zeitgeber, paths, output):
+def _run_main(zeitgeber, paths, output, **settings):
     zeitgeber.snakemake = SimpleNamespace(
         input=SimpleNamespace(
             war_parquet=[str(parquet_path) for parquet_path, _ in paths],
@@ -73,7 +74,7 @@ def _run_main(zeitgeber, paths, output):
         ),
         output=SimpleNamespace(zeitgeber_features=str(output)),
         params=SimpleNamespace(
-            config={"analysis": {"zeitgeber": _shipped_zeitgeber_config()}},
+            config={"analysis": {"zeitgeber": {**_shipped_zeitgeber_config(), **settings}}},
             samples_config=SAMPLES_CONFIG,
         ),
         threads=1,
@@ -160,6 +161,42 @@ def test_bins_match_averaging_every_animal_together(create_war_files):
     expected = together.groupby(["animal", "genotype", "sex", "zt_minutes", "daynight"])[columns].mean().reset_index()
 
     pd.testing.assert_frame_equal(pd.concat(bins, ignore_index=True), expected, check_exact=True)
+
+
+@pytest.mark.mutates_constants
+def test_the_shipped_settings_are_the_ones_read(zeitgeber):
+    """interval_minutes was time_aggregation_minutes, which nothing read, and baseline_hours and
+    exclude_from_baseline sat under zeitgeber_plots, where nothing read them either."""
+    from neurodent.results.zeitgeber import _zeitgeber_settings
+
+    settings = _shipped_zeitgeber_config()
+    assert set(settings) - {"features"} <= set(_zeitgeber_settings())
+    assert {"interval_minutes", "baseline_hours", "exclude_from_baseline"} <= set(settings)
+
+
+@pytest.mark.mutates_constants
+@pytest.mark.parametrize("interval", [30, 120])
+def test_interval_minutes_sets_the_bins(zeitgeber, create_war_files, tmp_path, interval):
+    result = _run_main(
+        zeitgeber, create_war_files(ANIMALS[:2]), tmp_path / "z.pkl", interval_minutes=interval
+    )
+
+    assert set(result["zt_minutes"] % interval) == {0}
+    assert result.groupby("animal")["zt_minutes"].nunique().max() == 1440 // interval
+
+
+@pytest.mark.mutates_constants
+def test_baseline_hours_and_exclude_from_baseline_are_read(zeitgeber, create_war_files, tmp_path):
+    paths = create_war_files(ANIMALS[:2])
+
+    twelve = _run_main(zeitgeber, paths, tmp_path / "twelve.pkl", baseline_hours=12)
+    six = _run_main(
+        zeitgeber, paths, tmp_path / "six.pkl", baseline_hours=6, exclude_from_baseline=["logrms"]
+    )
+
+    assert "logrms_nobase" in twelve.columns and "logrms_nobase" not in six.columns
+    assert not np.allclose(twelve["logampvar_nobase"], six["logampvar_nobase"])
+    pd.testing.assert_series_equal(twelve["logampvar"], six["logampvar"])
 
 
 def test_extraction_errors_name_the_animal():

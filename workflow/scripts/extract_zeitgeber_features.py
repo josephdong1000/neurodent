@@ -92,10 +92,12 @@ def main():
 
     logger.info(f"Validated {len(parquet_animal_set)} animals have both parquet and JSON files")
 
-    # Configure pipeline for extraction:
-    # - shift_for_48h=False: We want canonical features here, not plotting data
-    # - interval_minutes: Ensure it matches what we want for aggregation
-    pipeline_config = zeitgeber_params.copy()
+    # Every other key of the zeitgeber block is a pipeline setting (interval_minutes,
+    # baseline_hours, exclude_from_baseline, ...), and ZeitgeberAnalysisResult refuses a key it
+    # does not read, as the config schema does.
+    pipeline_config = {key: value for key, value in zeitgeber_params.items() if key != "features"}
+    logger.info(f"Zeitgeber settings: {pipeline_config}")
+    # shift_for_48h=False: We want canonical features here, not plotting data
     pipeline_config["shift_for_48h"] = False
 
     # Use ANIMAL_METADATA (injected by apply_samples_config, required)

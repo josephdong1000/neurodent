@@ -663,33 +663,31 @@ def test_baseline_grouped_empty_window(caplog):
     assert b_rows["feature_nobase"].isna().all()
 
 
-def test_zar_ignores_extra_config_kwargs():
-    """Test that ZeitgeberAnalysisResult ignores unknown config kwargs.
-    
-    Regression test for: run_zeitgeber_pipeline() got an unexpected keyword argument 'features'
-    """
+def test_zar_refuses_settings_it_does_not_read():
+    """Unknown settings used to be dropped without a word, so the config's
+    time_aggregation_minutes was never read and the bins stayed 60 minutes wide."""
     from unittest.mock import MagicMock
-    
-    mock_war = MagicMock()
-    mock_war.get_result.return_value = pd.DataFrame({
-        "timestamp": pd.date_range("2023-01-01 06:00", periods=3, freq="1h"),
-        "genotype": ["WT", "WT", "WT"],
-        "sex": ["Male", "Male", "Male"],
-        "feature": [1, 2, 3],
-    })
 
-    # Pass extra kwargs that are NOT valid for run_zeitgeber_pipeline
-    zar = zeitgeber.ZeitgeberAnalysisResult(
-        mock_war,
-        features=['logpsdband'],  # Invalid - should be ignored
-        unknown_key=42,           # Invalid - should be ignored
-        baseline_hours=2,         # Valid - should be used
-    )
-    
-    # Should not raise TypeError about unexpected keyword argument
-    result = zar.get_result()
-    
-    # Verify pipeline was applied (has sex/genotype columns from enrichment)
-    assert "sex" in result.columns
-    assert "zt_minutes" in result.columns
+    mock_war = MagicMock()
+    for settings in ({"features": ["logpsdband"]}, {"time_aggregation_minutes": 30}, {"unknown_key": 42}):
+        with pytest.raises(TypeError, match=list(settings)[0]):
+            zeitgeber.ZeitgeberAnalysisResult(mock_war, baseline_hours=2, **settings)
+
+
+def test_zar_bins_by_interval_minutes():
+    from unittest.mock import MagicMock
+
+    frame = pd.DataFrame({
+        "timestamp": pd.date_range("2023-01-01 06:00", periods=48, freq="30min"),
+        "genotype": ["WT"] * 48,
+        "sex": ["Male"] * 48,
+        "feature": np.arange(48.0),
+    })
+    mock_war = MagicMock()
+    mock_war.get_result.side_effect = lambda *args, **kwargs: frame.copy()
+
+    for interval in (30, 60, 120):
+        result = zeitgeber.ZeitgeberAnalysisResult(mock_war, interval_minutes=interval).get_result()
+        assert set(result["zt_minutes"] % interval) == {0}
+        assert result["zt_minutes"].nunique() == 1440 // interval
 

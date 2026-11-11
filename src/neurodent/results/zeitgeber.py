@@ -566,6 +566,11 @@ def run_zeitgeber_pipeline(
     return df_final
 
 
+def _zeitgeber_settings():
+    """The settings ZeitgeberAnalysisResult reads: the keyword arguments of run_zeitgeber_pipeline."""
+    return sorted(p for p in inspect.signature(run_zeitgeber_pipeline).parameters if p != "df")
+
+
 class ZeitgeberAnalysisResult:
     """
     Proxy wrapper for WindowAnalysisResult that applies Zeitgeber processing on the fly.
@@ -576,9 +581,22 @@ class ZeitgeberAnalysisResult:
     Args:
         war (WindowAnalysisResult): The implementation-specific analysis result object.
         **pipeline_config: Keywords arguments passed to `run_zeitgeber_pipeline`.
+            ``interval_minutes`` also sets the width of the zeitgeber bins.
+
+    Raises:
+        TypeError: For a setting that `run_zeitgeber_pipeline` does not take. Settings it
+            did not take used to be dropped without a word, which is how the pipeline
+            config's ``time_aggregation_minutes`` went unread while the bins stayed 60
+            minutes wide.
     """
 
     def __init__(self, war, **pipeline_config):
+        unknown = sorted(set(pipeline_config) - set(_zeitgeber_settings()))
+        if unknown:
+            raise TypeError(
+                f"ZeitgeberAnalysisResult does not read the settings {unknown}. "
+                f"It reads {_zeitgeber_settings()}."
+            )
         self.war = war
         self.config = pipeline_config
 
@@ -599,12 +617,7 @@ class ZeitgeberAnalysisResult:
                 interval = self.config.get("interval_minutes", 60)
                 df = add_zeitgeber_time_columns(df, interval_minutes=interval)
 
-        # Filter config to only include valid kwargs for run_zeitgeber_pipeline
-        sig = inspect.signature(run_zeitgeber_pipeline)
-        valid_kwargs = {p for p in sig.parameters if p != 'df'}
-        filtered_config = {k: v for k, v in self.config.items() if k in valid_kwargs}
-
-        return run_zeitgeber_pipeline(df, **filtered_config)
+        return run_zeitgeber_pipeline(df, **self.config)
 
     def get_result(self, *args, **kwargs):
         """Intercepts get_result and applies ZT pipeline."""

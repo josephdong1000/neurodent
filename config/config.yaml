@@ -107,20 +107,21 @@ analysis:
   aggregation:
     groupby: ["animalday", "isday"]  # Time window grouping for aggregation
 
-  # Zeitgeber time processing parameters
+  # Zeitgeber time processing parameters (war_zeitgeber). Every key here is read; the schema
+  # refuses any other. zeitgeber_shift_hours (clock hour of lights on, default 6) and
+  # baseline_window ("day", "night" or [start_hour, end_hour], overriding baseline_hours) may
+  # also be set.
   zeitgeber:
     features: ["logpsdband", "logpsdfrac", "logrms", "logampvar",
                "logpsdtotal", "lognspike", "psdslope",
-               "zpcorr", "zcohere", "zimcoh"]
-    time_aggregation_minutes: 60  # Time window for aggregation (60 = hourly)
+               "zpcorr", "zcohere", "zimcoh"]  # Every one must be in every WAR
+    interval_minutes: 60  # Width of each zeitgeber bin in minutes (60 = hourly); must divide 1440
+    baseline_hours: 12  # Hours from ZT0 averaged as the baseline the _nobase columns subtract
+    exclude_from_baseline: []  # Optional: columns given no _nobase version (e.g., ["logrms", "zcohere_delta"])
 
-  # Zeitgeber temporal plots parameters
+  # Zeitgeber temporal plots parameters (zeitgeber_plots). Every feature column the zeitgeber
+  # step writes is plotted.
   zeitgeber_plots:
-    features: ["logpsdband", "logpsdfrac", "logrms", "logampvar",
-               "logpsdtotal", "lognspike", "psdslope",
-               "zpcorr", "zcohere", "zimcoh"]
-    baseline_hours: 12  # Hours to use for baseline correction (first N hours)
-    exclude_from_baseline: []  # Optional: features to exclude from baseline correction (e.g., ["logrms", "zcohere_delta"])
     figure_format: "png"  # Figure output format: png, tif, pdf, svg
     data_format: "csv"    # Data export format: csv, pkl
     dpi: 300             # Figure resolution
