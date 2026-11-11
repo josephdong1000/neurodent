@@ -30,9 +30,7 @@ rule notebook:
         config=analysis_config(config),
         samples_config=samples_config,
     resources:
-        time=config["cluster"]["notebook"]["time"],
-        mem_mb=increment_memory(config["cluster"]["notebook"]["mem_mb"]),
-        nodes=config["cluster"]["notebook"]["nodes"],
+        **rule_resources(config["cluster"]["notebook"]),
     notebook:
         # Source notebook to execute
         "../notebooks/war_data_explorer.ipynb"

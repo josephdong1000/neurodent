@@ -37,9 +37,7 @@ rule war_relfreq_plots:
     retries:
         config["cluster"]["relfreq_plots"]["retries"]
     resources:
-        time=one_war_at_a_time_time(config["cluster"]["relfreq_plots"]),
-        mem_mb=one_war_at_a_time_mem_mb(config["cluster"]["relfreq_plots"]),
-        nodes=config["cluster"]["relfreq_plots"]["nodes"],
+        **rule_resources(config["cluster"]["relfreq_plots"], war_loading="whole"),
     log:
         stdout="logs/war_relfreq_plots/war_relfreq_plots.out",
         stderr="logs/war_relfreq_plots/war_relfreq_plots.err",

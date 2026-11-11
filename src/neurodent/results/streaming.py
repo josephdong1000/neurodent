@@ -52,6 +52,15 @@ if TYPE_CHECKING:
     from .window_analysis_result import WindowAnalysisResult
 
 
+STREAM_BATCH_ROWS = 5000
+"""Rows decoded at a time by :meth:`LazyWindowAnalysisResult.save_parquet_and_json`.
+
+The parquet reader still holds the whole row group a batch comes from, so peak memory also
+follows the row groups of the input file. ``neurodent.workflow.utils.resources`` sizes the
+streaming rules of the pipeline from both.
+"""
+
+
 # ---------------------------------------------------------------------------
 # Context + Transform protocol
 # ---------------------------------------------------------------------------
@@ -523,7 +532,7 @@ class LazyWindowAnalysisResult:
         folder: str | Path,
         *,
         filename: str = "war",
-        batch_size: int = 5000,
+        batch_size: int = STREAM_BATCH_ROWS,
     ) -> None:
         """Execute the pending transform chain against batched parquet reads.
 

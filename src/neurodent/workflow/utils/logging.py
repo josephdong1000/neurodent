@@ -65,7 +65,8 @@ def setup_snakemake_logging(snakemake) -> logging.Logger:
 def increment_memory(base_memory):
     """Return a callable ``mem(wildcards, attempt)`` that doubles on each retry.
 
-    Used by Snakemake rules to exponentially increase memory on retries::
+    The pipeline's rules no longer call it directly: ``rule_resources`` uses it for a rule whose
+    memory does not depend on its inputs. In a rule of your own::
 
         resources:
             mem_mb=increment_memory(4000),

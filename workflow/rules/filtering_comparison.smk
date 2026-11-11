@@ -25,9 +25,7 @@ rule filtering_comparison:
     retries:
         config["cluster"]["filtering_comparison"]["retries"]
     resources:
-        time=config["cluster"]["filtering_comparison"]["time"],
-        mem_mb=increment_memory(config["cluster"]["filtering_comparison"]["mem_mb"]),
-        nodes=config["cluster"]["filtering_comparison"]["nodes"],
+        **rule_resources(config["cluster"]["filtering_comparison"]),
     log:
         stdout="logs/filtering_comparison/filtering_comparison.out",
         stderr="logs/filtering_comparison/filtering_comparison.err",

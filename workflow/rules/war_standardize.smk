@@ -25,6 +25,10 @@ def _war_quality_filtered_json(wildcards):
 rule war_standardize:
     """
     Standardize quality-filtered WARs: channel reordering, padding, unique hash
+
+    The script streams the WAR, so its memory follows one row group and one batch of it
+    (rule_resources, war_loading="streamed"). war_generation writes each WAR in one row group,
+    so for this rule that is the whole WAR's uncompressed size.
     """
     input:
         war_parquet=_war_quality_filtered_parquet,
@@ -32,7 +36,7 @@ rule war_standardize:
     output:
         war_parquet="results/wars_standardized/{animal}/war.parquet",
         war_json="results/wars_standardized/{animal}/war.json",
-    threads: 1
+    threads: config["cluster"]["war_standardize"]["threads"]
     retries:
         config["cluster"]["war_standardize"]["retries"]
     params:
@@ -41,9 +45,7 @@ rule war_standardize:
         animal_folder=get_animal_folder,
         animal_id=get_animal_id,
     resources:
-        time=config["cluster"]["war_standardize"]["time"],
-        mem_mb=increment_memory(config["cluster"]["war_standardize"]["mem_mb"]),
-        nodes=config["cluster"]["war_standardize"]["nodes"],
+        **rule_resources(config["cluster"]["war_standardize"], war_loading="streamed"),
     log:
         stdout="logs/war_standardize/{animal}.out",
         stderr="logs/war_standardize/{animal}.err",

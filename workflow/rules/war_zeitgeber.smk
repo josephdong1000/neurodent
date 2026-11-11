@@ -35,9 +35,7 @@ rule war_zeitgeber:
         config=analysis_config(config),
         samples_config=samples_config,
     resources:
-        time=one_war_at_a_time_time(config["cluster"]["war_zeitgeber"]),
-        mem_mb=one_war_at_a_time_mem_mb(config["cluster"]["war_zeitgeber"]),
-        nodes=config["cluster"]["war_zeitgeber"]["nodes"],
+        **rule_resources(config["cluster"]["war_zeitgeber"], war_loading="whole"),
     log:
         stdout="logs/war_zeitgeber/war_zeitgeber.out",
         stderr="logs/war_zeitgeber/war_zeitgeber.err",

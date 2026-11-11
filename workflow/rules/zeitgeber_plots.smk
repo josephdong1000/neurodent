@@ -25,9 +25,7 @@ rule zeitgeber_plots:
     retries:
         config["cluster"]["zeitgeber_plots"]["retries"]
     resources:
-        time=config["cluster"]["zeitgeber_plots"]["time"],
-        mem_mb=increment_memory(config["cluster"]["zeitgeber_plots"]["mem_mb"]),
-        nodes=config["cluster"]["zeitgeber_plots"]["nodes"],
+        **rule_resources(config["cluster"]["zeitgeber_plots"]),
     log:
         stdout="logs/zeitgeber_plots/zeitgeber_plots.out",
         stderr="logs/zeitgeber_plots/zeitgeber_plots.err",

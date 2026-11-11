@@ -32,9 +32,7 @@ rule fdsar_diagnostics:
     retries:
         config["cluster"]["spike_averaged_traces"]["retries"]
     resources:
-        time=config["cluster"]["spike_averaged_traces"]["time"],
-        mem_mb=increment_memory(config["cluster"]["spike_averaged_traces"]["mem_mb"]),
-        nodes=config["cluster"]["spike_averaged_traces"]["nodes"],
+        **rule_resources(config["cluster"]["spike_averaged_traces"]),
     log:
         stdout="logs/fdsar_diagnostics/{animal}.out",
         stderr="logs/fdsar_diagnostics/{animal}.err",

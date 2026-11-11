@@ -26,9 +26,7 @@ rule ep_figures:
     retries:
         config["cluster"]["ep_figures"]["retries"]
     resources:
-        time=config["cluster"]["ep_figures"]["time"],
-        mem_mb=increment_memory(config["cluster"]["ep_figures"]["mem_mb"]),
-        nodes=config["cluster"]["ep_figures"]["nodes"],
+        **rule_resources(config["cluster"]["ep_figures"]),
     log:
         stdout="logs/ep_figures/ep_figures.out",
         stderr="logs/ep_figures/ep_figures.err",
@@ -56,9 +54,7 @@ rule ep_heatmaps:
     retries:
         config["cluster"]["ep_heatmaps"]["retries"]
     resources:
-        time=config["cluster"]["ep_heatmaps"]["time"],
-        mem_mb=increment_memory(config["cluster"]["ep_heatmaps"]["mem_mb"]),
-        nodes=config["cluster"]["ep_heatmaps"]["nodes"],
+        **rule_resources(config["cluster"]["ep_heatmaps"]),
     log:
         stdout="logs/ep_heatmaps/ep_heatmaps.out",
         stderr="logs/ep_heatmaps/ep_heatmaps.err",

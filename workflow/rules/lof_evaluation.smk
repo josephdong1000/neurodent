@@ -29,9 +29,7 @@ rule lof_evaluation:
     retries:
         config["cluster"]["lof_evaluation"]["retries"]
     resources:
-        time=config["cluster"]["lof_evaluation"]["time"],
-        mem_mb=increment_memory(config["cluster"]["lof_evaluation"]["mem_mb"]),
-        nodes=config["cluster"]["lof_evaluation"]["nodes"],
+        **rule_resources(config["cluster"]["lof_evaluation"]),
     log:
         stdout="logs/lof_evaluation/lof_evaluation.out",
         stderr="logs/lof_evaluation/lof_evaluation.err",

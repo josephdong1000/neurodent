@@ -32,9 +32,7 @@ rule war_generation:
     retries:
         config["cluster"]["war_generation"]["retries"]
     resources:
-        time=config["cluster"]["war_generation"]["time"],
-        mem_mb=increment_memory(config["cluster"]["war_generation"]["mem_mb"]),
-        nodes=config["cluster"]["war_generation"]["nodes"],
+        **rule_resources(config["cluster"]["war_generation"]),
     log:
         stdout="logs/war_generation/{animal}.out",
         stderr="logs/war_generation/{animal}.err",

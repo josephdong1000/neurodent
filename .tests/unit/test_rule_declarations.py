@@ -10,6 +10,10 @@ they run, for conventions every rule must follow and that a dry run cannot check
   to job sizes rerun every job.
 - A script reads the execution-only keys (``cluster``, ``temp_directory``, ``active_dataset``)
   from ``snakemake.config`` only, because ``snakemake.params.config`` no longer holds them.
+- A rule takes its resources from ``rule_resources``, and its threads and retries from the same
+  block of the ``cluster`` config.
+- A rule that runs a job declares ``retries``. A rule's ``retries`` wins over the profile's
+  ``restart-times``, so with every rule declaring it, the profile setting is never used.
 
 Running
 -------
@@ -25,6 +29,7 @@ import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 from neurodent.workflow.utils.config import EXECUTION_ONLY_KEYS
 
@@ -226,3 +231,58 @@ def test_jobs_read_execution_only_keys_from_snakemake_config(path):
             f"snakemake.config: {bad}. Rules pass analysis_config(config) as params, which "
             "leaves them out."
         )
+
+
+ACTIONS = ("script", "shell", "run", "notebook", "wrapper", "template_engine")
+RUNS_A_JOB = sorted(rule for rule, directives in ALL_RULES.items() if set(ACTIONS) & set(directives))
+LOCAL_RULES = {
+    name.strip()
+    for line in (WORKFLOW / "Snakefile").read_text(encoding="utf-8").splitlines()
+    if line.startswith("localrules:")
+    for name in line.split(":", 1)[1].split(",")
+}
+SUBMITTED = [rule for rule in RUNS_A_JOB if rule.split(":", 1)[1] not in LOCAL_RULES]
+CLUSTER = yaml.safe_load((REPO_ROOT / "config" / "config.yaml").read_text(encoding="utf-8"))["cluster"]
+RESOURCES = re.compile(
+    r'^\*\*rule_resources\(config\["cluster"\]\["(?P<block>\w+)"\]'
+    r'(?:,\s*war_loading="(?P<war_loading>\w+)")?\),?$'
+)
+
+
+def test_the_scan_sees_which_rules_run_jobs():
+    assert "war_quality_filter.smk:war_quality_filter" in SUBMITTED  # a run: block
+    assert "notebook.smk:notebook" in SUBMITTED
+    assert "Snakefile:dag" in RUNS_A_JOB and "Snakefile:dag" not in SUBMITTED
+    assert "Snakefile:all" not in RUNS_A_JOB
+
+
+@pytest.mark.parametrize("rule", RUNS_A_JOB)
+def test_every_rule_that_runs_a_job_declares_retries(rule):
+    assert "retries" in ALL_RULES[rule], (
+        f"{rule} declares no retries, so it would take the profile's restart-times. Give it "
+        "retries from its block of the cluster config."
+    )
+
+
+@pytest.mark.parametrize("rule", SUBMITTED)
+def test_every_rule_takes_its_resources_from_rule_resources(rule):
+    directives = ALL_RULES[rule]
+    match = RESOURCES.match(directives.get("resources", ""))
+    assert match, (
+        f"{rule} declares resources {directives.get('resources')!r}. Every rule takes them from "
+        'one call, **rule_resources(config["cluster"]["block"], war_loading=...).'
+    )
+    block = match["block"]
+    assert block in CLUSTER, f"{rule} reads cluster block {block}, which config.yaml lacks"
+    for directive in ("threads", "retries"):
+        assert directives.get(directive) == f'config["cluster"]["{block}"]["{directive}"]', (
+            f"{rule} takes its {directive} from somewhere other than its cluster block {block}"
+        )
+
+    # A rule sized from its input WARs reads them under the name war_parquet, and its block
+    # gives the per-window rate; a rule that reads no WARs gives no rate
+    if match["war_loading"]:
+        assert re.search(r"(?<!\w)war_parquet\s*=", directives.get("input", "")), rule
+        assert "mem_bytes_per_window" in CLUSTER[block], rule
+    else:
+        assert "mem_bytes_per_window" not in CLUSTER[block], rule

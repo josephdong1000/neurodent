@@ -11,6 +11,9 @@ to ensure all downstream analysis uses consistently filtered data.
 checkpoint war_fragment_filtering:
     """
     Apply fragment filtering to standardized WARs (no channel filtering)
+
+    The script streams the WAR, so its memory follows one row group and one batch of it,
+    plus what the filters keep per window (rule_resources, war_loading="streamed").
     """
     input:
         war_parquet="results/wars_standardized/{animal}/war.parquet",
@@ -28,9 +31,7 @@ checkpoint war_fragment_filtering:
         animal_folder=get_animal_folder,
         animal_id=get_animal_id,
     resources:
-        time=config["cluster"]["war_fragment_filter"]["time"],
-        mem_mb=increment_memory(config["cluster"]["war_fragment_filter"]["mem_mb"]),
-        nodes=config["cluster"]["war_fragment_filter"]["nodes"],
+        **rule_resources(config["cluster"]["war_fragment_filter"], war_loading="streamed"),
     log:
         stdout="logs/war_fragment_filtering/{animal}.out",
         stderr="logs/war_fragment_filtering/{animal}.err",
