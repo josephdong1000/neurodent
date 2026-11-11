@@ -3,8 +3,10 @@
 import contextlib
 import logging
 import os
+import signal
 import socket
 import sys
+import threading
 import traceback
 from datetime import datetime
 
@@ -59,6 +61,23 @@ def attempt_header(rule, wildcards, attempt):
     )
 
 
+def _exit_on_sigterm(signum, frame):
+    """Turn SIGTERM into SystemExit, so ``finally`` blocks and context managers run.
+
+    SLURM sends SIGTERM when a job reaches its time limit, or is cancelled, and SIGKILL 30
+    seconds later. By default SIGTERM ends Python at once, skipping all cleanup. A second
+    SIGTERM is ignored, so it cannot interrupt the cleanup the first one started.
+    """
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    print(
+        f"Received SIGTERM at {datetime.now().astimezone().isoformat(timespec='seconds')} "
+        "(a time limit or a cancel). Exiting after cleanup.",
+        file=sys.stderr,
+        flush=True,
+    )
+    raise SystemExit(128 + signum)
+
+
 def _append_line(paths, line):
     for path in dict.fromkeys(paths):
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
@@ -74,10 +93,15 @@ def setup_snakemake_logging(snakemake) -> logging.Logger:
     them: the script's prints and logging (stdout log), warnings and tracebacks (stderr log),
     and the output of child processes such as Dask workers, which inherit the descriptors.
 
+    It also installs a SIGTERM handler that raises ``SystemExit(143)``, so ``finally`` blocks
+    and context managers run when SLURM ends the job at its time limit: the temporary zarr
+    cache of ``compute_windowed_analysis`` is removed, and the Dask cluster is closed. SLURM
+    sends SIGKILL 30 seconds after SIGTERM. A second SIGTERM is ignored.
+
     Before, the stdout log was opened in write mode, so a retried job erased the log of the
     attempt that failed, and both Python streams went to it while the stderr log stayed empty.
     Only Python-level output was redirected, so Dask workers wrote to the SLURM job's own
-    output files instead.
+    output files instead, and SIGTERM ended the script without any cleanup.
 
     Args:
         snakemake: The global snakemake object injected by Snakemake. Its ``log`` names the
@@ -129,6 +153,10 @@ def setup_snakemake_logging(snakemake) -> logging.Logger:
     sys.stderr = open(2, "w", buffering=1, encoding="utf-8", errors="backslashreplace", closefd=False)
 
     logging.basicConfig(format=LOG_FORMAT, level=logging.INFO, stream=sys.stdout, force=True)
+
+    # Only the main thread may install a signal handler
+    if threading.current_thread() is threading.main_thread():
+        signal.signal(signal.SIGTERM, _exit_on_sigterm)
 
     return logging.getLogger(__name__)
 

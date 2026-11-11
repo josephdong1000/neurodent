@@ -440,6 +440,7 @@ class TestComputeWindowedAnalysisSignature:
         chunk_duration_s=...)`` must invoke ``stream_recording_to_zarr``
         inside the dask branch."""
         import pandas as pd
+        from neurodent.core import utils as core_utils
         from neurodent.loading import AnimalOrganizer
         from neurodent.analysis import AnimalAnalyzer
 
@@ -479,7 +480,8 @@ class TestComputeWindowedAnalysisSignature:
             ),
             patch(
                 "neurodent.core.utils.stream_recording_to_zarr",
-                return_value=str(tmp_path / "fake.zarr"),
+                # A cache name, which the analyzer removes when it is done
+                return_value=core_utils.zarr_cache_path(tmp_path),
             ) as mock_stream,
             patch("neurodent.analysis.animal_analyzer.da.from_zarr"),
             patch(

@@ -3,9 +3,10 @@
 setup_snakemake_logging used to open the stdout log in write mode, so a retried job erased the
 log of the attempt that failed, and it redirected only Python's streams, so Dask workers wrote
 to the SLURM job's own files. It now appends, opens each attempt with a header line, and points
-file descriptors 1 and 2 at the logs. It changes the process's own descriptors, so these tests
-run it in a subprocess and never touch pytest's streams. rule_log, its counterpart for a run:
-block, leaves the descriptors alone and is tested in process.
+file descriptors 1 and 2 at the logs. It also turns SIGTERM, which SLURM sends at a job's time
+limit, into SystemExit so that cleanup runs. It changes the process's own descriptors and signal
+handlers, so these tests run it in a subprocess and never touch pytest's streams. rule_log, its
+counterpart for a run: block, leaves the descriptors alone and is tested in process.
 """
 
 import logging
@@ -60,11 +61,24 @@ DRIVER = textwrap.dedent(
         subprocess.run([sys.executable, "-c", (
             "import sys; print('child out {0}'); print('child err {0}', file=sys.stderr)"
         ).format(attempt)], check=True)
+    if mode == "sigterm":
+        import signal, time
+        cache = os.path.join(os.path.dirname(stdout_path), "cache")
+        os.makedirs(cache)
+        try:
+            os.kill(os.getpid(), signal.SIGTERM)  # as SLURM does at the time limit
+            time.sleep(30)
+            print("not reached")
+        finally:
+            os.kill(os.getpid(), signal.SIGTERM)  # a second one must not cut the cleanup short
+            os.rmdir(cache)
+            print("cleanup finished")
     if mode == "fail":
         raise RuntimeError(f"attempt {attempt} failed")
     """
 )
-DRIVER_LINES = ("logged by", "printed by", "warned by", "descriptor 1 by", "failed")
+DRIVER_LINES = ("logged by", "printed by", "warned by", "descriptor 1 by", "failed",
+                "cleanup finished", "Received SIGTERM")
 
 
 class _Log(list):
@@ -148,6 +162,18 @@ def test_child_processes_such_as_dask_workers_write_to_the_logs(tmp_path):
     assert "child out 3" in out.read_text(encoding="utf-8")
     assert "child err 3" in err.read_text(encoding="utf-8")
     assert "child" not in result.stdout + result.stderr
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="os.kill on Windows terminates at once")
+def test_sigterm_runs_the_cleanup_before_the_job_exits(tmp_path):
+    out, err = tmp_path / "a1.out", tmp_path / "a1.err"
+    result = _run(tmp_path, out, err, 1, mode="sigterm")
+
+    assert result.returncode == 143, result.stderr
+    assert not (tmp_path / "cache").exists()
+    out_text = out.read_text(encoding="utf-8")
+    assert "cleanup finished" in out_text and "not reached" not in out_text
+    assert "Received SIGTERM" in err.read_text(encoding="utf-8")
 
 
 def test_a_single_log_takes_both_streams(tmp_path):

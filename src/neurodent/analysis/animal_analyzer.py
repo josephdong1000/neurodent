@@ -153,6 +153,13 @@ class AnimalAnalyzer:
                 high-memory nodes for maximum throughput.  Only has an effect when
                 ``multiprocess_mode="dask"``.  Defaults to 3600.
 
+        Note:
+            The Dask path caches each recording's windows in a temporary zarr store in the
+            temp directory, named by ``core.utils.zarr_cache_path``, and removes it on every
+            exit: after the computation, on an error, and on the ``SystemExit`` that
+            ``setup_snakemake_logging`` raises when SLURM sends SIGTERM at a job's time limit.
+            Before, it was removed only when the computation succeeded.
+
         Raises:
             AttributeError: If a feature's ``compute_...()`` function was not implemented, this error will be raised.
 
@@ -226,43 +233,38 @@ class AnimalAnalyzer:
                         )
                         del all_traces, np_fragments
 
-                    logging.debug("Processing metadata serially")
-                    metadatas = [
-                        self._process_fragment_metadata(idx, lan, window_s)
-                        for idx in range(n_fragments_war)
-                    ]
-                    meta_df = pd.DataFrame(metadatas)
-
-                    logging.debug("Processing features in parallel")
-                    np_fragments_reconstruct = da.from_zarr(
-                        tmppath, chunks=("auto", -1, -1)
-                    )
-                    logging.debug(f"Dask array shape: {np_fragments_reconstruct.shape}")
-                    logging.debug(
-                        f"Dask array chunks: {np_fragments_reconstruct.chunks}"
-                    )
-
-                    # Create delayed tasks for each fragment using efficient dependency resolution
-                    feature_values = [
-                        delayed(FragmentAnalyzer.process_fragment_with_dependencies)(
-                            np_fragments_reconstruct[idx], lan.f_s, features, kwargs
-                        )
-                        for idx in range(n_fragments_war)
-                    ]
-
-                    # Compute features in parallel
-                    feature_values = dask.compute(*feature_values)
-
-                    # Clean up temp directory after processing
-                    logging.debug("Cleaning up temp directory")
                     try:
-                        import shutil
+                        logging.debug("Processing metadata serially")
+                        metadatas = [
+                            self._process_fragment_metadata(idx, lan, window_s)
+                            for idx in range(n_fragments_war)
+                        ]
+                        meta_df = pd.DataFrame(metadatas)
 
-                        shutil.rmtree(tmppath)
-                    except (OSError, FileNotFoundError) as e:
-                        logging.warning(
-                            f"Failed to remove temporary directory {tmppath}: {e}"
+                        logging.debug("Processing features in parallel")
+                        np_fragments_reconstruct = da.from_zarr(
+                            tmppath, chunks=("auto", -1, -1)
                         )
+                        logging.debug(f"Dask array shape: {np_fragments_reconstruct.shape}")
+                        logging.debug(
+                            f"Dask array chunks: {np_fragments_reconstruct.chunks}"
+                        )
+
+                        # Create delayed tasks for each fragment using efficient dependency resolution
+                        feature_values = [
+                            delayed(FragmentAnalyzer.process_fragment_with_dependencies)(
+                                np_fragments_reconstruct[idx], lan.f_s, features, kwargs
+                            )
+                            for idx in range(n_fragments_war)
+                        ]
+
+                        # Compute features in parallel
+                        feature_values = dask.compute(*feature_values)
+                    finally:
+                        # On every exit, including an error or the SystemExit that
+                        # setup_snakemake_logging raises on SIGTERM
+                        logging.debug("Removing the zarr cache")
+                        core_utils.remove_zarr_cache(tmppath)
 
                     logging.debug("Combining metadata and feature values")
                     feat_df = pd.DataFrame(feature_values)
