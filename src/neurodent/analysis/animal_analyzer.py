@@ -40,9 +40,13 @@ class AnimalAnalyzer:
     Analysis state (``bad_channels_dict``, ``features_df``, ``window_analysis_result``,
     ``frequency_domain_spike_analysis_results``) is stored on the instance, so reuse a
     single ``AnimalAnalyzer(ao)`` across ``compute_bad_channels`` /
-    ``compute_windowed_analysis`` / ``compute_frequency_domain_spike_analysis``. Computing
-    bad channels on one instance and windowed analysis on a separate ``AnimalAnalyzer(ao)``
-    will yield a result with empty bad channels on the second instance.
+    ``compute_windowed_analysis`` / ``compute_frequency_domain_spike_analysis``. LOF scores
+    are kept on the organizer's recordings, and ``compute_windowed_analysis`` records them in
+    the result's ``lof_scores_dict``. The result's ``bad_channels_dict`` always starts empty:
+    the channels a LOF threshold picks stay in this instance's ``bad_channels_dict``, and a
+    result gives them with ``get_bad_channels_by_lof_threshold``. The result used to start
+    with this instance's ``bad_channels_dict``, so a threshold given to
+    ``compute_bad_channels`` put LOF's picks into it.
 
     Args:
         ao (AnimalOrganizer): A loaded organizer whose recordings are analyzed.
@@ -61,6 +65,9 @@ class AnimalAnalyzer:
         lof_chunk_duration_s: float = 60,
     ):
         """Compute bad channels using LOF analysis for all recordings.
+
+        The scores are recorded in the result of :meth:`compute_windowed_analysis`; the channels
+        a threshold picks are kept in ``self.bad_channels_dict`` only, not in that result.
 
         Args:
             lof_threshold (float, optional): Threshold for determining bad channels from LOF scores.
@@ -168,7 +175,9 @@ class AnimalAnalyzer:
             ValueError: If no recording of the animal is as long as one window.
 
         Returns:
-            WindowAnalysisResult: A WindowAnalysisResult object containing extracted features for all recordings
+            WindowAnalysisResult: A WindowAnalysisResult object containing extracted features for all recordings,
+            the LOF scores of every recording that has them, and an empty ``bad_channels_dict``. The
+            ``bad_channels_dict`` used to be this analyzer's, holding any LOF threshold's picks.
         """
         features = _sanitize_feature_request(features, exclude)
 
@@ -348,13 +357,14 @@ class AnimalAnalyzer:
             logging.warning(warning_msg)
             warnings.warn(warning_msg)
 
+        # The result starts with no bad channels; a channel filter records what it masks
         self.window_analysis_result = WindowAnalysisResult(
             self.features_df,
             self.ao.animal_id,
             self.ao.genotype,
             self.ao.sex,
             self.ao.channel_names,
-            self.bad_channels_dict,
+            {},
             suppress_short_interval_error,
             lof_scores_dict,
         )

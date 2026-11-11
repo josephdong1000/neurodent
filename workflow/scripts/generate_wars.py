@@ -87,13 +87,14 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             )
             az = AnimalAnalyzer(ao)
 
-            # Compute bad channels
-            logger.info(f"Computing bad channels for {animal_key}")
+            # Compute LOF scores. The WAR records the scores only; the LOF channel filter picks
+            # bad channels from them with reject_lof_threshold. Generation used to apply that
+            # threshold here too, which wrote LOF's picks into every WAR's bad_channels_dict.
+            logger.info(f"Computing LOF scores for {animal_key}")
             lof_config = config["analysis"]["channel_filter_config"]["lof"]
-            lof_threshold = lof_config.get("reject_lof_threshold")
             lof_chunk_duration_s = lof_config.get("lof_chunk_duration_s", 60)
             az.compute_bad_channels(
-                lof_threshold=lof_threshold,
+                lof_threshold=None,
                 lof_chunk_duration_s=lof_chunk_duration_s,
             )
 
