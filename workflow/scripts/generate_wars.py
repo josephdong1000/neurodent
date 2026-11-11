@@ -20,7 +20,7 @@ from dask.distributed import Client, LocalCluster
 from neurodent import core
 from neurodent.analysis import AnimalAnalyzer
 from neurodent.workflow import setup_snakemake_logging, apply_samples_config
-from neurodent.workflow.utils import load_animal_recordings
+from neurodent.workflow.utils import load_animal_recordings, local_cluster_kwargs
 
 
 def load_samples_and_config():
@@ -43,6 +43,9 @@ def load_samples_and_config():
 def generate_war_for_animal(samples_config, config, animal_folders, animal_id, channel_subset, logger):
     """Generate WAR for a specific animal, aggregating across multiple folders/sessions.
     
+    The Dask cluster is sized from the job by ``local_cluster_kwargs``: one worker per thread,
+    half of the job's memory split between the workers, and a dashboard on a free port.
+
     Args:
         config: The rule's analysis config. The scratch directory (``temp_directory``) and the
             Dask interface (``cluster.war_generation.interface``) are read from
@@ -61,17 +64,20 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
     # Logging key
     animal_key = f"{animal_id} (across {len(animal_folders)} folders)"
 
+    cluster_kwargs = local_cluster_kwargs(snakemake.threads, snakemake.resources.mem_mb)
     try:
         with (
             LocalCluster(
-                n_workers=snakemake.threads,
-                threads_per_worker=1,
+                **cluster_kwargs,
                 interface=snakemake.config["cluster"]["war_generation"]["interface"],
             ) as cluster,
             Client(cluster) as client,
         ):
             logger.info(f"\n\nLocal Dask cluster dashboard: {cluster.dashboard_link}")
-            logger.info(f"Number of workers: {len(client.scheduler_info()['workers'])}")
+            logger.info(
+                f"Number of workers: {len(client.scheduler_info()['workers'])}, memory limit "
+                f"{cluster_kwargs['memory_limit'] / 2**30:.1f} GiB each"
+            )
             
             logger.info(f"Processing {animal_id} across {len(animal_folders)} sessions")
             

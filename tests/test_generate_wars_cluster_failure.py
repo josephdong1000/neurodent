@@ -22,6 +22,7 @@ def generate_wars(monkeypatch):
     spec.loader.exec_module(module)  # main() is guarded by __name__, so nothing runs
     module.snakemake = SimpleNamespace(
         threads=1,
+        resources=SimpleNamespace(mem_mb=8000),
         config={"temp_directory": "/unused", "cluster": {"war_generation": {"interface": None}}},
     )
     monkeypatch.setattr(module.core.utils, "set_temp_directory", lambda *_: None)
@@ -44,3 +45,25 @@ def test_cluster_startup_failure_is_reported_as_itself(generate_wars, monkeypatc
             animal_id="A1", channel_subset=None,
             logger=SimpleNamespace(info=lambda *_: None, error=lambda *_: None),
         )
+
+
+def test_the_cluster_is_sized_from_the_job(generate_wars, monkeypatch):
+    from neurodent.workflow.utils import local_cluster_kwargs
+
+    received = {}
+
+    def recording_cluster(**kwargs):
+        received.update(kwargs)
+        raise RuntimeError("stop after recording the settings")
+
+    monkeypatch.setattr(generate_wars, "LocalCluster", recording_cluster)
+    generate_wars.snakemake.threads = 4
+    generate_wars.snakemake.resources.mem_mb = 80_000
+
+    with pytest.raises(RuntimeError, match="stop after"):
+        generate_wars.generate_war_for_animal(
+            samples_config={}, config={}, animal_folders=[("", "A1", "")],
+            animal_id="A1", channel_subset=None,
+            logger=SimpleNamespace(info=lambda *_: None, error=lambda *_: None),
+        )
+    assert received == {**local_cluster_kwargs(4, 80_000), "interface": None}

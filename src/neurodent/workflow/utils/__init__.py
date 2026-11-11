@@ -29,6 +29,7 @@ from .logging import (
     rule_log,
     increment_memory,
 )
+from .dask_cluster import local_cluster_kwargs
 from .resources import (
     count_war_values,
     war_stream_bytes,
@@ -66,6 +67,7 @@ __all__ = [
     "setup_snakemake_logging",
     "rule_log",
     "increment_memory",
+    "local_cluster_kwargs",
     "count_war_values",
     "war_stream_bytes",
     "war_input_mem_mb",
