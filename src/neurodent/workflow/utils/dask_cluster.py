@@ -20,8 +20,9 @@ def local_cluster_kwargs(n_workers, mem_mb):
       the workers, about 245 GiB each on the nodes of the IQSEC2 run, far above the job's limit.
     - ``dashboard_address`` ":0": the dashboard takes a free port. Before, it was fixed at 8787,
       so two jobs on one node collided.
-    - ``silence_logs`` INFO: Dask's INFO messages reach the job's log. Before, only WARN and
-      above did.
+    - ``silence_logs`` INFO: Dask's INFO messages reach the job's log, the attempts file of its
+      stderr log (see setup_snakemake_logging), not the declared stderr log. Before, only WARN
+      and above did, and they went to the SLURM job's own files.
 
     Args:
         n_workers (int): Workers to start, the job's ``threads``.

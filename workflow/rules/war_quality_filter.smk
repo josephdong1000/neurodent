@@ -36,7 +36,8 @@ checkpoint war_quality_filter:
 
         from neurodent.workflow.utils import clear_exclusion_record, rule_log, write_exclusion_record
 
-        # Appends to this animal's logs, so a retry keeps the log of the attempt before it
+        # Snakemake deletes the logs above before each attempt; rule_log also appends to the
+        # attempts files beside them, {animal}.attempts.out and .err, which keep every attempt
         with rule_log(log, rule, wildcards, resources.attempt) as logger:
             animal = wildcards.animal
             logger.info(f"Starting quality filtering for animal: {animal}")
