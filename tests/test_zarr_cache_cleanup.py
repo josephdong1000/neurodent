@@ -149,6 +149,9 @@ def _analyzer(n_fragments=6, n_channels=2, window_s=5, fs=1000):
     lrec = MagicMock()
     lrec.display_name = "rec0"
     lrec.LongRecording = si.NumpyRecording([traces], sampling_frequency=fs)
+    # A real count wherever the analyzer may compute or format with one, which a bare
+    # MagicMock cannot take: the samples in one window, as the organizer gives them
+    lrec.get_fragment_num_samples.side_effect = lambda seconds: int(round(seconds * fs))
 
     ao = AnimalOrganizer.__new__(AnimalOrganizer)
     ao._validate_sampling_rates = MagicMock()
