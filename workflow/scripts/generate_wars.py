@@ -40,6 +40,26 @@ def load_samples_and_config():
     return samples_config, config, animal_folders, animal_id, channel_subset
 
 
+def compute_lof_scores(az, config):
+    """Compute the LOF scores of the animal's recordings, without picking bad channels.
+
+    The WAR records the scores only, and the LOF channel filter picks bad channels from them
+    with ``reject_lof_threshold``. Generation used to pass that threshold to
+    ``compute_bad_channels`` too, which wrote LOF's picks into every WAR's
+    ``bad_channels_dict``.
+
+    Args:
+        az (AnimalAnalyzer): The analyzer of the animal's recordings.
+        config (dict): The pipeline config. ``lof_chunk_duration_s`` is read from
+            ``analysis.channel_filter_config.lof`` and defaults to 60.
+    """
+    lof_config = config["analysis"]["channel_filter_config"]["lof"]
+    az.compute_bad_channels(
+        lof_threshold=None,
+        lof_chunk_duration_s=lof_config.get("lof_chunk_duration_s", 60),
+    )
+
+
 def generate_war_for_animal(samples_config, config, animal_folders, animal_id, channel_subset, logger):
     """Generate WAR for a specific animal, aggregating across multiple folders/sessions.
     
@@ -87,16 +107,9 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             )
             az = AnimalAnalyzer(ao)
 
-            # Compute LOF scores. The WAR records the scores only; the LOF channel filter picks
-            # bad channels from them with reject_lof_threshold. Generation used to apply that
-            # threshold here too, which wrote LOF's picks into every WAR's bad_channels_dict.
+            # Compute LOF scores, which the WAR records without picking bad channels
             logger.info(f"Computing LOF scores for {animal_key}")
-            lof_config = config["analysis"]["channel_filter_config"]["lof"]
-            lof_chunk_duration_s = lof_config.get("lof_chunk_duration_s", 60)
-            az.compute_bad_channels(
-                lof_threshold=None,
-                lof_chunk_duration_s=lof_chunk_duration_s,
-            )
+            compute_lof_scores(az, config)
 
             # Generate WAR using Dask
             logger.info(f"Computing windowed analysis for {animal_key}")

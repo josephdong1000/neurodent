@@ -527,74 +527,42 @@ class TestFdsarChunkDurationWiring:
 
 
 class TestLofWiring:
-    """generate_wars.py records LOF scores only: it calls compute_bad_channels with no threshold.
+    """generate_wars.py records LOF scores only: compute_lof_scores, which
+    generate_war_for_animal calls, passes compute_bad_channels no threshold.
 
     It used to pass reject_lof_threshold, which wrote LOF's picks into every WAR's
     bad_channels_dict, where the channel filters and the LOF evaluation then found them. These
-    tests run the script's real generate_war_for_animal with the heavy parts replaced.
+    tests call the script's own compute_lof_scores, so they do not depend on how the script
+    starts its Dask cluster.
     """
 
     @staticmethod
-    def _run(monkeypatch, lof_config):
+    def _run(lof_config):
         import importlib.util
-        from contextlib import nullcontext
-        from types import SimpleNamespace
 
         script = Path(__file__).parent.parent / "workflow" / "scripts" / "generate_wars.py"
         spec = importlib.util.spec_from_file_location("generate_wars_lof_under_test", script)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)  # main() is guarded by __name__, so nothing runs
-        module.snakemake = SimpleNamespace(threads=1)
 
         calls = []
 
         class FakeAnalyzer:
-            def __init__(self, ao):
-                pass
-
             def compute_bad_channels(self, **kwargs):
                 calls.append(kwargs)
 
-            def compute_windowed_analysis(self, *args, **kwargs):
-                return SimpleNamespace(read_sars_spikes=lambda *a, **k: "war")
-
-            def compute_frequency_domain_spike_analysis(self, **kwargs):
-                return []
-
-        monkeypatch.setattr(module.core.utils, "set_temp_directory", lambda *_: None)
-        monkeypatch.setattr(module, "apply_samples_config", lambda *_: None)
-        monkeypatch.setattr(
-            module, "LocalCluster", lambda **kwargs: nullcontext(SimpleNamespace(dashboard_link=""))
-        )
-        monkeypatch.setattr(
-            module, "Client",
-            lambda cluster: nullcontext(SimpleNamespace(scheduler_info=lambda: {"workers": {}})),
-        )
-        monkeypatch.setattr(module, "load_animal_recordings", lambda *args, **kwargs: object())
-        monkeypatch.setattr(module, "AnimalAnalyzer", FakeAnalyzer)
-        config = {
-            "temp_directory": "/unused",
-            "cluster": {"war_generation": {"interface": None}},
-            "analysis": {
-                "channel_filter_config": {"lof": lof_config},
-                "war_generation": {"compute_windowed_analysis": {}},
-                "frequency_domain_spike_detection": {"default_params": {}},
-            },
-        }
-        module.generate_war_for_animal(
-            samples_config={}, config=config, animal_folders=[("", "A1", "")],
-            animal_id="A1", channel_subset=None,
-            logger=SimpleNamespace(info=lambda *_: None, error=lambda *_: None),
+        module.compute_lof_scores(
+            FakeAnalyzer(), {"analysis": {"channel_filter_config": {"lof": lof_config}}}
         )
         return calls
 
-    def test_no_threshold_even_when_one_is_configured(self, monkeypatch):
-        calls = self._run(monkeypatch, {"reject_lof_threshold": 2.5, "lof_chunk_duration_s": 120})
+    def test_no_threshold_even_when_one_is_configured(self):
+        calls = self._run({"reject_lof_threshold": 2.5, "lof_chunk_duration_s": 120})
 
         assert calls == [{"lof_threshold": None, "lof_chunk_duration_s": 120}]
 
-    def test_lof_chunk_duration_s_defaults_to_60(self, monkeypatch):
-        calls = self._run(monkeypatch, {"reject_lof_threshold": 2.5})
+    def test_lof_chunk_duration_s_defaults_to_60(self):
+        calls = self._run({"reject_lof_threshold": 2.5})
 
         assert calls == [{"lof_threshold": None, "lof_chunk_duration_s": 60}]
 
