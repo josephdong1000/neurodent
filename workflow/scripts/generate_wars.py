@@ -50,8 +50,9 @@ def compute_lof_scores(az, config):
 
     Args:
         az (AnimalAnalyzer): The analyzer of the animal's recordings.
-        config (dict): The pipeline config. ``lof_chunk_duration_s`` is read from
-            ``analysis.channel_filter_config.lof`` and defaults to 60.
+        config (dict): The rule's analysis config, as ``analysis_config`` gives it.
+            ``lof_chunk_duration_s`` is read from ``analysis.channel_filter_config.lof`` and
+            defaults to 60.
     """
     lof_config = config["analysis"]["channel_filter_config"]["lof"]
     az.compute_bad_channels(

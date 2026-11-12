@@ -32,7 +32,10 @@ class ZeitgeberPlotter:
     
     Args:
         data: Either a list of ZARs or a DataFrame containing zeitgeber-processed data.
-        features: List of features to extract (only used if data is list of ZARs).
+        features: List of features to extract. Required when data is a list of ZARs, and
+            ignored for a DataFrame. A ZAR that lacks a column of a requested feature
+            raises ValueError. Without features, a list of ZARs used to be reduced to the
+            mean of every numeric column.
         aggregate_config: Optional config for aggregation (only used if data is list of ZARs).
     
     Examples:

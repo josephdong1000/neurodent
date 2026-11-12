@@ -50,7 +50,12 @@ class WARSpikeMixin:
                 - If inplace=False: returns new WAR object with enhanced result DataFrame
 
         Notes:
-            - The number of sars must match the number of unique animaldays in self.result
+            - Each sar is matched to the animalday it names (its animal_day). A sar named for
+              an animalday with no rows, such as a recording shorter than one window, is
+              dropped with a warning, and a name given twice raises. When the names do not
+              cover every animalday of the WAR, as in results saved by an earlier version,
+              the sars are paired with the animaldays in sorted order instead, with a
+              warning. The number of sars used to have to equal the number of animaldays.
             - Spikes are binned into time windows matching the existing WAR fragments
             - nspike: array of spike counts per channel for each time window
             - lognspike: log-transformed spike counts using log_transform()
