@@ -132,6 +132,8 @@ class AnimalAnalyzer:
         suppress_short_interval_error=False,
         apply_notch_filter=True,
         chunk_duration_s: Optional[float] = 3600,
+        batch_fragments: Optional[int] = None,
+        first_batch_timeout_s: Optional[float] = core_utils.dask_batches.FIRST_TIMEOUT_S,
         **kwargs,
     ) -> "WindowAnalysisResult":
         """Computes windowed analysis of animal recordings. The data is divided into windows (time bins), then features are extracted from each window. The result is
@@ -162,6 +164,19 @@ class AnimalAnalyzer:
                 memory-constrained machines and a larger value (e.g. 2500+) on
                 high-memory nodes for maximum throughput.  Only has an effect when
                 ``multiprocess_mode="dask"``.  Defaults to 3600.
+            batch_fragments (int, optional): Windows the Dask path computes and gathers at a
+                time, by :func:`neurodent.core.utils.compute_in_batches`. None, the default,
+                takes one chunk of the zarr cache: ``int(chunk_duration_s / window_s)``
+                windows, or 100 when ``chunk_duration_s`` is None. Results do not depend on
+                it. Before, every window of a recording was gathered in one transfer, which
+                stalled the scheduler on a 51,000-window day and hung war_generation for 12
+                hours. Only has an effect when ``multiprocess_mode="dask"``.
+            first_batch_timeout_s (float, optional): Seconds the first batch may take with a
+                ``dask.distributed`` client. Later batches may take ten times their windows
+                at the slowest rate seen, and at least 600 s (see
+                :func:`neurodent.core.utils.dask_batches.batch_timeout`). A batch past its
+                deadline raises ``BatchTimeoutError``. None sets no deadline. Defaults to
+                3600.
 
         Note:
             The Dask path caches each recording's windows in a temporary zarr store in the
@@ -235,6 +250,7 @@ class AnimalAnalyzer:
                             n_samples_per_frag,
                             n_frag_per_chunk,
                         )
+                        zarr_chunk = n_frag_per_chunk
                     else:
                         # Default path: read all traces at once then write to zarr.
                         # Maximises throughput on high-memory systems.
@@ -249,10 +265,11 @@ class AnimalAnalyzer:
                         )
                         logging.debug(f"np_fragments.shape: {np_fragments.shape}")
                         # Cache fragments to zarr
-                        tmppath, _ = core_utils.cache_fragments_to_zarr(
+                        tmppath, zarr_array = core_utils.cache_fragments_to_zarr(
                             np_fragments, n_fragments_war
                         )
-                        del all_traces, np_fragments
+                        zarr_chunk = zarr_array.chunks[0]
+                        del all_traces, np_fragments, zarr_array
 
                     try:
                         logging.debug("Processing metadata serially")
@@ -279,8 +296,13 @@ class AnimalAnalyzer:
                             for idx in range(n_fragments_war)
                         ]
 
-                        # Compute features in parallel
-                        feature_values = dask.compute(*feature_values)
+                        # A batch at a time, one zarr chunk by default
+                        feature_values = core_utils.compute_in_batches(
+                            feature_values,
+                            zarr_chunk if batch_fragments is None else batch_fragments,
+                            first_timeout_s=first_batch_timeout_s,
+                            label="window",
+                        )
                     finally:
                         # On every exit, including an error or the SystemExit that
                         # setup_snakemake_logging raises on SIGTERM

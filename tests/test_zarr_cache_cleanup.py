@@ -183,7 +183,7 @@ def test_compute_windowed_analysis_removes_its_cache_on_every_exit(
     seen = []
 
     def compute(*tasks):
-        seen.extend(_left_behind(tmp_path))  # the cache exists while the windows are computed
+        seen.append(_left_behind(tmp_path))  # the cache exists while each batch is computed
         if failure is not None:
             raise failure("a worker died, or SLURM sent SIGTERM")
         return [{"rms": 0.0}] * len(tasks)
@@ -203,7 +203,9 @@ def test_compute_windowed_analysis_removes_its_cache_on_every_exit(
                     ["rms"], multiprocess_mode="dask", chunk_duration_s=chunk_duration_s
                 )
 
-    assert len(seen) == 1 and ZARR_CACHE_PATTERN.fullmatch(seen[0])
+    # One cache, there for every batch, which is one zarr chunk of windows
+    assert seen and all(left == seen[0] for left in seen)
+    assert len(seen[0]) == 1 and ZARR_CACHE_PATTERN.fullmatch(seen[0][0])
     assert _left_behind(tmp_path) == []
 
 

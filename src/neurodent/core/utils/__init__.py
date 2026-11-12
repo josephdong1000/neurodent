@@ -53,12 +53,18 @@ from .neighbors import (
     Natural_Neighbor,
     chunked_channel_distance_matrix,
 )
+from .dask_batches import (
+    BatchTimeoutError,
+    compute_in_batches,
+)
 from .misc import (
     parse_truncate,
     _HiddenPrints,
 )
 
 __all__ = [
+    "BatchTimeoutError",
+    "compute_in_batches",
     "assert_microvolts",
     "convert_units_to_multiplier",
     "extract_mne_unit_info",
