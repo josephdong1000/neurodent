@@ -7,8 +7,11 @@ Worker.get_data: the main process did not read the results within the 30 s conne
 Dask's gather kept nothing it had received, and the client asked for every key again, with no
 limit. One gather moved all 51,000 window results of one recording day, about 6 GB.
 
-Two modes run the same LocalCluster as workflow/scripts/generate_wars.py (one thread per
-worker, the default memory limit and dashboard):
+Two modes run the same LocalCluster as workflow/scripts/generate_wars.py, sized by
+local_cluster_kwargs from --workers and --mem-mb: one thread per worker, half of the job's
+memory split between the workers, and the dashboard on a free port. The runs of 2026-11-11
+(at 5f8e145f and 2c8890cc) used Dask's defaults instead, as generation then did: no memory
+limit of the cluster's own and the dashboard on port 8787.
 
 - synthetic: N tasks that each return about --result-kb of nested numpy arrays, gathered at
   once or in batches of --batch. No NeuRodent I/O.
@@ -73,6 +76,10 @@ def parse_args(argv=None):
     ap.add_argument("mode", choices=["synthetic", "windowed"])
     ap.add_argument("--out", required=True, help="Directory for the instruments' files.")
     ap.add_argument("--workers", type=int, default=4, help="Worker processes, one thread each.")
+    ap.add_argument(
+        "--mem-mb", type=int, default=int(os.environ.get("SLURM_MEM_PER_NODE", 0)) or None,
+        help="The job's memory in MB, which sizes the workers; default SLURM_MEM_PER_NODE.",
+    )
     ap.add_argument("--tcp-timeout", default="30s", help="distributed.comm.timeouts.tcp")
     ap.add_argument("--tick-limit", default="1s", help="distributed.admin.tick.limit")
     ap.add_argument("--cluster-log-level", default="INFO", help="LocalCluster silence_logs level.")
@@ -90,6 +97,8 @@ def parse_args(argv=None):
     args = ap.parse_args(argv)
     if args.mode == "windowed" and not (args.dataset and args.animal):
         ap.error("windowed needs --dataset and --animal")
+    if not args.mem_mb:
+        ap.error("--mem-mb is needed outside a SLURM job with --mem")
     return args
 
 
@@ -239,8 +248,9 @@ def run_windowed(args, recorder):
     az = AnimalAnalyzer(ao)
     if args.with_lof:
         lof = config["analysis"]["channel_filter_config"]["lof"]
+        # Scores only, as compute_lof_scores in generate_wars.py: generation picks no channels
         az.compute_bad_channels(
-            lof_threshold=lof.get("reject_lof_threshold"),
+            lof_threshold=None,
             lof_chunk_duration_s=lof.get("lof_chunk_duration_s", 60),
         )
     cwa = config["analysis"]["war_generation"].get("compute_windowed_analysis", {})
@@ -301,6 +311,8 @@ def main(argv=None):
 
     import dask
     from dask.distributed import Client, LocalCluster
+
+    from neurodent.workflow.utils import local_cluster_kwargs
     from tornado.ioloop import PeriodicCallback
 
     pattern_counter = PatternCounter(recorder)
@@ -350,10 +362,11 @@ def main(argv=None):
     try:
         with (
             LocalCluster(
-                n_workers=args.workers,
-                threads_per_worker=1,
-                interface=None,
-                silence_logs=getattr(logging, args.cluster_log_level.upper()),
+                **{
+                    **local_cluster_kwargs(args.workers, args.mem_mb),
+                    "interface": None,
+                    "silence_logs": getattr(logging, args.cluster_log_level.upper()),
+                }
             ) as cluster,
             Client(cluster) as client,
         ):
