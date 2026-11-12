@@ -76,6 +76,9 @@ def test_filter_all_leaves_the_stored_channels_alone(channels):
     filtered = war.filter_all(inplace=False, min_valid_channels=1)
 
     np.testing.assert_array_equal(_rms(filtered), _rms(expected))
+    # filter_all used to mask the stored channels as well
+    assert not np.isnan(_rms(filtered)[:12, 0]).all()
+    assert not np.isnan(_rms(filtered)[12:, 1]).all()
 
 
 @pytest.mark.parametrize("channels", CHANNEL_SETS)
