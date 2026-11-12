@@ -17,7 +17,10 @@ limit of the cluster's own and the dashboard on port 8787.
   once or in batches of --batch. No NeuRodent I/O.
 - windowed: one animal of a dataset config, optionally one of its sources, loaded as
   war_generation loads it, then compute_windowed_analysis in dask mode with the configured
-  features and chunk size. LOF is skipped unless --with-lof is given.
+  features and chunk size. LOF is skipped unless --with-lof is given. The windows are gathered
+  a batch at a time, as compute_windowed_analysis does since 2026-11-11, or with
+  --single-gather in one dask.compute, as it did before. --save-war keeps the result, for
+  scripts/compare_wars.py.
 
 Instruments, all under --out:
 
@@ -94,6 +97,11 @@ def parse_args(argv=None):
     ap.add_argument("--source", type=int, help="windowed: keep only this index of the animal's sources.")
     ap.add_argument("--temp-dir", help="windowed: temp directory for the zarr cache; default OUT/tmp.")
     ap.add_argument("--with-lof", action="store_true", help="windowed: run compute_bad_channels first.")
+    ap.add_argument(
+        "--single-gather", action="store_true",
+        help="windowed: gather every window in one dask.compute, as before batching.",
+    )
+    ap.add_argument("--save-war", help="windowed: save the WAR in this folder as war.parquet and war.json.")
     args = ap.parse_args(argv)
     if args.mode == "windowed" and not (args.dataset and args.animal):
         ap.error("windowed needs --dataset and --animal")
@@ -264,6 +272,9 @@ def run_windowed(args, recorder):
             chunk_duration_s=cwa.get("chunk_duration_s", 3600),
         )
     recorder.event("windowed_done", windows=len(war.result))
+    if args.save_war:
+        war.save_parquet_and_json(args.save_war, filename="war", slugify_filename=False)
+        recorder.event("war_saved", folder=str(args.save_war))
     return {"windows": len(war.result), "animaldays": list(ao.animaldays)}
 
 
@@ -334,6 +345,27 @@ def main(argv=None):
             recorder.event("compute_end", n_args=len(args_), seconds=seconds)
 
     dask.compute = timed_compute  # animal_analyzer calls dask.compute through the module
+
+    from neurodent.core import utils as core_utils
+
+    real_batches = core_utils.compute_in_batches
+
+    def timed_batches(tasks, batch_size, **kwargs):
+        if args.single_gather:
+            return list(dask.compute(*tasks))  # one gather of every window, timed above
+        start = time.monotonic()
+        state["compute_started"] = time.time()
+        state["in_compute"] = True
+        recorder.event("compute_start", n_args=len(tasks), batch_size=batch_size)
+        try:
+            return real_batches(tasks, batch_size, **kwargs)
+        finally:
+            state["in_compute"] = False
+            seconds = round(time.monotonic() - start, 1)
+            state["computes"].append({"n_args": len(tasks), "batch_size": batch_size, "seconds": seconds})
+            recorder.event("compute_end", n_args=len(tasks), batch_size=batch_size, seconds=seconds)
+
+    core_utils.compute_in_batches = timed_batches  # animal_analyzer calls it through the module
 
     stop = threading.Event()
 
