@@ -851,3 +851,56 @@ class TestSidecarSpikeIndices:
         data = json.loads(json_path.read_text())
         assert data["spike_indices_per_channel"] == [s.tolist() for s in spikes]
         assert data["spike_counts_per_channel"] == [len(s) for s in spikes]
+
+    def _loaded(self, tmp_path, n_channels):
+        spikes, _ = self._saved(tmp_path, n_channels)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return spikes, FrequencyDomainSpikeAnalysisResult.load_fif_and_json(tmp_path)
+
+    @pytest.mark.parametrize("n_channels", list(LATE_SPIKES))
+    def test_spike_events_sit_on_the_exact_samples(self, tmp_path, n_channels):
+        spikes, loaded = self._loaded(tmp_path, n_channels)
+        raw = loaded.result_mne
+
+        events, event_id = loaded._spike_events(raw)
+
+        assert np.all(np.diff(events[:, 0]) >= 0)
+        for ch_idx, want in enumerate(spikes):
+            name = f"Spike_Ch{ch_idx}"
+            if not len(want):
+                assert name not in event_id
+                continue
+            got = events[events[:, 2] == event_id[name], 0] - raw.first_samp
+            np.testing.assert_array_equal(got, np.sort(want))
+        # The events used to come from the FIF annotations, several samples off this late
+        from_annotations, _ = mne.events_from_annotations(raw, verbose=False)
+        assert not np.array_equal(np.sort(from_annotations[:, 0]), events[:, 0])
+
+    def test_spike_averaged_epochs_are_centred_on_the_exact_samples(self, tmp_path, monkeypatch):
+        spikes, loaded = self._loaded(tmp_path, 4)
+        seen = {}
+
+        def epochs(raw, events, event_id, **kwargs):
+            (name,) = event_id
+            seen[name] = events[:, 0] - raw.first_samp
+            return []  # no epochs, so nothing is plotted or saved
+
+        monkeypatch.setattr(mne, "Epochs", epochs)
+        counts = loaded.plot_spike_averaged_traces()
+
+        assert counts == {i: len(s) for i, s in enumerate(spikes)}
+        assert sorted(seen) == [f"Spike_Ch{i}" for i, s in enumerate(spikes) if len(s)]
+        for name, got in seen.items():
+            np.testing.assert_array_equal(got, np.sort(spikes[int(name.removeprefix("Spike_Ch"))]))
+
+    def test_without_spike_indices_the_events_come_from_the_annotations(self):
+        spikes = LATE_SPIKES[4]
+        raw = write_spike_annotations(_raw(4, 5000), spikes)
+        fdsar = FrequencyDomainSpikeAnalysisResult(result_mne=raw, channel_names=raw.ch_names)
+
+        events, event_id = fdsar._spike_events(raw)
+
+        want, want_id = mne.events_from_annotations(raw, verbose=False)
+        np.testing.assert_array_equal(events, want)
+        assert event_id == {k: v for k, v in want_id.items() if k.startswith("Spike_Ch")}

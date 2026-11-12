@@ -550,7 +550,10 @@ class FrequencyDomainSpikeAnalysisResult:
         """
         Plot spike-triggered averages for each channel.
 
-        Based on plot_spike_evoked_by_channel from the pipeline script.
+        Based on plot_spike_evoked_by_channel from the pipeline script. Epochs are centred
+        on each spike's exact sample when this result has ``spike_indices`` (see
+        :meth:`_spike_events`); they used to be centred on the FIF annotation onsets, which
+        fall a sample or more off past about 4.6 hours of recording.
 
         Args:
             tmin: Start time for epochs (seconds)
@@ -567,8 +570,7 @@ class FrequencyDomainSpikeAnalysisResult:
             raise ValueError("No MNE RawArray available for plotting")
 
         raw = self.result_mne
-        events, event_id = mne.events_from_annotations(raw)
-        spike_event_id = {k: v for k, v in event_id.items() if k.startswith("Spike_Ch")}
+        events, spike_event_id = self._spike_events(raw)
 
         if not spike_event_id:
             logging.warning("No spike events with label 'Spike_Ch*' found.")
@@ -638,6 +640,38 @@ class FrequencyDomainSpikeAnalysisResult:
                 raise RuntimeError(f"Failed to create plot for {event_name}") from e
 
         return event_counts
+
+    def _spike_events(self, raw: mne.io.BaseRaw) -> tuple[np.ndarray, dict]:
+        """MNE events for the spikes on ``raw``, and the ids of the channels that have any.
+
+        With ``spike_indices``, each event sits on its detected sample, ``raw.first_samp``
+        included, and channel i is ``Spike_Ch{i}`` with id i + 1. Without them, the events
+        come from the ``Spike_Ch{i}`` annotations of ``raw``, as they always used to. A FIF
+        stores annotation onsets as float32, so those events fall a sample or more off past
+        about 4.6 hours of recording.
+
+        Args:
+            raw (mne.io.BaseRaw): The recording the spikes belong to.
+
+        Returns:
+            tuple[np.ndarray, dict]: The events, sorted by sample, and ``{"Spike_Ch{i}": id}``
+            for every channel with at least one spike.
+        """
+        if not self.spike_indices:
+            events, event_id = mne.events_from_annotations(raw)
+            return events, {k: v for k, v in event_id.items() if k.startswith(SPIKE_ANNOTATION_PREFIX)}
+        rows, event_id = [], {}
+        for ch_idx, indices in enumerate(self.spike_indices):
+            indices = np.sort(np.asarray(indices, dtype=np.int64))
+            if not indices.size:
+                continue
+            code = ch_idx + 1
+            event_id[f"{SPIKE_ANNOTATION_PREFIX}{ch_idx}"] = code
+            rows.append(np.column_stack(
+                [indices + raw.first_samp, np.zeros_like(indices), np.full_like(indices, code)]
+            ))
+        events = np.concatenate(rows) if rows else np.empty((0, 3), dtype=np.int64)
+        return events[np.argsort(events[:, 0], kind="stable")], event_id
 
     def get_spike_counts_per_channel(self) -> list[int]:
         """
