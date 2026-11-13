@@ -1,0 +1,485 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Basic Usage Tutorial\n",
+    "\n",
+    "This tutorial will walk you through the basic workflow of using Neurodent for rodent EEG analysis.\n",
+    "\n",
+    "## Overview\n",
+    "\n",
+    "Neurodent provides a streamlined workflow for:\n",
+    "1. Loading EEG recordings from various formats\n",
+    "2. Extracting features from continuous data (Windowed Analysis)\n",
+    "3. Visualizing and analyzing results\n",
+    "\n",
+    "Let's get started!"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 1. Installation and Setup\n",
+    "\n",
+    "First, ensure you have Neurodent installed. See the [Installation Guide](../installation/index.html) for detailed instructions.\n",
+    "\n",
+    "```bash\n",
+    "pip install neurodent\n",
+    "```\n",
+    "\n",
+    "Or with uv:\n",
+    "```bash\n",
+    "uv init yourprojectname\n",
+    "cd yourprojectname\n",
+    "uv add neurodent\n",
+    "```"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 2. Import Required Modules\n",
+    "\n",
+    "Let's import the necessary modules from Neurodent:\n",
+    "\n",
+    "> **Tip:** To see detailed progress information during processing, check out the [Configuration Guide](configuration.ipynb) to learn how to enable logging.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from pathlib import Path\n",
+    "from datetime import datetime\n",
+    "\n",
+    "import matplotlib.pyplot as plt\n",
+    "\n",
+    "from neurodent import core, visualization, constants"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 3. Configure Temporary Directory (Optional)\n",
+    "\n",
+    "Neurodent uses a temporary directory for intermediate files during processing. You can set this to a location with sufficient space:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Set temporary directory for intermediate files\n",
+    "# core.set_temp_directory(\"/path/to/your/temp/dir\")\n",
+    "\n",
+    "# Or use the default temp directory\n",
+    "print(f\"Using temp directory: {core.get_temp_directory()}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 4. Load EEG Data\n",
+    "\n",
+    "Neurodent supports multiple data formats through `LongRecordingOrganizer` (LRO):\n",
+    "- **SpikeInterface mode** (`mode=\"si\"`): Load any format supported by SpikeInterface (EDF, NWB, Open Ephys, Neuralynx, binary, etc.). Use `extract_func` for custom readers.\n",
+    "- **MNE mode** (`mode=\"mne\"`): Load any format supported by MNE-Python.\n",
+    "- **Pre-created recording** (`mode=None, recording=...`): Pass an already-loaded SpikeInterface `BaseRecording` directly.\n",
+    "\n",
+    "### Loading a single file\n",
+    "\n",
+    "The simplest way to load data is to point LRO to a file path.  Here we\n",
+    "load a small EDF recording shipped with the repository:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Load an EDF file by passing a single path\n",
+    "lro = core.LongRecordingOrganizer(\n",
+    "    item=\"../../.tests/integration/data/A10/A10_recording.edf\",\n",
+    "    mode=\"si\",\n",
+    "    extract_func=\"read_edf\",\n",
+    "    manual_datetimes=datetime(2023, 12, 13),\n",
+    ")\n",
+    "\n",
+    "print(f\"Sampling frequency: {lro.meta.f_s}\")\n",
+    "print(f\"Number of channels: {lro.meta.n_channels}\")\n",
+    "print(f\"Duration: {lro.LongRecording.get_total_duration():.1f} s\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Loading multi-file formats with ``DiscoveredFile``\n",
+    "\n",
+    "Some formats consist of multiple files per recording (e.g. a `.bin`\n",
+    "data file paired with a `.csv` metadata file).  Wrap these paths in\n",
+    "a `DiscoveredFile` so the LRO treats them as a single unit:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from neurodent.core.discovery import DiscoveredFile\n",
+    "\n",
+    "# Two files that together form one recording\n",
+    "discovered = DiscoveredFile(\n",
+    "    paths=(\n",
+    "        \"../../.tests/integration/data/A10/Cage 2 A10-0_ColMajor.bin\",\n",
+    "        \"../../.tests/integration/data/A10/Cage 2 A10-0_Meta.csv\",\n",
+    "    ),\n",
+    ")\n",
+    "\n",
+    "lro_bin = core.LongRecordingOrganizer(\n",
+    "    item=discovered,\n",
+    "    mode=\"si\",\n",
+    "    extract_func=\"../../tests/integration/readers.py:read_bin_csv_pair\",\n",
+    "    manual_datetimes=datetime(2023, 12, 13),\n",
+    ")\n",
+    "\n",
+    "print(f\"Sampling frequency: {lro_bin.meta.f_s}\")\n",
+    "print(f\"Number of channels: {lro_bin.meta.n_channels}\")\n",
+    "print(f\"Channel names: {lro_bin.meta.channel_names}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 5. Create Animal Organizer\n",
+    "\n",
+    "The `AnimalOrganizer` (AO) uses placeholder patterns (e.g. `{animal}`,\n",
+    "`{session}`) to discover and group recordings automatically.  For\n",
+    "multi-file formats, pass a **list** of patterns — one per file type:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Multi-pattern for paired bin/csv files\n",
+    "ao = visualization.AnimalOrganizer(\n",
+    "    pattern=[\n",
+    "        \"../../.tests/integration/data/{animal}/*_ColMajor.bin\",\n",
+    "        \"../../.tests/integration/data/{animal}/*_Meta.csv\",\n",
+    "    ],\n",
+    "    animal_id=\"A10\",\n",
+    "    assume_from_number=True,  # parse channel aliases from numbers\n",
+    "    lro_kwargs={\n",
+    "        \"mode\": \"si\",\n",
+    "        \"extract_func\": \"../../tests/integration/readers.py:read_bin_csv_pair\",\n",
+    "        \"manual_datetimes\": datetime(2023, 12, 13),\n",
+    "    },\n",
+    ")\n",
+    "\n",
+    "print(f\"Animal Organizer created for {ao.animal_id}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 6. Compute Windowed Analysis Results (WAR)\n",
+    "\n",
+    "Now we can compute features from the EEG data. Neurodent extracts features in time windows:\n",
+    "\n",
+    "### Available Features:\n",
+    "\n",
+    "**Linear Features** (per channel):\n",
+    "- `rms`: RMS amplitude\n",
+    "- `logrms`: Log RMS amplitude\n",
+    "- `ampvar`: Amplitude variance\n",
+    "- `logampvar`: Log amplitude variance\n",
+    "- `psdtotal`: Total PSD power\n",
+    "- `logpsdtotal`: Log total PSD power\n",
+    "- `psdslope`: PSD slope\n",
+    "- `nspike`: Number of spikes detected\n",
+    "- `lognspike`: Log number of spikes\n",
+    "\n",
+    "**Band Features** (per frequency band: delta, theta, alpha, beta, gamma):\n",
+    "- `psdband`: Band power\n",
+    "- `logpsdband`: Log band power\n",
+    "- `psdfrac`: Fractional band power\n",
+    "- `logpsdfrac`: Log fractional band power\n",
+    "\n",
+    "**Connectivity/Matrix Features** (between channels):\n",
+    "- `cohere`: Coherence\n",
+    "- `zcohere`: Z-scored coherence\n",
+    "- `imcoh`: Imaginary coherence\n",
+    "- `zimcoh`: Z-scored imaginary coherence\n",
+    "- `pcorr`: Pearson correlation\n",
+    "- `zpcorr`: Z-scored Pearson correlation\n",
+    "\n",
+    "**Spectral Features**:\n",
+    "- `psd`: Full power spectral density"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Compute windowed analysis with selected features\n",
+    "# You can specify 'all' or list specific features\n",
+    "features = ['rms', 'psdband', 'cohere', 'psd']\n",
+    "\n",
+    "war = ao.compute_windowed_analysis(\n",
+    "    features=features,\n",
+    "    multiprocess_mode='serial'  # Options: 'serial', 'multiprocess', 'dask'\n",
+    ")\n",
+    "\n",
+    "print(f\"Windowed analysis completed!\")\n",
+    "print(f\"Features computed: {features}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 7. Filter and Clean Data\n",
+    "\n",
+    "Neurodent provides filtering methods to remove artifacts and outliers:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Apply filtering using method chaining\n",
+    "war_filtered = (\n",
+    "    war\n",
+    "    .filter_logrms_range(z_range=3)  # Remove outliers based on log RMS\n",
+    "    .filter_high_rms(max_rms=500)     # Remove high amplitude artifacts\n",
+    "    .filter_low_rms(min_rms=10)       # Remove low amplitude periods\n",
+    ")\n",
+    "\n",
+    "print(\"Filtering completed!\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 8. Basic Visualization\n",
+    "\n",
+    "### Single Animal Plots\n",
+    "\n",
+    "Use `AnimalPlotter` to visualize data over time from a single animal. **Note**: Do NOT aggregate time windows before plotting - the plotter needs the temporal data intact:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Create plotter for single animal\n",
+    "ap = visualization.AnimalPlotter(war_filtered)\n",
+    "\n",
+    "# Plot RMS over time\n",
+    "fig = ap.plot_linear_temporal(features=['rms'])\n",
+    "plt.show()\n",
+    "\n",
+    "# Plot PSD band powers\n",
+    "fig = ap.plot_psd_spectrogram()\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 9. Aggregate Time Windows (Optional)\n",
+    "\n",
+    "You can flatten all windows into a single value by averaging across time. This saves memory and gives you a summary statistic across an entire session.\n",
+    "\n",
+    "> **Note:** You should not aggregate before plotting time-series data with `AnimalPlotter`, as this removes the temporal information needed for over-time visualizations."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Example: Aggregate for summary statistics\n",
+    "# Only do this if you need a single value per animal/session\n",
+    "war_aggregated = war_filtered.copy()\n",
+    "war_aggregated.aggregate_time_windows()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Multi-Animal Comparison\n",
+    "\n",
+    "To compare across multiple animals, use `ExperimentPlotter`.  Here we\n",
+    "build a second WAR for animal F22 so we can compare the two:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Build a WAR for a second animal (F22)\n",
+    "ao_f22 = visualization.AnimalOrganizer(\n",
+    "    pattern=[\n",
+    "        \"../../.tests/integration/data/{animal}/*_ColMajor.bin\",\n",
+    "        \"../../.tests/integration/data/{animal}/*_Meta.csv\",\n",
+    "    ],\n",
+    "    animal_id=\"F22\",\n",
+    "    assume_from_number=True,\n",
+    "    lro_kwargs={\n",
+    "        \"mode\": \"si\",\n",
+    "        \"extract_func\": \"../../tests/integration/readers.py:read_bin_csv_pair\",\n",
+    "        \"manual_datetimes\": datetime(2023, 12, 12),\n",
+    "    },\n",
+    ")\n",
+    "\n",
+    "war_f22 = ao_f22.compute_windowed_analysis(\n",
+    "    features=features, multiprocess_mode=\"serial\"\n",
+    ")\n",
+    "war_f22_filtered = (\n",
+    "    war_f22\n",
+    "    .filter_logrms_range(z_range=3)\n",
+    "    .filter_high_rms(max_rms=500)\n",
+    "    .filter_low_rms(min_rms=10)\n",
+    ")\n",
+    "\n",
+    "# Create ExperimentPlotter with both animals\n",
+    "wars = [war_filtered, war_f22_filtered]\n",
+    "\n",
+    "ep = visualization.ExperimentPlotter(\n",
+    "    wars,\n",
+    "    features=features,\n",
+    "    exclude=['nspike', 'lognspike'],\n",
+    "    plot_order={'genotype': ['Unknown']},  # genotype is set via samples config; 'Unknown' is the default\n",
+    ")\n",
+    "\n",
+    "# Categorical plot grouped by genotype\n",
+    "g = ep.plot_catplot(\n",
+    "    'rms',\n",
+    "    groupby='genotype',\n",
+    "    kind='box',\n",
+    "    catplot_params={'showfliers': False},\n",
+    ")\n",
+    "plt.show()\n",
+    "\n",
+    "# PSD band powers grouped by genotype\n",
+    "g = ep.plot_catplot(\n",
+    "    'psdband',\n",
+    "    groupby='genotype',\n",
+    "    x='genotype',\n",
+    "    hue='band',\n",
+    "    kind='box',\n",
+    "    collapse_channels=True,\n",
+    "    catplot_params={'showfliers': False},\n",
+    ")\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 10. Save Results\n",
+    "\n",
+    "You can save your WAR objects for later analysis:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import tempfile\n",
+    "\n",
+    "# Use a temporary directory for demonstration purposes\n",
+    "with tempfile.TemporaryDirectory() as tmpdir:\n",
+    "    output_path = Path(tmpdir) / \"A10\"\n",
+    "    output_path.mkdir(parents=True, exist_ok=True)\n",
+    "\n",
+    "    # Save WAR\n",
+    "    war_filtered.save_pickle_and_json(folder=output_path)\n",
+    "    print(f\"WAR saved to {output_path}\")\n",
+    "\n",
+    "    # Load WAR\n",
+    "    war_loaded = visualization.WindowAnalysisResult.load_pickle_and_json(output_path)\n",
+    "    print(f\"Loaded result for {war_loaded.animal_id}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Summary\n",
+    "\n",
+    "In this tutorial, you learned how to:\n",
+    "\n",
+    "1. Import and configure Neurodent\n",
+    "2. Load EEG data using `LongRecordingOrganizer` (single path and `DiscoveredFile`)\n",
+    "3. Create an `AnimalOrganizer` for feature extraction\n",
+    "4. Compute windowed analysis features (`WindowAnalysisResult`)\n",
+    "5. Filter and clean data\n",
+    "6. (Optionally) Aggregate time windows for summary statistics\n",
+    "7. Visualize results using `AnimalPlotter` and `ExperimentPlotter`\n",
+    "8. Save and load results\n",
+    "\n",
+    "## Next Steps\n",
+    "\n",
+    "- **[Data Loading Tutorial](data_loading.ipynb)**: Learn about loading different data formats\n",
+    "- **[Windowed Analysis Tutorial](../tutorials/windowed_analysis.ipynb)**: Deep dive into feature extraction\n",
+    "- **[Visualization Tutorial](../tutorials/visualization.ipynb)**: Advanced plotting techniques\n",
+    "- **[Spike Analysis Tutorial](../tutorials/spike_analysis.ipynb)**: Working with spike-sorted data"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": ".venv",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.10.8"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
