@@ -24,8 +24,10 @@ limit of the cluster's own and the dashboard on port 8787.
 
 Instruments, all under --out:
 
-- stacks.txt: every thread's stack, each minute and on a fatal signal such as a segfault
-  (faulthandler, which needs no GIL).
+- stacks.txt: every thread's stack, every --stacks-every minutes and on a fatal signal such as a
+  segfault (faulthandler). --stacks-every 0 keeps only the fatal-signal dump: on Python 3.10 the
+  periodic dump reads other threads' frames without the GIL, and four of the runs of 2026-11-11
+  and 2026-11-12 that used it segfaulted in the cluster's event-loop thread.
 - events.jsonl: each dask.compute call's start and end, garbage collections over 0.5 s,
   event-loop lag over 1 s on the cluster's loop, and log records from distributed about
   gathers, unresponsive loops, failed transfers and lost workers.
@@ -89,6 +91,8 @@ def parse_args(argv=None):
     ap.add_argument("--stuck-min", type=float, default=30, help="Minutes without a new result.")
     ap.add_argument("--deadline-min", type=float, default=300, help="Minutes for the whole run.")
     ap.add_argument("--every", type=int, default=500, help="Results between scheduler records.")
+    ap.add_argument("--stacks-every", type=float, default=1.0,
+                    help="Minutes between stack dumps; 0 dumps only on a fatal signal.")
     ap.add_argument("--n-tasks", type=int, default=51000, help="synthetic: tasks.")
     ap.add_argument("--result-kb", type=int, default=120, help="synthetic: size of each result.")
     ap.add_argument("--batch", type=int, default=0, help="synthetic: tasks per gather; 0 is all.")
@@ -290,7 +294,8 @@ def main(argv=None):
     recorder = Recorder(out / "events.jsonl")
     stacks = open(out / "stacks.txt", "a", buffering=1, encoding="utf-8")
     faulthandler.enable(file=stacks, all_threads=True)
-    faulthandler.dump_traceback_later(60, repeat=True, file=stacks)
+    if args.stacks_every > 0:
+        faulthandler.dump_traceback_later(60 * args.stacks_every, repeat=True, file=stacks)
     state = {"in_compute": False, "computes": [], "max_loop_lag": 0.0, "max_gc": 0.0, "status": "running"}
     summary_path = out / "summary.json"
     scheduler_path = out / "scheduler.jsonl"
