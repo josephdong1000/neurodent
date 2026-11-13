@@ -297,6 +297,35 @@ def load_dataset_config(
     return merged
 
 
+EXECUTION_ONLY_KEYS = ("cluster", "temp_directory", "active_dataset")
+"""Top-level config keys that decide how and where a job runs, never what it writes."""
+
+
+def analysis_config(config: dict) -> dict:
+    """Return the part of the pipeline config that can change what a rule writes.
+
+    Every rule passes this to its job as the ``config`` param, instead of the whole config.
+    Snakemake reruns a job when its params change, so a rule that passed the whole config
+    reran on any edit to job sizes, the scratch directory or the dataset name, none of which
+    changes an output. That is why finishing a run needed ``--rerun-triggers mtime input``.
+    This copy leaves out the keys in ``EXECUTION_ONLY_KEYS``: ``cluster`` (job sizes),
+    ``temp_directory`` and ``active_dataset``. A script that needs one of them reads it from
+    ``snakemake.config``, which is not a rerun trigger.
+
+    Args:
+        config (dict): The merged pipeline config, as the Snakefile holds it.
+
+    Returns:
+        dict: A deep copy of ``config`` without the execution-only keys, with the remaining
+        keys in their original order, so the params of a job do not change between runs.
+    """
+    return {
+        key: copy.deepcopy(value)
+        for key, value in config.items()
+        if key not in EXECUTION_ONLY_KEYS
+    }
+
+
 def enumerate_cohort(samples_config: dict) -> list:
     """Return the ordered, de-duplicated list of animal ids in a samples config.
 

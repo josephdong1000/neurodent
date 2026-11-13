@@ -35,6 +35,7 @@ __all__ = [
     "FilterSpec",
     "compute_filter_mask",
     "register_filter",
+    "require_bad_channels_dict",
     "required_columns_for_config",
     "update_bad_channels_dict_from_config",
 ]
@@ -230,6 +231,24 @@ def _filter_reject_channels(
     return mask
 
 
+def require_bad_channels_dict(bad_channels_dict) -> None:
+    """Refuse a reject_channels_by_session filter that was given no bad_channels_dict.
+
+    The filter masks only the channels it is given. Without a dict it used to mask the WAR's
+    stored bad_channels_dict in a WindowAnalysisResult and nothing in a streaming result, so
+    the two disagreed, and the stored dict held LOF's picks from WAR generation.
+
+    Raises:
+        ValueError: If ``bad_channels_dict`` is None.
+    """
+    if bad_channels_dict is None:
+        raise ValueError(
+            "reject_channels_by_session needs a bad_channels_dict, the channels to reject for "
+            "each animalday. Pass one, {} to reject none. It no longer uses the WAR's stored "
+            "bad_channels_dict."
+        )
+
+
 def _filter_reject_channels_by_session(
     df_stats: pd.DataFrame,
     channel_info: ChannelInfo,
@@ -239,6 +258,7 @@ def _filter_reject_channels_by_session(
     use_abbrevs: bool | None = None,
     **_kwargs: Any,
 ) -> np.ndarray:
+    require_bad_channels_dict(bad_channels_dict)
     n_channels = len(channel_info.channel_names)
     mask = np.ones((n_windows, n_channels), dtype=bool)
     if not bad_channels_dict:

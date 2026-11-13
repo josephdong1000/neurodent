@@ -21,12 +21,15 @@ Running
 
 """
 
+import copy
 from pathlib import Path
 
+import jsonschema
 import pytest
 import yaml
 
 from neurodent.workflow.utils import format_config_value, increment_memory
+from neurodent.workflow.utils.config import load_dataset_config
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -130,3 +133,67 @@ class TestConfigSchema:
         assert isinstance(cfg, dict), (
             f"Dataset config '{dataset}' should be a non-empty YAML mapping"
         )
+
+
+def _schema():
+    return yaml.safe_load(
+        (REPO_ROOT / "workflow" / "schemas" / "config.schema.yaml").read_text(encoding="utf-8")
+    )
+
+
+def _merged_config(dataset, tmp_path):
+    return load_dataset_config(
+        dataset,
+        config_path=REPO_ROOT / "config" / "config.yaml",
+        local_path=tmp_path / "no_local_override.yaml",
+        datasets_dir=REPO_ROOT / "config" / "datasets",
+    )
+
+
+def _errors(config):
+    schema = _schema()
+    validator = jsonschema.validators.validator_for(schema)
+    validator.check_schema(schema)
+    return [error.message for error in validator(schema).iter_errors(config)]
+
+
+class TestClusterSchema:
+    """The schema lists the keys of every cluster block and refuses anything else."""
+
+    @pytest.mark.parametrize(
+        "dataset",
+        [p.stem for p in sorted((REPO_ROOT / "config" / "datasets").glob("*.yaml"))],
+    )
+    def test_every_dataset_config_validates(self, dataset, tmp_path):
+        assert _errors(_merged_config(dataset, tmp_path)) == []
+
+    @pytest.mark.parametrize("block", ["split_joint_recordings", "frequency_domain_spike_detection"])
+    def test_the_unused_blocks_are_gone_and_refused(self, block, tmp_path):
+        config = _merged_config("example", tmp_path)
+        assert block not in config["cluster"]
+        config["cluster"][block] = copy.deepcopy(config["cluster"]["ep_figures"])
+        assert any(block in message for message in _errors(config))
+
+    @pytest.mark.parametrize(
+        "block, key",
+        [
+            ("diagnostic_figures", "interface"),  # only war_generation starts a Dask cluster
+            ("ep_figures", "mem_bytes_per_window"),  # its rule reads no WARs
+            ("war_standardize", "seconds_per_value"),  # its time is not computed
+            ("war_generation", "mem_mb_floor"),  # a typo
+        ],
+    )
+    def test_a_key_its_rules_do_not_read_is_refused(self, block, key, tmp_path):
+        config = _merged_config("example", tmp_path)
+        config["cluster"][block][key] = 1
+        assert any(key in message for message in _errors(config))
+
+    @pytest.mark.parametrize(
+        "block, key",
+        [("war_zeitgeber", "seconds_per_window"), ("war_flattening", "mem_bytes_per_window"),
+         ("notebook", "retries"), ("war_generation", "interface")],
+    )
+    def test_a_key_its_rules_need_is_required(self, block, key, tmp_path):
+        config = _merged_config("example", tmp_path)
+        del config["cluster"][block][key]
+        assert any(key in message for message in _errors(config))

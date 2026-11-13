@@ -27,19 +27,17 @@ rule war_channel_filtering_manual:
     output:
         war_parquet="results/wars_channel_filtered_manual/{animal}/war.parquet",
         war_json="results/wars_channel_filtered_manual/{animal}/war.json",
-    threads: 1
+    threads: config["cluster"]["war_channel_filtering"]["threads"]
     retries:
         config["cluster"]["war_channel_filtering"]["retries"]
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
         animal_folder=get_animal_folder,
         animal_id=get_animal_id,
         filter_type="manual",
     resources:
-        time=config["cluster"]["war_channel_filtering"]["time"],
-        mem_mb=increment_memory(config["cluster"]["war_channel_filtering"]["mem_mb"]),
-        nodes=config["cluster"]["war_channel_filtering"]["nodes"],
+        **rule_resources(config["cluster"]["war_channel_filtering"], war_loading="streamed"),
     log:
         stdout="logs/war_channel_filtering_manual/{animal}.out",
         stderr="logs/war_channel_filtering_manual/{animal}.err",
@@ -57,19 +55,17 @@ rule war_channel_filtering_lof:
     output:
         war_parquet="results/wars_channel_filtered_lof/{animal}/war.parquet",
         war_json="results/wars_channel_filtered_lof/{animal}/war.json",
-    threads: 1
+    threads: config["cluster"]["war_channel_filtering"]["threads"]
     retries:
         config["cluster"]["war_channel_filtering"]["retries"]
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
         animal_folder=get_animal_folder,
         animal_id=get_animal_id,
         filter_type="lof",
     resources:
-        time=config["cluster"]["war_channel_filtering"]["time"],
-        mem_mb=increment_memory(config["cluster"]["war_channel_filtering"]["mem_mb"]),
-        nodes=config["cluster"]["war_channel_filtering"]["nodes"],
+        **rule_resources(config["cluster"]["war_channel_filtering"], war_loading="streamed"),
     log:
         stdout="logs/war_channel_filtering_lof/{animal}.out",
         stderr="logs/war_channel_filtering_lof/{animal}.err",

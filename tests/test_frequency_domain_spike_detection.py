@@ -259,39 +259,6 @@ class TestFrequencyDomainSpikeDetector:
         # Verify NumpyRecording was created with filtered data
         mock_numpy_recording.assert_called_once()
 
-    def test_add_spike_annotations(self):
-        """Test MNE annotation creation."""
-        # Create simple MNE object
-        n_channels = 3
-        fs = 1000.0
-        duration = 5.0
-        n_samples = int(duration * fs)
-
-        info = mne.create_info(ch_names=[f"ch{i}" for i in range(n_channels)], sfreq=fs, ch_types="eeg")
-        data = np.random.randn(n_channels, n_samples) * 0.1
-        raw = mne.io.RawArray(data, info)
-
-        # Create spike indices
-        spike_indices_per_channel = [
-            np.array([500, 1500, 3000]),  # ch0
-            np.array([800, 2200]),  # ch1
-            np.array([]),  # ch2 (no spikes)
-        ]
-
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=RuntimeWarning)
-
-            annotated_raw = FrequencyDomainSpikeDetector._add_spike_annotations(raw, spike_indices_per_channel, fs)
-
-        # Check annotations
-        annotations = annotated_raw.annotations
-        assert len(annotations) == 5  # 3 + 2 + 0 spikes
-
-        # Check annotation descriptions
-        descriptions = annotations.description
-        spike_descriptions = [desc for desc in descriptions if desc.startswith("Spike_Ch")]
-        assert len(spike_descriptions) == 5
-
     @patch.object(FrequencyDomainSpikeDetector, "_preprocess_array")
     @patch.object(FrequencyDomainSpikeDetector, "_detect_spikes_channel")
     def test_detect_spikes_recording_serial(

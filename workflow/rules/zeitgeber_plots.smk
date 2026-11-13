@@ -18,16 +18,14 @@ rule zeitgeber_plots:
         figure_dir=directory("results/zeitgeber_plots/"),
         data_dir=directory("results/zeitgeber_plot_data/"),
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
     threads:
         config["cluster"]["zeitgeber_plots"]["threads"]
     retries:
         config["cluster"]["zeitgeber_plots"]["retries"]
     resources:
-        time=config["cluster"]["zeitgeber_plots"]["time"],
-        mem_mb=increment_memory(config["cluster"]["zeitgeber_plots"]["mem_mb"]),
-        nodes=config["cluster"]["zeitgeber_plots"]["nodes"],
+        **rule_resources(config["cluster"]["zeitgeber_plots"]),
     log:
         stdout="logs/zeitgeber_plots/zeitgeber_plots.out",
         stderr="logs/zeitgeber_plots/zeitgeber_plots.err",

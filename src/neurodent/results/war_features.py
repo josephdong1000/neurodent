@@ -10,6 +10,7 @@ import pandas as pd
 
 from neurodent import constants
 from neurodent.constants import FeatureNames, FeatureRequest
+from neurodent.core.utils import channel_averaged_columns
 from .feature_utils import average_feature, extract_linear_array
 
 
@@ -126,9 +127,15 @@ class WARFeatureMixin:
            frequency band's connectivity matrix and averages the upper triangle
            (excluding diagonal). Creates columns like: zcohere_delta, zcohere_theta, etc.
 
+        Every feature's columns are named by
+        :func:`neurodent.core.utils.channel_averaged_columns`, so psdslope gives
+        psdslope_slope and psdslope_intercept. psd, a spectrum per channel, has no
+        channel-averaged value: naming it raises, and None or "all" leave it out. It used to
+        be passed through unaveraged.
+
         Args:
             features: Feature name, list of feature names,
-                or None to return all features. Can include any combination of linear, band,
+                or None to return all features except psd. Can include any combination of linear, band,
                 or matrix features. Defaults to None (all features).
             exclude: Feature name or list of feature names to
                 exclude. Defaults to [].
@@ -141,6 +148,10 @@ class WARFeatureMixin:
                 - Band features expanded to 5 columns per feature (one per frequency band)
                 - Matrix features expanded to 5 columns per feature (one per frequency band)
                 - All feature values are scalars (float)
+                - Requested features the WAR does not have are left out
+
+        Raises:
+            ValueError: If psd is named, or a feature's columns could not be made.
 
         Example:
             >>> war = WindowAnalysisResult.load_parquet_and_json(folder_path, "war.parquet", "war_metadata.json")
@@ -164,11 +175,17 @@ class WARFeatureMixin:
         """
         from neurodent import constants
 
+        every_feature = features is None or features == "all" or (
+            not isinstance(features, str) and list(features) == ["all"]
+        )
         features = _sanitize_feature_request(features, exclude)
+        if every_feature:
+            features = [f for f in features if f not in constants.HIST_FEATURES]
         result_win = self.result if df is None else df
 
         # Filter to only features that exist in the dataframe
         available_features = [f for f in features if f in result_win.columns]
+        columns_by_feature = {f: channel_averaged_columns(f) for f in available_features}
 
         # Get the base result with requested features
         df_result = result_win.loc[
@@ -181,12 +198,6 @@ class WARFeatureMixin:
         ]
         banded_matrix_features_in_data = [
             f for f in available_features if f in constants.BANDED_MATRIX_FEATURES
-        ]
-        simple_matrix_features_in_data = [
-            f for f in available_features if f in constants.SIMPLE_MATRIX_FEATURES
-        ]
-        simple_features_in_data = [
-            f for f in available_features if f in constants.LINEAR_FEATURES
         ]
         linear_2d_features_in_data = [
             f for f in available_features if f in constants.LINEAR_2D_FEATURES
@@ -215,27 +226,13 @@ class WARFeatureMixin:
                     df_result, linear_2d_feature
                 )
 
-        # Build list of features to average
-        features_to_average = []
-        features_to_average.extend(simple_features_in_data)
-        features_to_average.extend(
-            simple_matrix_features_in_data
-        )  # pcorr, zpcorr (no bands)
-
-        for band_feature in band_features_in_data:
-            for band in constants.BAND_NAMES:
-                features_to_average.append(f"{band_feature}_{band}")
-
-        for matrix_feature in banded_matrix_features_in_data:
-            for band in constants.BAND_NAMES:
-                features_to_average.append(f"{matrix_feature}_{band}")
-
-        # LINEAR_2D features: each gets one per-component expanded column.
-        for linear_2d_feature in linear_2d_features_in_data:
-            for component in constants.COMPONENT_LABELS.get(linear_2d_feature, []):
-                features_to_average.append(f"{linear_2d_feature}_{component}")
-
-        # Average all features across channels
+        # Average every feature's columns, as channel_averaged_columns names them
+        features_to_average = [
+            column for feature in available_features for column in columns_by_feature[feature]
+        ]
+        missing = [column for column in features_to_average if column not in df_result.columns]
+        if missing:
+            raise ValueError(f"Channel averaging did not make the columns {missing}")
         df_result = self._average_across_channels(df_result, features_to_average)
 
         # Drop original band/banded-matrix/linear-2d features (now that

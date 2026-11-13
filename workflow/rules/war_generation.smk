@@ -26,15 +26,13 @@ rule war_generation:
         animal_id=get_animal_id,
         is_split_recording=lambda wc: get_joint_session_channels(wc) is not None,
         channel_subset=get_joint_session_channels,  # None for regular animals, list for joint sessions
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
     threads: config["cluster"]["war_generation"]["threads"]
     retries:
         config["cluster"]["war_generation"]["retries"]
     resources:
-        time=config["cluster"]["war_generation"]["time"],
-        mem_mb=increment_memory(config["cluster"]["war_generation"]["mem_mb"]),
-        nodes=config["cluster"]["war_generation"]["nodes"],
+        **rule_resources(config["cluster"]["war_generation"]),
     log:
         stdout="logs/war_generation/{animal}.out",
         stderr="logs/war_generation/{animal}.err",

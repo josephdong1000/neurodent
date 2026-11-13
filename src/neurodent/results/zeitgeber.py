@@ -11,52 +11,93 @@ import numpy as np
 from pathlib import Path
 from neurodent import constants
 from neurodent.core import metadata as metadata_module
-from neurodent.core.utils import normalize_value_from_aliases
+from neurodent.core.utils import channel_averaged_columns, normalize_value_from_aliases
 
 logger = logging.getLogger(__name__)
 
 
 def get_expanded_feature_names(base_features):
     """
-    Expand base feature names into their full column names (e.g. bands, matrix features).
-    
-    Uses neurodent.constants to determine expansion rules.
-    
-    - BAND_FEATURES and BANDED_MATRIX_FEATURES get expanded to per-band columns (e.g. zcohere_delta)
-    - SIMPLE_MATRIX_FEATURES, LINEAR_FEATURES, and HIST_FEATURES remain as single columns (e.g. zpcorr)
+    Expand base feature names into their channel-averaged column names.
+
+    Each feature is named by :func:`neurodent.core.utils.channel_averaged_columns`, the one
+    rule ``get_channel_averaged_result`` follows: band and banded matrix features give one
+    column per band (e.g. zcohere_delta), multi-component features one per component
+    (psdslope_slope, psdslope_intercept), and the rest keep their name (e.g. zpcorr). This
+    function used to apply its own rule, which kept psdslope whole, so the zeitgeber
+    extraction dropped psdslope's columns, and which passed unknown names and psd through.
+    Those now raise.
 
     Args:
         base_features (list[str]): List of base feature names (e.g. ['logpsdband', 'rms', 'zpcorr']).
 
     Returns:
         list[str]: List of expanded column names.
+
+    Raises:
+        ValueError: For a name that is not a feature, or for psd.
     """
-    from neurodent import constants
-    
-    expanded_features = []
-    
-    for feature in base_features:
-        ftype = constants.FEATURE_TYPES.get(feature)
-        if ftype is not None and ftype.is_dict_stored:
-            # Expand into per-band features (e.g. zcohere -> zcohere_delta, zcohere_theta, ...)
-            for band in constants.BAND_NAMES:
-                expanded_features.append(f"{feature}_{band}")
-        else:
-            # LINEAR, SIMPLE_MATRIX, HIST, and unknown features remain as single columns
-            expanded_features.append(feature)
-            
-    return expanded_features
+    return [column for feature in base_features for column in channel_averaged_columns(feature)]
+
+
+ZEITGEBER_BIN_COLUMNS = ["animal", "genotype", "sex", "zt_minutes", "daynight"]
+"""The columns that define one zeitgeber bin, in the order they lead the aggregated frame."""
+
+
+def aggregate_zeitgeber_bins(df, features):
+    """
+    Average each requested feature's columns within each zeitgeber bin.
+
+    This is the one aggregation behind the zeitgeber pipeline's output and
+    ``ZeitgeberPlotter``. The columns are those :func:`channel_averaged_columns` names for
+    the features, each with its baseline-subtracted ``_nobase`` companion when ``df`` has one
+    (a column listed in ``exclude_from_baseline`` has none), in the order ``df`` has them.
+    Rows are grouped by the columns of :data:`ZEITGEBER_BIN_COLUMNS` present in ``df``. The
+    two callers used to choose the columns separately, the pipeline by a naming rule that
+    left out psdslope and the plotter by taking every numeric column, and a missing column
+    was dropped without a word.
+
+    Args:
+        df (pd.DataFrame): A channel-averaged frame that has been through the zeitgeber
+            pipeline, with an 'animal' column.
+        features (list[str]): The features to keep, as the config names them.
+
+    Returns:
+        pd.DataFrame: One row per bin: the bin columns, then the feature columns.
+
+    Raises:
+        ValueError: If a column of a requested feature is missing from ``df``, or ``df``
+            has none of the bin columns.
+    """
+    columns = [column for feature in features for column in channel_averaged_columns(feature)]
+    missing = [column for column in columns if column not in df.columns]
+    if missing:
+        raise ValueError(
+            f"The zeitgeber frame has no column {missing}, which the features "
+            f"{list(features)} need"
+        )
+    wanted = set(columns) | {f"{column}_nobase" for column in columns}
+    feature_columns = [column for column in df.columns if column in wanted]
+    group_columns = [column for column in ZEITGEBER_BIN_COLUMNS if column in df.columns]
+    if not group_columns:
+        raise ValueError(f"The zeitgeber frame has none of the bin columns {ZEITGEBER_BIN_COLUMNS}")
+    return df.groupby(group_columns)[feature_columns].mean().reset_index()
 
 
 def _extract_zeitgeber_frame(war, animal_name, features_to_extract, pipeline_config):
     """
-    Extract channel-averaged features for zeitgeber analysis from one loaded WAR.
+    Extract one loaded WAR's zeitgeber bins: its channel-averaged features, averaged per bin.
 
     This replaced ``_load_war_for_zeitgeber``, which loaded the WAR itself so that a pool
     could run several loads at once. The caller now loads the WARs one at a time, through
     :func:`neurodent.workflow.iter_wars`, and releases each after this returns. The
     returned frame does not refer to the WAR. A WAR that fails to load is now reported by
     the loader, naming the file, rather than wrapped in the RuntimeError below.
+
+    The windows are averaged into bins here, by :func:`aggregate_zeitgeber_bins`, so a WAR
+    without a requested feature fails, naming the animal. This returned the per-window frame,
+    and the caller averaged every animal's windows together, leaving out columns it did not
+    find.
 
     Args:
         war (WindowAnalysisResult): A loaded, non-flattened WAR.
@@ -65,8 +106,8 @@ def _extract_zeitgeber_frame(war, animal_name, features_to_extract, pipeline_con
         pipeline_config (dict): Configuration for the zeitgeber pipeline.
 
     Returns:
-        pd.DataFrame: DataFrame containing channel-averaged features and animal identifier.
-                      The DataFrame will have columns for each extracted feature and an 'animal' column.
+        pd.DataFrame: One row per zeitgeber bin of the animal, with the bin columns and the
+            features' channel-averaged columns and their ``_nobase`` companions.
 
     Raises:
         RuntimeError: If extraction fails. Names the animal, with the original error as its cause.
@@ -79,7 +120,7 @@ def _extract_zeitgeber_frame(war, animal_name, features_to_extract, pipeline_con
 
         df = zar.get_channel_averaged_result(features=features_to_extract)
         df["animal"] = animal_name
-        return df
+        return aggregate_zeitgeber_bins(df, features_to_extract)
 
     except Exception as e:
         raise RuntimeError(f"Failed to process animal {animal_name}") from e
@@ -525,6 +566,11 @@ def run_zeitgeber_pipeline(
     return df_final
 
 
+def _zeitgeber_settings():
+    """The settings ZeitgeberAnalysisResult reads: the keyword arguments of run_zeitgeber_pipeline."""
+    return sorted(p for p in inspect.signature(run_zeitgeber_pipeline).parameters if p != "df")
+
+
 class ZeitgeberAnalysisResult:
     """
     Proxy wrapper for WindowAnalysisResult that applies Zeitgeber processing on the fly.
@@ -535,9 +581,22 @@ class ZeitgeberAnalysisResult:
     Args:
         war (WindowAnalysisResult): The implementation-specific analysis result object.
         **pipeline_config: Keywords arguments passed to `run_zeitgeber_pipeline`.
+            ``interval_minutes`` also sets the width of the zeitgeber bins.
+
+    Raises:
+        TypeError: For a setting that `run_zeitgeber_pipeline` does not take. Settings it
+            did not take used to be dropped without a word, which is how the pipeline
+            config's ``time_aggregation_minutes`` went unread while the bins stayed 60
+            minutes wide.
     """
 
     def __init__(self, war, **pipeline_config):
+        unknown = sorted(set(pipeline_config) - set(_zeitgeber_settings()))
+        if unknown:
+            raise TypeError(
+                f"ZeitgeberAnalysisResult does not read the settings {unknown}. "
+                f"It reads {_zeitgeber_settings()}."
+            )
         self.war = war
         self.config = pipeline_config
 
@@ -558,12 +617,7 @@ class ZeitgeberAnalysisResult:
                 interval = self.config.get("interval_minutes", 60)
                 df = add_zeitgeber_time_columns(df, interval_minutes=interval)
 
-        # Filter config to only include valid kwargs for run_zeitgeber_pipeline
-        sig = inspect.signature(run_zeitgeber_pipeline)
-        valid_kwargs = {p for p in sig.parameters if p != 'df'}
-        filtered_config = {k: v for k, v in self.config.items() if k in valid_kwargs}
-
-        return run_zeitgeber_pipeline(df, **filtered_config)
+        return run_zeitgeber_pipeline(df, **self.config)
 
     def get_result(self, *args, **kwargs):
         """Intercepts get_result and applies ZT pipeline."""

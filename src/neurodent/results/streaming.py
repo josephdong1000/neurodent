@@ -45,11 +45,21 @@ from .filters import (
     ChannelInfo,
     FilterScope,
     compute_filter_mask,
+    require_bad_channels_dict,
     update_bad_channels_dict_from_config,
 )
 
 if TYPE_CHECKING:
     from .window_analysis_result import WindowAnalysisResult
+
+
+STREAM_BATCH_ROWS = 5000
+"""Rows decoded at a time by :meth:`LazyWindowAnalysisResult.save_parquet_and_json`.
+
+The parquet reader still holds the whole row group a batch comes from, so peak memory also
+follows the row groups of the input file. ``neurodent.workflow.utils.resources`` sizes the
+streaming rules of the pipeline from both.
+"""
 
 
 # ---------------------------------------------------------------------------
@@ -156,8 +166,44 @@ class ReorderAndPadChannels(Transform):
         return metadata
 
 
+def rename_animalday(animalday: str, old_animal_id: str, new_animal_id: str) -> str:
+    """Give an animalday a new animal id in place of the one it starts with.
+
+    Animaldays are named ``{animal_id} {genotype} {day}``, so only the leading id changes.
+    :class:`AddUniqueHash` used to replace the id wherever it occurred in the name, so an id
+    that also occurs later in it, such as animal 1 in ``1 WT Jan-01-2021``, changed the day too.
+
+    Args:
+        animalday (str): The animalday to rename.
+        old_animal_id (str): The animal id it starts with.
+        new_animal_id (str): The animal id to put in its place.
+
+    Returns:
+        str: The renamed animalday.
+
+    Raises:
+        ValueError: If ``animalday`` does not start with ``old_animal_id``.
+    """
+    if not animalday.startswith(old_animal_id):
+        raise ValueError(
+            f"Animalday {animalday!r} does not start with the animal id {old_animal_id!r}"
+        )
+    return new_animal_id + animalday[len(old_animal_id):]
+
+
 class AddUniqueHash(Transform):
-    """Append a random hex suffix to ``animal_id`` (and rewrite ``animal`` / ``animalday`` cells)."""
+    """Append a random hex suffix to ``animal_id``, and rename what is named after it.
+
+    The ``animal`` cells take the new id, and the ``animalday`` cells and the keys of
+    ``bad_channels_dict`` and ``lof_scores_dict`` take it in place of the old one, through
+    :func:`rename_animalday`. The dict keys used to keep the old name, so every animalday
+    looked as if it had no entry and was given an empty one, with a warning each.
+    ``WindowAnalysisResult.add_unique_hash`` runs this transform too.
+
+    Args:
+        nbytes (int, optional): Random bytes in the suffix, passed to ``secrets.token_hex``,
+            which writes two hex characters per byte. None uses its default of 32 bytes.
+    """
 
     def __init__(self, nbytes: int | None = None):
         self.nbytes = nbytes
@@ -169,18 +215,25 @@ class AddUniqueHash(Transform):
         self.original_animal_id = ctx.metadata.get("animal_id", "") or ""
         self.new_animal_id = f"{self.original_animal_id}_{secrets.token_hex(self.nbytes)}"
 
+    def _rename(self, animalday):
+        # A WAR aggregated without animalday in its groupby has None there
+        if not isinstance(animalday, str):
+            return animalday
+        return rename_animalday(animalday, self.original_animal_id, self.new_animal_id)
+
     def apply(self, batch_df):
         if "animal" in batch_df.columns:
             batch_df["animal"] = self.new_animal_id
         if "animalday" in batch_df.columns:
-            batch_df["animalday"] = batch_df["animalday"].str.replace(
-                self.original_animal_id, self.new_animal_id
-            )
+            batch_df["animalday"] = batch_df["animalday"].map(self._rename)
         return batch_df
 
     def update_metadata(self, metadata):
         metadata = dict(metadata)
         metadata["animal_id"] = self.new_animal_id
+        for key in ("bad_channels_dict", "lof_scores_dict"):
+            if metadata.get(key):
+                metadata[key] = {self._rename(day): value for day, value in metadata[key].items()}
         return metadata
 
 
@@ -208,6 +261,10 @@ class ApplyFilters(Transform):
         # animalday is required for the bad_channels_dict bookkeeping after either reject_channels* filter.
         if "reject_channels" in self.filter_config or "reject_channels_by_session" in self.filter_config:
             cols.add("animalday")
+        if "reject_channels_by_session" in self.filter_config:
+            require_bad_channels_dict(
+                (self.filter_config["reject_channels_by_session"] or {}).get("bad_channels_dict")
+            )
         self.required_columns_pass1 = tuple(sorted(cols))
         self._mask: np.ndarray | None = None
         self._row_offset = 0
@@ -499,13 +556,28 @@ class LazyWindowAnalysisResult:
     def apply_filters(
         self, filter_config: dict | None = None, min_valid_channels: int = 3
     ) -> "LazyWindowAnalysisResult":
+        """Record the filters of :meth:`WindowAnalysisResult.apply_filters`, which agree with it.
+
+        Args:
+            filter_config (dict, optional): Filter names and parameters, as for the eager
+                method. Defaults to logrms_range, high_rms, low_rms and high_beta. The default
+                used to include reject_channels_by_session with no dict, which masked nothing
+                here and the stored bad_channels_dict in the eager method.
+            min_valid_channels (int): Minimum valid channels per window. Defaults to 3.
+
+        Returns:
+            LazyWindowAnalysisResult: self, for chaining.
+
+        Raises:
+            ValueError: For an unknown filter, or reject_channels_by_session with no
+                ``bad_channels_dict``, here rather than when the chain runs.
+        """
         if filter_config is None:
             filter_config = {
                 "logrms_range": {"z_range": 3},
                 "high_rms": {"max_rms": 500},
                 "low_rms": {"min_rms": DEFAULT_MIN_RMS},
                 "high_beta": {"max_beta_prop": 0.4},
-                "reject_channels_by_session": {},
             }
         self._pending.append(ApplyFilters(filter_config, min_valid_channels))
         return self
@@ -523,7 +595,7 @@ class LazyWindowAnalysisResult:
         folder: str | Path,
         *,
         filename: str = "war",
-        batch_size: int = 5000,
+        batch_size: int = STREAM_BATCH_ROWS,
     ) -> None:
         """Execute the pending transform chain against batched parquet reads.
 

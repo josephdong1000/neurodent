@@ -25,16 +25,14 @@ rule fdsar_diagnostics:
     output:
         diagnostics_dir=directory("results/fdsar_diagnostics/{animal}"),
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
         fdsar_dir="results/fdsars/{animal}",
     threads: config["cluster"]["spike_averaged_traces"]["threads"]
     retries:
         config["cluster"]["spike_averaged_traces"]["retries"]
     resources:
-        time=config["cluster"]["spike_averaged_traces"]["time"],
-        mem_mb=increment_memory(config["cluster"]["spike_averaged_traces"]["mem_mb"]),
-        nodes=config["cluster"]["spike_averaged_traces"]["nodes"],
+        **rule_resources(config["cluster"]["spike_averaged_traces"]),
     log:
         stdout="logs/fdsar_diagnostics/{animal}.out",
         stderr="logs/fdsar_diagnostics/{animal}.err",

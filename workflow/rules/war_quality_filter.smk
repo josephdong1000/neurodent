@@ -28,98 +28,86 @@ checkpoint war_quality_filter:
     retries:
         config["cluster"]["war_quality_filter"]["retries"]
     resources:
-        time=config["cluster"]["war_quality_filter"]["time"],
-        mem_mb=increment_memory(config["cluster"]["war_quality_filter"]["mem_mb"]),
-        nodes=config["cluster"]["war_quality_filter"]["nodes"],
+        **rule_resources(config["cluster"]["war_quality_filter"]),
     run:
-        import logging
-        from pathlib import Path
-        import sys
         import json
-        from datetime import datetime
+        import shutil
+        from pathlib import Path
 
-        from neurodent.workflow.utils import clear_exclusion_record, write_exclusion_record
+        from neurodent.workflow.utils import clear_exclusion_record, rule_log, write_exclusion_record
 
-        # Set up logging for this animal
-        log_file = Path(log[0])
-        log_file.parent.mkdir(parents=True, exist_ok=True)
+        # Snakemake deletes the logs above before each attempt; rule_log also appends to the
+        # attempts files beside them, {animal}.attempts.out and .err, which keep every attempt
+        with rule_log(log, rule, wildcards, resources.attempt) as logger:
+            animal = wildcards.animal
+            logger.info(f"Starting quality filtering for animal: {animal}")
 
-        logging.basicConfig(
-            filename=log[0], level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", filemode="w"
-        )
-        logger = logging.getLogger()
+            # Helper function to clean up existing files
+            def cleanup_existing_files(destination_dir, input_files):
+                """Remove any existing files for rejected animals"""
+                for file_path in [Path(x) for x in input_files]:
+                    if file_path.is_file():
+                        destination_file = destination_dir / file_path.name
+                        if destination_file.exists():
+                            destination_file.unlink()  # Remove existing file if present
+                            logger.info(f"Removed existing file: {destination_file}")
 
-        animal = wildcards.animal
-        logger.info(f"Starting quality filtering for animal: {animal}")
+            # Get bad animaldays from samples config (inline samples_data or samples_file)
+            bad_folder_animalday = resolve_samples_config(config).get("bad_folder_animalday", [])
 
+            # Get quality filtering parameters from config
+            exclude_bad_animaldays = config["samples"]["quality_filter"]["exclude_bad_animaldays"]
+            exclude_unknown_genotypes = config["samples"]["quality_filter"]["exclude_unknown_genotypes"]
 
-        # Helper function to clean up existing files
-        def cleanup_existing_files(destination_dir, input_files):
-            """Remove any existing files for rejected animals"""
-            for file_path in [Path(x) for x in input_files]:
-                if file_path.is_file():
-                    destination_file = destination_dir / file_path.name
-                    if destination_file.exists():
-                        destination_file.unlink()  # Remove existing file if present
-                        logging.info(f"Removed existing file: {destination_file}")
+            logger.info(
+                f"Quality filter settings - exclude_bad_animaldays: {exclude_bad_animaldays}, exclude_unknown_genotypes: {exclude_unknown_genotypes}"
+            )
 
-                # Get bad animaldays from samples config (inline samples_data or samples_file)
-        bad_folder_animalday = resolve_samples_config(config).get("bad_folder_animalday", [])
+            # Create filtered directory and clean up any existing files
+            destination_dir = Path(output[0])
+            destination_dir.mkdir(parents=True, exist_ok=True)
+            cleanup_existing_files(destination_dir, input)
 
-        # Get quality filtering parameters from config
-        exclude_bad_animaldays = config["samples"]["quality_filter"]["exclude_bad_animaldays"]
-        exclude_unknown_genotypes = config["samples"]["quality_filter"]["exclude_unknown_genotypes"]
+            # Check if this is a bad animalday first
+            combined_name = ANIMAL_TO_FULL_ID_MAP[animal]
+            logger.info(f"Original animal name: {combined_name}")
 
-        logger.info(
-            f"Quality filter settings - exclude_bad_animaldays: {exclude_bad_animaldays}, exclude_unknown_genotypes: {exclude_unknown_genotypes}"
-        )
+            if exclude_bad_animaldays and combined_name in bad_folder_animalday:
+                reason = "listed in bad_folder_animalday, and samples.quality_filter.exclude_bad_animaldays is on"
+                logger.warning(f"REJECTED: Animal {animal} ({combined_name}): {reason}")
+                write_exclusion_record(destination_dir, combined_name, reason)
+                return
 
-        # Create filtered directory and clean up any existing files
-        destination_dir = Path(output[0])
-        destination_dir.mkdir(parents=True, exist_ok=True)
-        cleanup_existing_files(destination_dir, input)
+            try:
+                # Apply quality filters
+                with open(input.war_json, "r") as f:
+                    data = json.load(f)
+                    genotype = data.get("genotype", "Unknown")
+                    logger.info(f"Animal genotype: {genotype}")
 
-        # Check if this is a bad animalday first
-        combined_name = ANIMAL_TO_FULL_ID_MAP[animal]
-        logger.info(f"Original animal name: {combined_name}")
+                    if exclude_unknown_genotypes and genotype == "Unknown":
+                        reason = "genotype is Unknown, and samples.quality_filter.exclude_unknown_genotypes is on"
+                        logger.warning(f"REJECTED: Animal {animal}: {reason}")
+                        write_exclusion_record(destination_dir, combined_name, reason)
+                        return
 
-        if exclude_bad_animaldays and combined_name in bad_folder_animalday:
-            reason = "listed in bad_folder_animalday, and samples.quality_filter.exclude_bad_animaldays is on"
-            logger.warning(f"REJECTED: Animal {animal} ({combined_name}): {reason}")
-            write_exclusion_record(destination_dir, combined_name, reason)
-            return
+                # A record left by an earlier run that excluded this animal would otherwise make it
+                # look excluded again to anything reading the directory.
+                clear_exclusion_record(destination_dir)
+                logger.info(f"ACCEPTED: Animal {animal} passed all quality filters")
+                logger.info(f"Copying files to: {destination_dir}")
 
-        try:
-            # Apply quality filters
-            with open(input.war_json, "r") as f:
-                data = json.load(f)
-                genotype = data.get("genotype", "Unknown")
-                logger.info(f"Animal genotype: {genotype}")
+                # Copy all files from the original WAR directory
+                copied_files = []
+                for file_path in [Path(x) for x in input]:
+                    if file_path.is_file():
+                        destination_file = destination_dir / file_path.name
+                        shutil.copy2(file_path, destination_file)
+                        copied_files.append(file_path.name)
+                        logger.info(f"Copied file: {file_path.name} -> {destination_file}")
 
-                if exclude_unknown_genotypes and genotype == "Unknown":
-                    reason = "genotype is Unknown, and samples.quality_filter.exclude_unknown_genotypes is on"
-                    logger.warning(f"REJECTED: Animal {animal}: {reason}")
-                    write_exclusion_record(destination_dir, combined_name, reason)
-                    return
+                logger.info(f"Successfully copied {len(copied_files)} files: {copied_files}")
 
-            # A record left by an earlier run that excluded this animal would otherwise make it
-            # look excluded again to anything reading the directory.
-            clear_exclusion_record(destination_dir)
-            logger.info(f"ACCEPTED: Animal {animal} passed all quality filters")
-            logger.info(f"Copying files to: {destination_dir}")
-
-            # Copy all files from the original WAR directory
-            import shutil
-            copied_files = []
-            for file_path in [Path(x) for x in input]:
-                if file_path.is_file():
-                    destination_file = destination_dir / file_path.name
-                    shutil.copy2(file_path, destination_file)
-                    copied_files.append(file_path.name)
-                    logger.info(f"Copied file: {file_path.name} -> {destination_file}")
-
-            logger.info(f"Successfully copied {len(copied_files)} files: {copied_files}")
-
-        except Exception as e:
-            logger.error(f"ERROR: Failed to process animal {animal}: {str(e)}")
-            raise
+            except Exception as e:
+                logger.error(f"ERROR: Failed to process animal {animal}: {str(e)}")
+                raise

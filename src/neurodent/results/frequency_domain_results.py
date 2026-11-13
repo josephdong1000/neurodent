@@ -31,6 +31,96 @@ if TYPE_CHECKING:
 from neurodent.core.utils import resolve_channels, slugify
 
 
+SPIKE_ANNOTATION_PREFIX = "Spike_Ch"
+"""Spike annotations are named ``Spike_Ch{i}``, i being the index of the spike's channel."""
+
+
+def write_spike_annotations(raw: mne.io.BaseRaw, spike_indices_per_channel) -> mne.io.BaseRaw:
+    """Mark every detected spike on ``raw`` as an annotation, replacing its annotations.
+
+    Each spike becomes a zero-length annotation named ``Spike_Ch{i}``, i being the index of
+    its channel in ``spike_indices_per_channel``, with onset ``index / sfreq`` seconds from
+    the first sample, so it falls on the detected sample. This is the only writer of spike
+    annotations; :func:`read_spike_annotations` reads them back. Onsets used to be written
+    at ``(index + 1) / sfreq``, one sample late, and :meth:`FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne`
+    wrote a second kind, named after the channel, which the export then replaced.
+
+    Args:
+        raw (mne.io.BaseRaw): The recording the spikes were detected in.
+        spike_indices_per_channel (list[np.ndarray]): 0-based sample indices of the spikes
+            on each channel.
+
+    Returns:
+        mne.io.BaseRaw: ``raw``, annotated in place.
+
+    Raises:
+        ValueError: If an index is outside the recording.
+    """
+    sfreq = raw.info["sfreq"]
+    onsets, names = [], []
+    for ch_idx, indices in enumerate(spike_indices_per_channel):
+        indices = np.asarray(indices, dtype=np.int64)
+        if indices.size and (indices.min() < 0 or indices.max() >= raw.n_times):
+            raise ValueError(
+                f"Spike indices of channel {ch_idx} run from {indices.min()} to {indices.max()}, "
+                f"outside the recording's {raw.n_times} samples"
+            )
+        onsets.append(indices / sfreq)
+        names.extend([f"{SPIKE_ANNOTATION_PREFIX}{ch_idx}"] * indices.size)
+    onsets = np.concatenate(onsets) if onsets else np.array([], dtype=float)
+    order = np.argsort(onsets, kind="stable")
+    raw.set_annotations(
+        mne.Annotations(
+            onset=onsets[order],
+            duration=np.zeros(len(order)),
+            description=np.asarray(names, dtype=str)[order],
+        )
+    )
+    return raw
+
+
+def read_spike_annotations(raw: mne.io.BaseRaw) -> list[np.ndarray]:
+    """The sample index of each spike annotation on ``raw``, one sorted array per channel.
+
+    Reads the ``Spike_Ch{i}`` annotations that :func:`write_spike_annotations` writes.
+    Indices are 0-based, counted from the first sample of ``raw``, and onsets are rounded to
+    the nearest sample. Annotations written before onsets moved to the detected sample give
+    indices one sample late. A FIF stores onsets as float32, which rounds them to several
+    samples in long recordings (to 8 ms past 18 hours), so a saved result's exact indices
+    come from its JSON sidecar instead (see ``load_fif_and_json``).
+
+    Args:
+        raw (mne.io.BaseRaw): A recording with spike annotations.
+
+    Returns:
+        list[np.ndarray]: One int64 array of sample indices per channel of ``raw``.
+
+    Raises:
+        ValueError: If an annotation names a channel index that ``raw`` does not have.
+    """
+    n_channels = len(raw.ch_names)
+    annotations = raw.annotations
+    onsets_per_channel = [[] for _ in range(n_channels)]
+    for onset, description in zip(annotations.onset, annotations.description):
+        if not description.startswith(SPIKE_ANNOTATION_PREFIX):
+            continue
+        ch_idx = int(description[len(SPIKE_ANNOTATION_PREFIX):])
+        if not 0 <= ch_idx < n_channels:
+            raise ValueError(
+                f"Spike annotation {description!r} names a channel the recording's "
+                f"{n_channels} channels do not include"
+            )
+        onsets_per_channel[ch_idx].append(onset)
+    return [
+        np.sort(
+            raw.time_as_index(onsets, use_rounding=True, origin=annotations.orig_time).astype(np.int64)
+        )
+        if onsets
+        else np.array([], dtype=np.int64)
+        for onsets in onsets_per_channel
+    ]
+
+
 class FrequencyDomainSpikeAnalysisResult:
     """
     Wrapper for frequency-domain spike detection results.
@@ -253,18 +343,14 @@ class FrequencyDomainSpikeAnalysisResult:
                 Defaults to "serial".
 
         Returns:
-            mne.io.RawArray: MNE RawArray with spike annotations
+            mne.io.RawArray: MNE RawArray with spike annotations, written by
+            :func:`write_spike_annotations` on the detected samples. They used to be
+            written one sample late.
         """
         if self.result_mne is None:
             if self.result_sas:
                 result_mne = FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(
                     self.result_sas, chunk_duration_s, multiprocess_mode=multiprocess_mode,
-                )
-                from neurodent.analysis import (
-                    FrequencyDomainSpikeDetector,
-                )
-                FrequencyDomainSpikeDetector._add_spike_annotations(
-                    result_mne, self.spike_indices, result_mne.info['sfreq']
                 )
                 if save_raw:
                     self.result_mne = result_mne
@@ -292,6 +378,13 @@ class FrequencyDomainSpikeAnalysisResult:
         ``{animal_id}-{genotype}-{animal_day}``). The previous ``slugify_filebase``
         kwarg was removed — the unsafe (un-slugified) form was never the right
         answer for any real caller.
+
+        The JSON sidecar keeps every spike's exact 0-based sample index under
+        ``spike_indices_per_channel``, one list per channel, which ``load_fif_and_json``
+        prefers to the FIF annotations: a FIF stores annotation times as float32, which
+        rounds spikes in long recordings to several samples. Sidecars used to hold only
+        ``spike_counts_per_channel``. Without ``spike_indices``, both keys now come from
+        the spike annotations of the raw being saved; the counts used to be left empty.
 
         Args:
             folder: Destination folder to save results
@@ -343,7 +436,8 @@ class FrequencyDomainSpikeAnalysisResult:
         # Save MNE data
         result_mne.save(filebase + "-raw.fif", overwrite=overwrite)
 
-        # Save metadata as JSON
+        # Save metadata as JSON, with the exact spike indices the FIF cannot hold
+        spike_indices = self.spike_indices or read_spike_annotations(result_mne)
         json_dict = {
             "animal_id": self.animal_id,
             "genotype": self.genotype,
@@ -352,7 +446,10 @@ class FrequencyDomainSpikeAnalysisResult:
             "metadata": self.metadata.metadata_path if self.metadata else None,
             "channel_names": self.channel_abbrevs if save_abbrevs else self.channel_names,
             "detection_params": self.detection_params,
-            "spike_counts_per_channel": [len(spikes) for spikes in self.spike_indices] if self.spike_indices else [],
+            "spike_counts_per_channel": [len(spikes) for spikes in spike_indices],
+            "spike_indices_per_channel": [
+                np.asarray(spikes, dtype=np.int64).tolist() for spikes in spike_indices
+            ],
         }
 
         with open(filebase + ".json", "w") as f:
@@ -366,11 +463,21 @@ class FrequencyDomainSpikeAnalysisResult:
         Load FrequencyDomainSpikeAnalysisResult from fif and json files.
         Mirrors the SpikeAnalysisResult.load_fif_and_json interface.
 
+        Spike indices come from the sidecar's ``spike_indices_per_channel``, exact 0-based
+        sample indices. A sidecar written before that key existed still loads: its indices
+        are read from the FIF annotations, with a warning, because those put each spike one
+        sample late and, stored as float32, round spikes in long recordings to several
+        samples. Indices always used to be read from the annotations.
+
         Args:
             folder: Folder containing the saved files
 
         Returns:
             FrequencyDomainSpikeAnalysisResult: Loaded result object
+
+        Raises:
+            ValueError: If the sidecar's spike indices do not have one list per channel of
+                the FIF.
         """
         folder = Path(folder)
         if not folder.exists():
@@ -393,8 +500,23 @@ class FrequencyDomainSpikeAnalysisResult:
         # Load MNE data
         result_mne = mne.io.read_raw_fif(fif_path, preload=False)
 
-        # Extract spike indices from MNE annotations
-        spike_indices = cls._extract_spike_indices_from_mne(result_mne)
+        if "spike_indices_per_channel" in data:
+            spike_indices = [
+                np.asarray(spikes, dtype=np.int64) for spikes in data["spike_indices_per_channel"]
+            ]
+            if len(spike_indices) != len(result_mne.ch_names):
+                raise ValueError(
+                    f"{json_path.name} has spike indices for {len(spike_indices)} channels, but "
+                    f"{fif_path.name} has {len(result_mne.ch_names)}"
+                )
+        else:
+            warnings.warn(
+                f"{json_path.name} has no spike_indices_per_channel, so spike indices are read from "
+                f"the annotations of {fif_path.name}. Those put each spike one sample late, and "
+                f"a FIF stores their times as float32, which rounds spikes in long recordings to "
+                f"several samples. Regenerate the result for exact indices."
+            )
+            spike_indices = read_spike_annotations(result_mne)
 
         # Fix detection params: convert lists back to tuples for specific parameters
         detection_params = data.get("detection_params", {})
@@ -428,7 +550,10 @@ class FrequencyDomainSpikeAnalysisResult:
         """
         Plot spike-triggered averages for each channel.
 
-        Based on plot_spike_evoked_by_channel from the pipeline script.
+        Based on plot_spike_evoked_by_channel from the pipeline script. Epochs are centred
+        on each spike's exact sample when this result has ``spike_indices`` (see
+        :meth:`_spike_events`); they used to be centred on the FIF annotation onsets, which
+        fall a sample or more off past about 4.6 hours of recording.
 
         Args:
             tmin: Start time for epochs (seconds)
@@ -445,8 +570,7 @@ class FrequencyDomainSpikeAnalysisResult:
             raise ValueError("No MNE RawArray available for plotting")
 
         raw = self.result_mne
-        events, event_id = mne.events_from_annotations(raw)
-        spike_event_id = {k: v for k, v in event_id.items() if k.startswith("Spike_Ch")}
+        events, spike_event_id = self._spike_events(raw)
 
         if not spike_event_id:
             logging.warning("No spike events with label 'Spike_Ch*' found.")
@@ -517,31 +641,37 @@ class FrequencyDomainSpikeAnalysisResult:
 
         return event_counts
 
-    @staticmethod
-    def _extract_spike_indices_from_mne(mne_raw: mne.io.RawArray) -> list[np.ndarray]:
-        """
-        Extract spike sample indices from MNE annotations.
+    def _spike_events(self, raw: mne.io.BaseRaw) -> tuple[np.ndarray, dict]:
+        """MNE events for the spikes on ``raw``, and the ids of the channels that have any.
+
+        With ``spike_indices``, each event sits on its detected sample, ``raw.first_samp``
+        included, and channel i is ``Spike_Ch{i}`` with id i + 1. Without them, the events
+        come from the ``Spike_Ch{i}`` annotations of ``raw``, as they always used to. A FIF
+        stores annotation onsets as float32, so those events fall a sample or more off past
+        about 4.6 hours of recording.
 
         Args:
-            mne_raw: MNE RawArray with spike annotations
+            raw (mne.io.BaseRaw): The recording the spikes belong to.
 
         Returns:
-            list[np.ndarray]: Spike indices per channel
+            tuple[np.ndarray, dict]: The events, sorted by sample, and ``{"Spike_Ch{i}": id}``
+            for every channel with at least one spike.
         """
-        events, event_id = mne.events_from_annotations(mne_raw)
-        spike_event_id = {k: v for k, v in event_id.items() if k.startswith("Spike_Ch")}
-
-        n_channels = len(mne_raw.ch_names)
-        spike_indices = [np.array([], dtype=int) for _ in range(n_channels)]
-
-        for event_name, code in spike_event_id.items():
-            ch_idx = int(event_name.split("_Ch")[-1])
-            if ch_idx < n_channels:
-                # Extract sample indices from events array (column 0)
-                channel_spike_samples = events[events[:, 2] == code, 0]
-                spike_indices[ch_idx] = channel_spike_samples
-
-        return spike_indices
+        if not self.spike_indices:
+            events, event_id = mne.events_from_annotations(raw)
+            return events, {k: v for k, v in event_id.items() if k.startswith(SPIKE_ANNOTATION_PREFIX)}
+        rows, event_id = [], {}
+        for ch_idx, indices in enumerate(self.spike_indices):
+            indices = np.sort(np.asarray(indices, dtype=np.int64))
+            if not indices.size:
+                continue
+            code = ch_idx + 1
+            event_id[f"{SPIKE_ANNOTATION_PREFIX}{ch_idx}"] = code
+            rows.append(np.column_stack(
+                [indices + raw.first_samp, np.zeros_like(indices), np.full_like(indices, code)]
+            ))
+        events = np.concatenate(rows) if rows else np.empty((0, 3), dtype=np.int64)
+        return events[np.argsort(events[:, 0], kind="stable")], event_id
 
     def get_spike_counts_per_channel(self) -> list[int]:
         """
@@ -554,7 +684,7 @@ class FrequencyDomainSpikeAnalysisResult:
             return [len(spikes) for spikes in self.spike_indices]
         elif self.result_mne:
             # Extract from MNE annotations if spike_indices not available
-            spike_indices = self._extract_spike_indices_from_mne(self.result_mne)
+            spike_indices = read_spike_annotations(self.result_mne)
             return [len(spikes) for spikes in spike_indices]
         else:
             return []
@@ -577,8 +707,15 @@ class FrequencyDomainSpikeAnalysisResult:
             multiprocess_mode (Literal["dask", "serial"], optional): Whether to use Dask for parallel
                 per-channel conversion. Defaults to "serial".
 
+        Raises:
+            ValueError: If the SortingAnalyzers differ in sampling frequency or in number of
+                samples.
+
         Returns:
-            mne.io.RawArray: The converted RawArray, with spikes labeled as annotations
+            mne.io.RawArray: The converted RawArray, holding every sample of the recording,
+            with each channel's spikes annotated by
+            :func:`write_spike_annotations` as ``Spike_Ch{i}``. The annotations used to be
+            named after the channel, a form nothing else wrote or read.
         """
         if len(sas) == 0:
             return None
@@ -590,8 +727,15 @@ class FrequencyDomainSpikeAnalysisResult:
                 f"All SortingAnalyzers must have the same sampling frequency. Got frequencies: {sfreqs}"
             )
 
-        # Preallocate data array
-        total_frames = int(sas[0].recording.get_duration() * sfreqs[0])
+        # Preallocate data array, one column per sample. The length used to be
+        # int(duration * sfreq), which drops the last sample when the float product falls
+        # just short of the count (1001 samples at 1000 Hz, for example).
+        n_samples = [sa.recording.get_num_samples() for sa in sas]
+        if len(set(n_samples)) != 1:
+            raise ValueError(
+                f"All SortingAnalyzers must have the same number of samples. Got: {n_samples}"
+            )
+        total_frames = n_samples[0]
         n_channels = len(sas)
         data = np.empty((n_channels, total_frames))
         logging.debug(f"Data shape: {data.shape}")
@@ -615,28 +759,19 @@ class FrequencyDomainSpikeAnalysisResult:
         logging.debug(f"Channel names: {channel_names}")
         sfreq = sfreqs[0]
 
-        # Extract spike times for each unit and create annotations
-        onset = []
-        description = []
-        for sa in sas:
-            for unit_id in sa.sorting.get_unit_ids():
-                spike_train = sa.sorting.get_unit_spike_train(unit_id)
-                # Convert to seconds and filter to recording duration
-                spike_times = spike_train / sa.sorting.get_sampling_frequency()
-                mask = spike_times < sa.recording.get_duration()
-                spike_times = spike_times[mask]
-
-                # Create annotation for each spike
-                onset.extend(spike_times)
-                description.extend(
-                    [sa.recording.get_channel_ids().item()] * len(spike_times)
-                )  # collapse all units into 1 spike train
-        annotations = mne.Annotations(onset, duration=0, description=description)
+        # Each channel's spike train, all units collapsed into one
+        spike_indices_per_channel = [
+            np.sort(np.concatenate(
+                [np.asarray(sa.sorting.get_unit_spike_train(unit_id), dtype=np.int64)
+                 for unit_id in sa.sorting.get_unit_ids()]
+                or [np.array([], dtype=np.int64)]
+            ))
+            for sa in sas
+        ]
 
         info = mne.create_info(ch_names=channel_names, sfreq=sfreq, ch_types="eeg")
         raw = mne.io.RawArray(data=data, info=info)
-        raw = raw.set_annotations(annotations)
-        return raw
+        return write_spike_annotations(raw, spike_indices_per_channel)
 
     @staticmethod
     def convert_sa_to_np(
@@ -654,7 +789,8 @@ class FrequencyDomainSpikeAnalysisResult:
                 already called from ``convert_sas_to_mne`` in Dask mode, as that parallelizes across
                 channels and nested Dask may not improve performance.
         Returns:
-            np.ndarray: The converted traces
+            np.ndarray: The converted traces, one value per sample of the recording. The
+            last sample used to be lost for about one length in 200.
         """
         # Check that SortingAnalyzer only has 1 channel
         if len(sa.recording.get_channel_ids()) != 1:
@@ -665,8 +801,9 @@ class FrequencyDomainSpikeAnalysisResult:
         rec = sa.recording
         logging.debug(f"Recording info: {rec}")
 
-        # Calculate total number of frames and chunks
-        total_frames = int(rec.get_duration() * rec.get_sampling_frequency())
+        # Calculate total number of frames and chunks. The count used to be
+        # int(duration * sfreq), which can drop the last sample.
+        total_frames = rec.get_num_samples()
         fs = rec.get_sampling_frequency()
         frames_per_chunk = max(1, int(round(chunk_duration_s * fs)))
         n_chunks = max(1, total_frames // frames_per_chunk)

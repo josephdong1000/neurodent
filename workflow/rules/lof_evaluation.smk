@@ -20,7 +20,7 @@ rule lof_evaluation:
         plot_png="results/lof_evaluation/lof_fscore_vs_threshold.png",
         barplot_png="results/lof_evaluation/lof_scores_by_channel.png",
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
         animal_folder_map=lambda wildcards: {animal: get_animal_folder(type('', (), {'animal': animal})) for animal in ANIMALS},
         animal_id_map=lambda wildcards: {animal: get_animal_id(type('', (), {'animal': animal})) for animal in ANIMALS},
@@ -29,9 +29,7 @@ rule lof_evaluation:
     retries:
         config["cluster"]["lof_evaluation"]["retries"]
     resources:
-        time=config["cluster"]["lof_evaluation"]["time"],
-        mem_mb=increment_memory(config["cluster"]["lof_evaluation"]["mem_mb"]),
-        nodes=config["cluster"]["lof_evaluation"]["nodes"],
+        **rule_resources(config["cluster"]["lof_evaluation"]),
     log:
         stdout="logs/lof_evaluation/lof_evaluation.out",
         stderr="logs/lof_evaluation/lof_evaluation.err",

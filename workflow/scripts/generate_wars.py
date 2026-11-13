@@ -20,11 +20,16 @@ from dask.distributed import Client, LocalCluster
 from neurodent import core
 from neurodent.analysis import AnimalAnalyzer
 from neurodent.workflow import setup_snakemake_logging, apply_samples_config
-from neurodent.workflow.utils import load_animal_recordings
+from neurodent.workflow.utils import load_animal_recordings, local_cluster_kwargs
 
 
 def load_samples_and_config():
-    """Load sample configuration and pipeline config"""
+    """Load the samples config and the analysis config from the rule's params.
+
+    ``config`` is the rule's analysis config, without the execution-only keys (see
+    ``neurodent.workflow.utils.analysis_config``). The scratch directory and the Dask settings
+    are read from ``snakemake.config`` where they are used.
+    """
     # Get parameters from Snakemake
     samples_config = snakemake.params.samples_config
     config = snakemake.params.config
@@ -35,16 +40,44 @@ def load_samples_and_config():
     return samples_config, config, animal_folders, animal_id, channel_subset
 
 
+def compute_lof_scores(az, config):
+    """Compute the LOF scores of the animal's recordings, without picking bad channels.
+
+    The WAR records the scores only, and the LOF channel filter picks bad channels from them
+    with ``reject_lof_threshold``. Generation used to pass that threshold to
+    ``compute_bad_channels`` too, which wrote LOF's picks into every WAR's
+    ``bad_channels_dict``.
+
+    Args:
+        az (AnimalAnalyzer): The analyzer of the animal's recordings.
+        config (dict): The rule's analysis config, as ``analysis_config`` gives it.
+            ``lof_chunk_duration_s`` is read from ``analysis.channel_filter_config.lof`` and
+            defaults to 60.
+    """
+    lof_config = config["analysis"]["channel_filter_config"]["lof"]
+    az.compute_bad_channels(
+        lof_threshold=None,
+        lof_chunk_duration_s=lof_config.get("lof_chunk_duration_s", 60),
+    )
+
+
 def generate_war_for_animal(samples_config, config, animal_folders, animal_id, channel_subset, logger):
     """Generate WAR for a specific animal, aggregating across multiple folders/sessions.
     
+    The Dask cluster is sized from the job by ``local_cluster_kwargs``: one worker per thread,
+    half of the job's memory split between the workers, and a dashboard on a free port.
+
     Args:
+        config: The rule's analysis config. The scratch directory (``temp_directory``) and the
+            Dask interface (``cluster.war_generation.interface``) are read from
+            ``snakemake.config`` instead, because the analysis config leaves them out so that
+            changing them does not rerun the job.
         animal_folders: List of (folder_path, source_animal_id, session_key) tuples.
         channel_subset: Global channel subset for this animal if it is part of a joint session.
     """
 
     # Set temp directory
-    core.utils.set_temp_directory(config["temp_directory"])
+    core.utils.set_temp_directory(snakemake.config["temp_directory"])
 
     # Set aliases
     apply_samples_config(samples_config)
@@ -52,17 +85,20 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
     # Logging key
     animal_key = f"{animal_id} (across {len(animal_folders)} folders)"
 
+    cluster_kwargs = local_cluster_kwargs(snakemake.threads, snakemake.resources.mem_mb)
     try:
         with (
             LocalCluster(
-                n_workers=snakemake.threads,
-                threads_per_worker=1,
-                interface=config["cluster"]["war_generation"]["interface"],
+                **cluster_kwargs,
+                interface=snakemake.config["cluster"]["war_generation"]["interface"],
             ) as cluster,
             Client(cluster) as client,
         ):
             logger.info(f"\n\nLocal Dask cluster dashboard: {cluster.dashboard_link}")
-            logger.info(f"Number of workers: {len(client.scheduler_info()['workers'])}")
+            logger.info(
+                f"Number of workers: {len(client.scheduler_info()['workers'])}, memory limit "
+                f"{cluster_kwargs['memory_limit'] / 2**30:.1f} GiB each"
+            )
             
             logger.info(f"Processing {animal_id} across {len(animal_folders)} sessions")
             
@@ -72,15 +108,9 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             )
             az = AnimalAnalyzer(ao)
 
-            # Compute bad channels
-            logger.info(f"Computing bad channels for {animal_key}")
-            lof_config = config["analysis"]["channel_filter_config"]["lof"]
-            lof_threshold = lof_config.get("reject_lof_threshold")
-            lof_chunk_duration_s = lof_config.get("lof_chunk_duration_s", 60)
-            az.compute_bad_channels(
-                lof_threshold=lof_threshold,
-                lof_chunk_duration_s=lof_chunk_duration_s,
-            )
+            # Compute LOF scores, which the WAR records without picking bad channels
+            logger.info(f"Computing LOF scores for {animal_key}")
+            compute_lof_scores(az, config)
 
             # Generate WAR using Dask
             logger.info(f"Computing windowed analysis for {animal_key}")

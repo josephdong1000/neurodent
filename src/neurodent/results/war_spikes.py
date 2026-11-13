@@ -50,7 +50,12 @@ class WARSpikeMixin:
                 - If inplace=False: returns new WAR object with enhanced result DataFrame
 
         Notes:
-            - The number of sars must match the number of unique animaldays in self.result
+            - Each sar is matched to the animalday it names (its animal_day). A sar named for
+              an animalday with no rows, such as a recording shorter than one window, is
+              dropped with a warning, and a name given twice raises. When the names do not
+              cover every animalday of the WAR, as in results saved by an earlier version,
+              the sars are paired with the animaldays in sorted order instead, with a
+              warning. The number of sars used to have to equal the number of animaldays.
             - Spikes are binned into time windows matching the existing WAR fragments
             - nspike: array of spike counts per channel for each time window
             - lognspike: log-transformed spike counts using log_transform()
@@ -90,16 +95,21 @@ class WARSpikeMixin:
     def _spike_animaldays(self, sars):
         """The animalday names to match spike results by, or None to pair them in sorted order.
 
-        Names are used when every one is an animalday of this WAR. Spike results computed by
-        AnimalAnalyzer carry exactly the WAR's names. Ones saved by an earlier version may not,
-        and those fall back to the old pairing, in sorted animalday order, with a warning.
+        Names are used when every animalday of this WAR has a spike result of that name.
+        Spike results computed by AnimalAnalyzer carry the WAR's names, plus one for each
+        recording too short to give a single window, and _read_from_spikes_all drops those
+        with a warning. Names used to be required to all be animaldays of the WAR, so one
+        such recording sent every result to the sorted-order pairing, which then raised
+        because there were more results than animaldays. Results saved by an earlier version
+        can carry names the WAR does not use at all, and those still fall back to the old
+        pairing, in sorted animalday order, with a warning.
         """
         names = [getattr(sar, "animal_day", None) for sar in sars]
         in_war = set(self.result["animalday"])
-        if all(name in in_war for name in names):
+        if in_war.issubset(names):
             return names
         logging.warning(
-            f"Spike results are named {names}, which are not all animaldays of this WAR "
+            f"Spike results are named {names}, which do not cover the animaldays of this WAR "
             f"({sorted(in_war)}). Pairing them with the animaldays in sorted order instead."
         )
         return None
@@ -108,13 +118,14 @@ class WARSpikeMixin:
         """
         Extract spike features from MNE RawArray objects with spike annotations.
 
-        This method extracts spike timing from MNE annotations (where spikes are marked
-        with channel-specific event labels) and bins them into WAR time windows.
+        This method reads the spike annotations of each raw, ``Spike_Ch{i}`` for the channel
+        at index i as ``write_spike_annotations`` writes them, and bins the spikes into WAR
+        time windows. It used to look annotations up by channel name, which the spike
+        results do not use, so it found none and gave every window zero spikes.
 
         Args:
             raws: List of MNE RawArray objects with spike annotations. One per recording
-                  session (animalday). Each should have annotations with channel names
-                  as event labels (e.g., 'LMot', 'RMot', etc.).
+                  session (animalday), with the WAR's channels in the WAR's order.
             inplace: If True, modifies self.result and returns self.
                     If False, returns a new WindowAnalysisResult.
             animaldays: The animalday each raw belongs to, in the same order. Strongly
@@ -124,32 +135,24 @@ class WARSpikeMixin:
             WindowAnalysisResult: WAR object with added spike features (nspike, lognspike).
 
         Notes:
-            - Expects MNE annotations with channel names as event descriptions
-            - Spike times are extracted from event onsets and binned to WAR windows
-            - Channels not found in annotations will have empty spike arrays
+            - Spike times are the annotated samples divided by the sampling rate. A FIF
+              stores annotation times as float32, so spikes read from a long saved
+              recording can be several samples off; ``read_sars_spikes`` with
+              ``read_mode="sa"`` uses the exact indices.
+            - Channels with no spike annotations get empty spike arrays.
             - Delegates to _read_from_spikes_all() for the actual binning logic
 
         Example:
             >>> # From MNE spike annotations
             >>> enhanced_war = war.read_mnes_spikes([mne_raw1, mne_raw2], inplace=False)
         """
+        from .frequency_domain_results import read_spike_annotations
+
         spikes_all = []
         for raw in raws:
             # each mne is a contiguous recording session
-            events, event_id = mne.events_from_annotations(raw)
-            event_id = {k.item(): v for k, v in event_id.items()}
-
-            spikes_channel = []
-            for channel in raw.ch_names:
-                if channel not in event_id.keys():
-                    logging.warning(f"Channel {channel} not found in event_id")
-                    spikes_channel.append([])
-                    continue
-                event_id_channel = event_id[channel]
-                spike_times = events[events[:, 2] == event_id_channel, 0]
-                spike_times = spike_times / raw.info["sfreq"]
-                spikes_channel.append(spike_times)
-            spikes_all.append(spikes_channel)
+            sfreq = raw.info["sfreq"]
+            spikes_all.append([indices / sfreq for indices in read_spike_annotations(raw)])
         return self._read_from_spikes_all(spikes_all, inplace=inplace, animaldays=animaldays)
 
     def _read_from_spikes_all(
@@ -180,10 +183,12 @@ class WARSpikeMixin:
             WindowAnalysisResult: WAR object with spike features added to result DataFrame.
 
         Raises:
-            ValueError: If the number of names and spike sets differ, or an animalday in the
-                result has no spike set.
+            ValueError: If the number of names and spike sets differ, a name is given twice,
+                or an animalday in the result has no spike set.
 
         Notes:
+            - Spike sets named for an animalday with no rows, such as a recording shorter
+              than one window, are dropped with a warning.
             - Each animalday's counts are written to that animalday's own rows. They used to
               be concatenated in sorted name order and assigned to the rows by position, but
               rows are sorted by timestamp, and names sort differently from dates across some
@@ -206,6 +211,9 @@ class WARSpikeMixin:
             raise ValueError(
                 f"{len(spikes_all)} spike sets were given for {len(animaldays)} animaldays"
             )
+        repeated = sorted({str(day) for day in animaldays if animaldays.count(day) > 1})
+        if repeated:
+            raise ValueError(f"More than one spike set is named for animalday(s) {repeated}")
         spikes_by_day = dict(zip(animaldays, spikes_all))
         missing = [day for day in days_in_rows if day not in spikes_by_day]
         if missing:

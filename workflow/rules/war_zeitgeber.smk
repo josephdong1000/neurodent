@@ -16,9 +16,11 @@ rule war_zeitgeber:
     marks as bad were in every zeitgeber figure while every other figure left them out. Channel
     averaging uses nanmean, so a rejected channel drops out of the average instead of blanking it.
 
-    The script loads the WARs one at a time, each once, so the rule needs one core and memory
-    for the largest single WAR, about 47 GiB for IQSEC2. It used to load 15 at a time and
-    peaked at 270 of its 293 GiB.
+    The script loads the WARs one at a time, each once, so the rule needs one core. Its memory
+    and time are computed from the input WARs when the job is scheduled, from the largest WAR
+    and from all windows together (see neurodent.workflow.utils.resources), so they follow the
+    dataset. On IQSEC2 the largest WAR alone peaks at about 47 GiB. The script used to load 15
+    at a time and peaked at 270 of its 293 GiB.
     """
     input:
         war_parquet=lambda wc: get_wars_after_quality_filtered(wc, filepath_prepend="results/wars_channel_filtered_manual", filepath_append="war.parquet"),
@@ -30,12 +32,10 @@ rule war_zeitgeber:
     retries:
         config["cluster"]["war_zeitgeber"]["retries"]
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
     resources:
-        time=config["cluster"]["war_zeitgeber"]["time"],
-        mem_mb=increment_memory(config["cluster"]["war_zeitgeber"]["mem_mb"]),
-        nodes=config["cluster"]["war_zeitgeber"]["nodes"],
+        **rule_resources(config["cluster"]["war_zeitgeber"], war_loading="whole"),
     log:
         stdout="logs/war_zeitgeber/war_zeitgeber.out",
         stderr="logs/war_zeitgeber/war_zeitgeber.err",

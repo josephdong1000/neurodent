@@ -18,7 +18,8 @@ import sys
 import glob
 
 # Import workflow utilities
-from neurodent.workflow.utils import deep_merge_dict, merge_dataset_config, expand_animals_config, format_config_value, increment_memory, load_samples_config, resolve_samples_config
+from neurodent.workflow.utils import analysis_config, deep_merge_dict, merge_dataset_config, expand_animals_config, format_config_value, load_samples_config, resolve_samples_config
+from neurodent.workflow.utils import rule_resources
 from neurodent.workflow.utils import format_exclusion_summary, quality_filter_outcome
 from snakemake.logging import logger
 
@@ -283,16 +284,19 @@ rule graphs:
 
 rule rulegraph:
     output: "results/graphs/rulegraph.png"
+    retries: 0
     shell: "snakemake --rulegraph --forceall | dot -Tpng > {output}"
 
 
 rule filegraph:
     output: "results/graphs/filegraph.png"
+    retries: 0
     shell: "snakemake --filegraph --forceall | dot -Tpng > {output}"
 
 
 rule dag:
     output: "results/graphs/dag.png"
+    retries: 0
     shell: "snakemake --dag --forceall | dot -Tpng > {output}"
 
 localrules: graphs, rulegraph, filegraph, dag

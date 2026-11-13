@@ -31,12 +31,10 @@ checkpoint war_flattening:
     retries:
         config["cluster"]["war_flattening"]["retries"]
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
     resources:
-        time=config["cluster"]["war_flattening"]["time"],
-        mem_mb=increment_memory(config["cluster"]["war_flattening"]["mem_mb"]),
-        nodes=config["cluster"]["war_flattening"]["nodes"],
+        **rule_resources(config["cluster"]["war_flattening"], war_loading="streamed"),
     log:
         stdout="logs/war_flattening/{animal}.out",
         stderr="logs/war_flattening/{animal}.err",
@@ -58,12 +56,10 @@ rule war_flattening_manual:
     retries:
         config["cluster"]["war_flattening"]["retries"]
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
     resources:
-        time=config["cluster"]["war_flattening"]["time"],
-        mem_mb=increment_memory(config["cluster"]["war_flattening"]["mem_mb"]),
-        nodes=config["cluster"]["war_flattening"]["nodes"],
+        **rule_resources(config["cluster"]["war_flattening"], war_loading="streamed"),
     log:
         stdout="logs/war_flattening_manual/{animal}.out",
         stderr="logs/war_flattening_manual/{animal}.err",
@@ -85,12 +81,10 @@ rule war_flattening_lof:
     retries:
         config["cluster"]["war_flattening"]["retries"]
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
     resources:
-        time=config["cluster"]["war_flattening"]["time"],
-        mem_mb=increment_memory(config["cluster"]["war_flattening"]["mem_mb"]),
-        nodes=config["cluster"]["war_flattening"]["nodes"],
+        **rule_resources(config["cluster"]["war_flattening"], war_loading="streamed"),
     log:
         stdout="logs/war_flattening_lof/{animal}.out",
         stderr="logs/war_flattening_lof/{animal}.err",

@@ -526,62 +526,45 @@ class TestFdsarChunkDurationWiring:
         assert kwargs["chunk_duration_s"] == 3600
 
 
-class TestLofThresholdWiring:
-    """Verify that generate_wars.py reads lof config and passes
-    reject_lof_threshold and lof_chunk_duration_s to ao.compute_bad_channels().
+class TestLofWiring:
+    """generate_wars.py records LOF scores only: compute_lof_scores, which
+    generate_war_for_animal calls, passes compute_bad_channels no threshold.
+
+    It used to pass reject_lof_threshold, which wrote LOF's picks into every WAR's
+    bad_channels_dict, where the channel filters and the LOF evaluation then found them. These
+    tests call the script's own compute_lof_scores, so they do not depend on how the script
+    starts its Dask cluster.
     """
 
     @staticmethod
-    def _call_compute_bad_channels(lof_config, mock_ao):
-        """Replicate the generate_wars.py logic for calling compute_bad_channels."""
-        lof_threshold = lof_config.get("reject_lof_threshold")
-        lof_chunk_duration_s = lof_config.get("lof_chunk_duration_s", 60)
-        mock_ao.compute_bad_channels(
-            lof_threshold=lof_threshold,
-            lof_chunk_duration_s=lof_chunk_duration_s,
+    def _run(lof_config):
+        import importlib.util
+
+        script = Path(__file__).parent.parent / "workflow" / "scripts" / "generate_wars.py"
+        spec = importlib.util.spec_from_file_location("generate_wars_lof_under_test", script)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)  # main() is guarded by __name__, so nothing runs
+
+        calls = []
+
+        class FakeAnalyzer:
+            def compute_bad_channels(self, **kwargs):
+                calls.append(kwargs)
+
+        module.compute_lof_scores(
+            FakeAnalyzer(), {"analysis": {"channel_filter_config": {"lof": lof_config}}}
         )
+        return calls
 
-    def test_lof_threshold_forwarded(self):
-        """reject_lof_threshold is forwarded as lof_threshold."""
-        ao = MagicMock()
-        self._call_compute_bad_channels({"reject_lof_threshold": 3.0}, ao)
+    def test_no_threshold_even_when_one_is_configured(self):
+        calls = self._run({"reject_lof_threshold": 2.5, "lof_chunk_duration_s": 120})
 
-        _, kwargs = ao.compute_bad_channels.call_args
-        assert kwargs["lof_threshold"] == 3.0
+        assert calls == [{"lof_threshold": None, "lof_chunk_duration_s": 120}]
 
-    def test_lof_threshold_none_when_absent(self):
-        """When reject_lof_threshold is absent, None is forwarded."""
-        ao = MagicMock()
-        self._call_compute_bad_channels({}, ao)
+    def test_lof_chunk_duration_s_defaults_to_60(self):
+        calls = self._run({"reject_lof_threshold": 2.5})
 
-        _, kwargs = ao.compute_bad_channels.call_args
-        assert kwargs["lof_threshold"] is None
-
-    def test_no_limit_memory_parameter(self):
-        """compute_bad_channels should NOT receive a limit_memory kwarg."""
-        ao = MagicMock()
-        self._call_compute_bad_channels({"reject_lof_threshold": 2.5}, ao)
-
-        _, kwargs = ao.compute_bad_channels.call_args
-        assert "limit_memory" not in kwargs
-
-    def test_lof_chunk_duration_s_forwarded(self):
-        """lof_chunk_duration_s is forwarded from config."""
-        ao = MagicMock()
-        self._call_compute_bad_channels(
-            {"reject_lof_threshold": 2.5, "lof_chunk_duration_s": 120}, ao,
-        )
-
-        _, kwargs = ao.compute_bad_channels.call_args
-        assert kwargs["lof_chunk_duration_s"] == 120
-
-    def test_lof_chunk_duration_s_default_60(self):
-        """When lof_chunk_duration_s is absent, defaults to 60."""
-        ao = MagicMock()
-        self._call_compute_bad_channels({"reject_lof_threshold": 2.5}, ao)
-
-        _, kwargs = ao.compute_bad_channels.call_args
-        assert kwargs["lof_chunk_duration_s"] == 60
+        assert calls == [{"lof_threshold": None, "lof_chunk_duration_s": 60}]
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="memray is only available on Linux")

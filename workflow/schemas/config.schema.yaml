@@ -104,6 +104,71 @@ properties:
               dpi:
                 type: integer
                 description: Figure resolution in dots per inch
+      zeitgeber:
+        type: object
+        description: >-
+          Zeitgeber feature extraction (war_zeitgeber). Every key is read, and any other key
+          is refused, as ZeitgeberAnalysisResult refuses a setting it does not read.
+        additionalProperties: false
+        required: ["features"]
+        properties:
+          features:
+            type: array
+            description: Features to extract. Every one must be in every WAR.
+            items:
+              type: string
+          interval_minutes:
+            type: integer
+            minimum: 1
+            maximum: 1440
+            description: Width of each zeitgeber bin in minutes. Must divide 1440.
+          baseline_hours:
+            type: number
+            description: Hours from ZT0 averaged as the baseline that the _nobase columns subtract.
+          baseline_window:
+            description: >-
+              Baseline window overriding baseline_hours: "day", "night", or
+              [start_hour, end_hour].
+            oneOf:
+              - type: string
+                enum: ["day", "night"]
+              - type: array
+                items:
+                  type: number
+                minItems: 2
+                maxItems: 2
+          exclude_from_baseline:
+            type: array
+            description: Channel-averaged columns given no _nobase version.
+            items:
+              type: string
+          zeitgeber_shift_hours:
+            type: number
+            description: Clock hour of lights on, which becomes ZT0. Defaults to 6.
+      zeitgeber_plots:
+        type: object
+        description: >-
+          Zeitgeber plots (zeitgeber_plots). Every feature column the zeitgeber step writes is
+          plotted. Any other key is refused.
+        additionalProperties: false
+        properties:
+          figure_format:
+            type: string
+            description: Figure output format, such as png, tif, pdf or svg.
+          data_format:
+            type: string
+            enum: ["csv", "pkl"]
+            description: Format of the exported plot data.
+          dpi:
+            type: integer
+            description: Figure resolution in dots per inch.
+          figsize:
+            type: array
+            description: Figure size, [width, height].
+            items:
+              type: number
+            minItems: 2
+            maxItems: 2
       channel_filter_config:
         type: object
         description: Channel filtering configurations
@@ -121,3 +186,160 @@ properties:
                   Duration in seconds of each chunk used for pairwise-distance
                   computation in LOF bad-channel detection.  Lower values reduce
                   peak RAM at the cost of more I/O passes over the recording.
+  cluster:
+    type: object
+    description: >-
+      SLURM resources of each rule, one block per rule or group of rules, read by
+      neurodent.workflow.utils.rule_resources. A block takes only the keys its rules read, so
+      an unknown block or key is refused rather than silently ignored.
+    additionalProperties: false
+    required:
+      - war_generation
+      - spike_averaged_traces
+      - war_quality_filter
+      - diagnostic_figures
+      - war_fragment_filter
+      - war_flattening
+      - war_zeitgeber
+      - relfreq_plots
+      - ep_figures
+      - ep_heatmaps
+      - zeitgeber_plots
+      - lof_evaluation
+      - notebook
+      - war_standardize
+      - war_channel_filtering
+      - filtering_comparison
+    properties:
+      war_generation:
+        $ref: "#/$defs/dask_cluster_block"
+      spike_averaged_traces:
+        $ref: "#/$defs/cluster_block"
+      war_quality_filter:
+        $ref: "#/$defs/cluster_block"
+      diagnostic_figures:
+        $ref: "#/$defs/war_sized_cluster_block"
+      war_fragment_filter:
+        $ref: "#/$defs/war_sized_cluster_block"
+      war_flattening:
+        $ref: "#/$defs/war_sized_cluster_block"
+      war_zeitgeber:
+        $ref: "#/$defs/war_timed_cluster_block"
+      relfreq_plots:
+        $ref: "#/$defs/war_timed_cluster_block"
+      ep_figures:
+        $ref: "#/$defs/cluster_block"
+      ep_heatmaps:
+        $ref: "#/$defs/cluster_block"
+      zeitgeber_plots:
+        $ref: "#/$defs/cluster_block"
+      lof_evaluation:
+        $ref: "#/$defs/cluster_block"
+      notebook:
+        $ref: "#/$defs/cluster_block"
+      war_standardize:
+        $ref: "#/$defs/war_sized_cluster_block"
+      war_channel_filtering:
+        $ref: "#/$defs/war_sized_cluster_block"
+      filtering_comparison:
+        $ref: "#/$defs/cluster_block"
+
+$defs:
+  time:
+    type: string
+    description: >-
+      Time limit as the SLURM profile accepts it, for example "2h", "30m" or "1h30m". The
+      same limit applies to every attempt.
+  mem_mb:
+    type: integer
+    minimum: 1
+    description: >-
+      Least memory the job asks for, in MB, doubled on each retry. A rule sized from its
+      input WARs asks for more when they need it.
+  nodes:
+    type: integer
+    minimum: 1
+  threads:
+    type: integer
+    minimum: 1
+  retries:
+    type: integer
+    minimum: 0
+    description: >-
+      Times a failed job is resubmitted. Every rule sets it, so the profile's restart-times is
+      never used.
+  cluster_block:
+    type: object
+    description: Resources of a rule whose size does not depend on its inputs.
+    additionalProperties: false
+    required: [time, mem_mb, nodes, threads, retries]
+    properties:
+      time: {$ref: "#/$defs/time"}
+      mem_mb: {$ref: "#/$defs/mem_mb"}
+      nodes: {$ref: "#/$defs/nodes"}
+      threads: {$ref: "#/$defs/threads"}
+      retries: {$ref: "#/$defs/retries"}
+  dask_cluster_block:
+    type: object
+    description: Resources of war_generation, which also starts a local Dask cluster.
+    additionalProperties: false
+    required: [time, mem_mb, nodes, threads, retries, interface]
+    properties:
+      time: {$ref: "#/$defs/time"}
+      mem_mb: {$ref: "#/$defs/mem_mb"}
+      nodes: {$ref: "#/$defs/nodes"}
+      threads: {$ref: "#/$defs/threads"}
+      retries: {$ref: "#/$defs/retries"}
+      interface:
+        type: ["string", "null"]
+        description: Network interface for the Dask cluster, or null for the default.
+  war_sized_cluster_block:
+    type: object
+    description: Resources of a rule whose memory is computed from its input WARs.
+    additionalProperties: false
+    required: [time, mem_mb, nodes, threads, retries, mem_bytes_per_window]
+    properties:
+      time: {$ref: "#/$defs/time"}
+      mem_mb: {$ref: "#/$defs/mem_mb"}
+      nodes: {$ref: "#/$defs/nodes"}
+      threads: {$ref: "#/$defs/threads"}
+      retries: {$ref: "#/$defs/retries"}
+      mem_bytes_per_window:
+        type: number
+        minimum: 0
+        description: >-
+          Bytes the rule's script keeps or builds per input window, on top of what it holds
+          of the largest input WAR.
+  war_timed_cluster_block:
+    type: object
+    description: Resources of a rule whose memory and time are computed from its input WARs.
+    additionalProperties: false
+    required:
+      - time
+      - mem_mb
+      - nodes
+      - threads
+      - retries
+      - mem_bytes_per_window
+      - seconds_per_value
+      - seconds_per_window
+    properties:
+      time: {$ref: "#/$defs/time"}
+      mem_mb: {$ref: "#/$defs/mem_mb"}
+      nodes: {$ref: "#/$defs/nodes"}
+      threads: {$ref: "#/$defs/threads"}
+      retries: {$ref: "#/$defs/retries"}
+      mem_bytes_per_window:
+        type: number
+        minimum: 0
+        description: >-
+          Bytes the rule's script keeps or builds per input window, on top of the largest
+          input WAR loaded whole.
+      seconds_per_value:
+        type: number
+        minimum: 0
+        description: Run time per stored value of the input WARs, added to time.
+      seconds_per_window:
+        type: number
+        minimum: 0
+        description: Run time per window of the input WARs, added to time.

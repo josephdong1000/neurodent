@@ -88,6 +88,66 @@ class TestSpikeCountsLandOnTheirOwnRows:
         with pytest.raises(ValueError, match="spike sets were given"):
             war._read_from_spikes_all([SPIKES[JAN31]], animaldays=[JAN31, FEB01])
 
+    def test_a_name_given_twice_raises(self):
+        """Two spike sets with one name would leave one of them unused without a word."""
+        war = _war()
+
+        with pytest.raises(ValueError, match="More than one spike set"):
+            war._read_from_spikes_all(
+                [SPIKES[JAN31], SPIKES[JAN31], SPIKES[FEB01]], animaldays=[JAN31, JAN31, FEB01]
+            )
+
+
+def _fake_sar(name, spikes_per_channel):
+    """A stand-in spike result named ``name``, holding spike times in seconds per channel."""
+
+    def sa(times):
+        sorting = SimpleNamespace(
+            get_unit_ids=lambda: [0],
+            get_unit_spike_train=lambda unit_id: np.round(np.asarray(times) * 1000).astype(int),
+            get_sampling_frequency=lambda: 1000.0,
+        )
+        return SimpleNamespace(sorting=sorting)
+
+    return SimpleNamespace(animal_day=name, result_sas=[sa(t) for t in spikes_per_channel])
+
+
+# A recording shorter than one window gives no rows, but spike detection still runs on it, so
+# its spike result names an animalday the WAR does not have.
+SHORT = "A1 WT Feb-02-2020"
+
+
+@pytest.mark.parametrize("position", [0, 1, 2])
+def test_a_result_for_a_recording_with_no_windows_is_dropped_by_name(position, caplog):
+    """Matched by name wherever it falls; it used to send every result to the sorted pairing,
+    which raised because there were three results for two animaldays."""
+    import logging
+
+    sars = [_fake_sar(JAN31, SPIKES[JAN31]), _fake_sar(FEB01, SPIKES[FEB01])]
+    sars.insert(position, _fake_sar(SHORT, [[0.5, 1.5], [2.5]]))
+    war = _war()
+    with caplog.at_level(logging.WARNING):
+        war.read_sars_spikes(sars, read_mode="sa", inplace=True)
+
+    assert _channel0(war) == EXPECTED_CH0
+    assert list(war.result["animalday"]) == [JAN31] * 3 + [FEB01] * 2
+    assert "with no windows were ignored" in caplog.text and SHORT in caplog.text
+    assert "sorted order" not in caplog.text
+
+
+def test_results_that_miss_an_animalday_of_the_war_still_pair_in_sorted_order(caplog):
+    """Names that do not cover every animalday of the WAR are not trusted, as before."""
+    import logging
+
+    sars = [_fake_sar(FEB01, SPIKES[FEB01]), _fake_sar(SHORT, SPIKES[JAN31])]
+    war = _war()
+    with caplog.at_level(logging.WARNING):
+        war.read_sars_spikes(sars, read_mode="sa", inplace=True)
+
+    assert "Pairing them with the animaldays in sorted order" in caplog.text
+    # Sorted animalday order is Feb-01 then Jan-31, so the second result lands on Jan-31.
+    assert _channel0(war) == EXPECTED_CH0
+
 
 def test_read_sars_spikes_matches_by_each_results_own_animalday():
     """The pipeline's entry point passes every spike result's animal_day, so order is irrelevant."""
@@ -136,3 +196,41 @@ def test_results_named_in_another_format_still_land_on_their_own_rows(caplog):
 
     assert _channel0(war) == EXPECTED_CH0
     assert "Pairing them with the animaldays in sorted order" in caplog.text
+
+
+def _annotated_raw(spikes_per_channel, n_samples=15000):
+    """A RawArray with the spikes annotated as the spike results write them, Spike_Ch{i}."""
+    import mne
+
+    from neurodent.results.frequency_domain_results import write_spike_annotations
+
+    info = mne.create_info(["LMot", "RMot"], sfreq=1000.0, ch_types="eeg")
+    raw = mne.io.RawArray(np.zeros((2, n_samples)), info, verbose=False)
+    indices = [np.round(np.asarray(t) * 1000).astype(int) for t in spikes_per_channel]
+    return write_spike_annotations(raw, indices)
+
+
+def test_read_mnes_spikes_reads_annotations_by_channel_index():
+    """It looked annotations up by channel name, which the spike results never use, so every
+    window got zero spikes."""
+    war = _war()
+    raws = [_annotated_raw(SPIKES[FEB01]), _annotated_raw(SPIKES[JAN31])]
+
+    war.read_mnes_spikes(raws, inplace=True, animaldays=[FEB01, JAN31])
+
+    assert _channel0(war) == EXPECTED_CH0
+    assert [int(np.asarray(v)[1]) for v in war.result["nspike"]] == [0] * 5
+
+
+def test_read_sars_spikes_in_mne_mode_matches_sa_mode():
+    """Both read modes give the same counts from the same spike results."""
+    sars = []
+    for day in (JAN31, FEB01):
+        sar = _fake_sar(day, SPIKES[day])
+        sar.result_mne = _annotated_raw(SPIKES[day])
+        sars.append(sar)
+
+    from_sa = _war().read_sars_spikes(sars, read_mode="sa", inplace=True)
+    from_mne = _war().read_sars_spikes(sars, read_mode="mne", inplace=True)
+
+    assert _channel0(from_mne) == _channel0(from_sa) == EXPECTED_CH0

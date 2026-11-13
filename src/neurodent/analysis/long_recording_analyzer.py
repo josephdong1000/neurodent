@@ -20,7 +20,6 @@ try:
     from mne_connectivity import envelope_correlation
 except Exception:  # pragma: no cover
     envelope_correlation = None
-from scipy.interpolate import Akima1DInterpolator
 
 from .. import constants
 from neurodent.loading import LongRecordingOrganizer
@@ -30,6 +29,9 @@ from .fragment_analyzer import FragmentAnalyzer
 class LongRecordingAnalyzer:
     """Class for analyzing LongRecordings by breaking them into smaller time windows (fragments).
 
+    Only complete windows are analysed: the samples after the last complete window of the
+    recording form no window. The last window used to be partial, with its PSD interpolated.
+
     Args:
         longrecording (LongRecordingOrganizer): The LongRecordingOrganizer instance to analyze.
         fragment_len_s (int, optional): Length of adjacent windows in seconds. Defaults to 10.
@@ -38,7 +40,7 @@ class LongRecordingAnalyzer:
     Attributes:
         LongRecording (LongRecordingOrganizer): The LongRecordingOrganizer instance being analyzed.
         fragment_len_s (int): Length of each analysis fragment/window in seconds.
-        n_fragments (int): Total number of fragments in the recording.
+        n_fragments (int): Number of complete windows in the recording.
         channel_names (list[str]): List of channel names.
         n_channels (int): Number of channels.
         mult_to_uV (float): Multiplier to convert raw data to microvolts.
@@ -165,6 +167,10 @@ class LongRecordingAnalyzer:
     ):
         """Compute PSD (power spectral density)
 
+        Every window is complete, so every window's PSD is computed the same way. The last
+        window of a recording used to be partial, and its PSD was interpolated onto the
+        frequencies of the window before it.
+
         Args:
             index (int): Index of time window
             welch_bin_t (float, optional): Length of time bins to use in Welch's method, in seconds. Defaults to 1.
@@ -174,7 +180,6 @@ class LongRecordingAnalyzer:
         Returns:
             f (np.ndarray): Array of sample frequencies
             psd (np.ndarray): Array of PSD values at sample frequencies. (X, M), X = number of sample frequencies, M = number of channels.
-            If sample window length is too short, PSD is interpolated
         """
         rec = self.get_fragment_np(index)
 
@@ -186,13 +191,6 @@ class LongRecordingAnalyzer:
             multitaper=multitaper,
             **kwargs,
         )
-
-        if index == self.n_fragments - 1 and self.n_fragments > 1:
-            f_prev, _ = self.compute_psd(
-                index - 1, welch_bin_t, notch_filter, multitaper
-            )
-            psd = Akima1DInterpolator(f, psd, axis=0, extrapolate=True)(f_prev)
-            f = f_prev
 
         return f, psd
 
@@ -391,18 +389,20 @@ class LongRecordingAnalyzer:
     def convert_idx_to_timebound(self, index: int) -> tuple[float, float]:
         """Convert fragment index to timebound (start time, end time)
 
+        The window length in samples comes from the organizer's
+        ``get_fragment_num_samples``, the count that also slices the windows. It used to be
+        computed here as ``round(fragment_len_s * f_s)``, with the end capped at the
+        recording length for a partial last window.
+
         Args:
             index (int): Fragment index
 
         Returns:
             tuple[float, float]: Timebound in seconds
         """
-        frag_len_idx = round(self.fragment_len_s * self.f_s)
+        frag_len_idx = self.LongRecording.get_fragment_num_samples(self.fragment_len_s)
         startidx = frag_len_idx * index
-        endidx = min(
-            frag_len_idx * (index + 1),
-            self.LongRecording.LongRecording.get_num_frames(),
-        )
+        endidx = frag_len_idx * (index + 1)
         return (startidx / self.f_s, endidx / self.f_s)
 
     def compute_cohere(

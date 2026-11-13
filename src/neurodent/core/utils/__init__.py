@@ -17,6 +17,7 @@ from .naming import (
     normalize_value_from_aliases,
     rename_mne_channels,
     slugify,
+    channel_averaged_columns,
     get_feature_label,
 )
 from .paths import (
@@ -34,6 +35,8 @@ from .caching import (
     cache_fragments_to_zarr,
     stream_fragments_to_zarr,
     stream_recording_to_zarr,
+    zarr_cache_path,
+    remove_zarr_cache,
     should_use_cached_file,
     get_cache_status_message,
     should_use_cache_unified,
@@ -50,12 +53,18 @@ from .neighbors import (
     Natural_Neighbor,
     chunked_channel_distance_matrix,
 )
+from .dask_batches import (
+    BatchTimeoutError,
+    compute_in_batches,
+)
 from .misc import (
     parse_truncate,
     _HiddenPrints,
 )
 
 __all__ = [
+    "BatchTimeoutError",
+    "compute_in_batches",
     "assert_microvolts",
     "convert_units_to_multiplier",
     "extract_mne_unit_info",
@@ -68,6 +77,7 @@ __all__ = [
     "normalize_value_from_aliases",
     "rename_mne_channels",
     "slugify",
+    "channel_averaged_columns",
     "get_feature_label",
     "set_temp_directory",
     "get_temp_directory",
@@ -81,6 +91,8 @@ __all__ = [
     "cache_fragments_to_zarr",
     "stream_fragments_to_zarr",
     "stream_recording_to_zarr",
+    "zarr_cache_path",
+    "remove_zarr_cache",
     "should_use_cached_file",
     "get_cache_status_message",
     "should_use_cache_unified",

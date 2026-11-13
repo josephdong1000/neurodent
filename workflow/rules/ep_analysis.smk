@@ -19,16 +19,14 @@ rule ep_figures:
         figure_dir=directory("results/ep_figures/"),
         data_dir=directory("results/ep_data/"),
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
     threads:
         config["cluster"]["ep_figures"]["threads"]
     retries:
         config["cluster"]["ep_figures"]["retries"]
     resources:
-        time=config["cluster"]["ep_figures"]["time"],
-        mem_mb=increment_memory(config["cluster"]["ep_figures"]["mem_mb"]),
-        nodes=config["cluster"]["ep_figures"]["nodes"],
+        **rule_resources(config["cluster"]["ep_figures"]),
     log:
         stdout="logs/ep_figures/ep_figures.out",
         stderr="logs/ep_figures/ep_figures.err",
@@ -49,16 +47,14 @@ rule ep_heatmaps:
         heatmap_dir=directory("results/ep_heatmaps/"),
         heatmap_data_dir=directory("results/ep_heatmap_data/"),
     params:
-        config=config,
+        config=analysis_config(config),
         samples_config=samples_config,
     threads:
         config["cluster"]["ep_heatmaps"]["threads"]
     retries:
         config["cluster"]["ep_heatmaps"]["retries"]
     resources:
-        time=config["cluster"]["ep_heatmaps"]["time"],
-        mem_mb=increment_memory(config["cluster"]["ep_heatmaps"]["mem_mb"]),
-        nodes=config["cluster"]["ep_heatmaps"]["nodes"],
+        **rule_resources(config["cluster"]["ep_heatmaps"]),
     log:
         stdout="logs/ep_heatmaps/ep_heatmaps.out",
         stderr="logs/ep_heatmaps/ep_heatmaps.err",

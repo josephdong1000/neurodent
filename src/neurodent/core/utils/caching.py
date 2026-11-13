@@ -2,6 +2,8 @@
 
 import logging
 import os
+import re
+import shutil
 
 from pathlib import Path
 from typing import Callable, Literal, Optional, Union
@@ -10,6 +12,57 @@ import numpy as np
 import zarr
 
 from .paths import get_temp_directory
+
+ZARR_CACHE_PATTERN = re.compile(r"temp_(?:slurm\d+|pid\d+)_[0-9a-f]{48}\.zarr")
+"""Names of the temporary zarr caches that zarr_cache_path makes and remove_zarr_cache removes."""
+
+
+def zarr_cache_path(tmpdir: Optional[Union[str, Path]] = None) -> str:
+    """Return a new path for a temporary zarr cache.
+
+    The name carries the SLURM job id, as in ``temp_slurm25758031_<48 hex digits>.zarr``, or the
+    process id outside SLURM (``temp_pid4242_...``), so a cache that a killed job left behind
+    can be traced to that job. Before, caches were named ``temp_<48 hex digits>.zarr``.
+
+    Args:
+        tmpdir (str | Path, optional): Directory for the cache. Defaults to
+            :func:`get_temp_directory`.
+
+    Returns:
+        str: A path in ``tmpdir`` that matches ``ZARR_CACHE_PATTERN``. Nothing is created.
+    """
+    if tmpdir is None:
+        tmpdir = get_temp_directory()
+    job = os.environ.get("SLURM_JOB_ID", "")
+    tag = f"slurm{job}" if job.isdigit() else f"pid{os.getpid()}"
+    return os.path.join(tmpdir, f"temp_{tag}_{os.urandom(24).hex()}.zarr")
+
+
+def remove_zarr_cache(path: Union[str, Path]) -> None:
+    """Remove a temporary zarr cache made by :func:`zarr_cache_path`, and nothing else.
+
+    A cache that does not exist, because it was never written or is already gone, is not an
+    error. A cache that cannot be removed is logged as a warning, as before.
+
+    Args:
+        path (str | Path): The cache to remove.
+
+    Raises:
+        ValueError: If the name does not match ``ZARR_CACHE_PATTERN``. Nothing is removed, so a
+            wrong path can never delete a directory this module did not make.
+    """
+    path = Path(path)
+    if not ZARR_CACHE_PATTERN.fullmatch(path.name):
+        raise ValueError(
+            f"Refusing to remove {path}: not a temporary zarr cache, whose name would look like "
+            "temp_slurm25758031_<48 hex digits>.zarr"
+        )
+    try:
+        shutil.rmtree(path)
+    except FileNotFoundError:
+        pass
+    except OSError as e:
+        logging.warning(f"Failed to remove temporary directory {path}: {e}")
 
 
 def cache_fragments_to_zarr(
@@ -38,12 +91,16 @@ def cache_fragments_to_zarr(
 
     Returns:
         tuple[str, zarr.Array]: A tuple containing:
-            - str: Path to the temporary zarr file
+            - str: Path to the temporary zarr file, named by :func:`zarr_cache_path`. The
+              caller removes it with :func:`remove_zarr_cache`.
             - zarr.Array: The zarr array object for accessing cached data
 
     Raises:
         ImportError: If zarr is not available
         ValueError: If ``chunk_size`` is not None and is less than 1
+
+    If writing fails, or is interrupted, the partial store is removed before the error
+    propagates. Before, it was left in the temporary directory.
     """
     if chunk_size is not None and chunk_size < 1:
         raise ValueError(
@@ -56,14 +113,6 @@ def cache_fragments_to_zarr(
     except ImportError:
         raise ImportError("zarr package is required for fragment caching")
 
-    if tmpdir is None:
-        tmpdir = get_temp_directory()
-
-    # Generate unique temporary path
-    tmppath = os.path.join(tmpdir, f"temp_{os.urandom(24).hex()}.zarr")
-
-    logging.debug(f"Caching numpy array with zarr in {tmppath}")
-
     # Create Zarr array with optimal settings for fragment-wise access
     if chunk_size is None:
         chunk_size = min(100, n_fragments)  # Cap at 100 fragments per chunk
@@ -73,19 +122,26 @@ def cache_fragments_to_zarr(
         if chunk_size < 1:
             raise ValueError("chunk_size must be >= 1 when provided")
         chunk_size = min(chunk_size, n_fragments)
-    zarr_array = zarr.open(
-        tmppath,
-        mode="w",
-        shape=np_fragments.shape,
-        chunks=(
-            chunk_size,
-            -1,  # No chunking along timestamp dimension
-            -1,  # No chunking along channel dimension
-        ),
-        dtype=np_fragments.dtype,
-        compressor=zarr.Blosc(cname="lz4", clevel=3, shuffle=zarr.Blosc.SHUFFLE),  # Fast compression
-    )
-    zarr_array[:n_fragments] = np_fragments[:n_fragments]
+
+    tmppath = zarr_cache_path(tmpdir)
+    logging.debug(f"Caching numpy array with zarr in {tmppath}")
+    try:
+        zarr_array = zarr.open(
+            tmppath,
+            mode="w",
+            shape=np_fragments.shape,
+            chunks=(
+                chunk_size,
+                -1,  # No chunking along timestamp dimension
+                -1,  # No chunking along channel dimension
+            ),
+            dtype=np_fragments.dtype,
+            compressor=zarr.Blosc(cname="lz4", clevel=3, shuffle=zarr.Blosc.SHUFFLE),  # Fast compression
+        )
+        zarr_array[:n_fragments] = np_fragments[:n_fragments]
+    except BaseException:
+        remove_zarr_cache(tmppath)  # a partial store is of no use to anyone
+        raise
 
     # Log debug properties of the zarr array
     total_memory_bytes = zarr_array.nbytes
@@ -130,19 +186,20 @@ def stream_fragments_to_zarr(
             ``None``, uses :func:`get_temp_directory`.
 
     Returns:
-        str: Path to the temporary zarr file on disk.
+        str: Path to the temporary zarr file on disk, named by :func:`zarr_cache_path`. The
+        caller removes it with :func:`remove_zarr_cache`.
 
     Raises:
         ValueError: If ``chunk_size`` < 1.
         ImportError: If zarr is not available.
+
+    If writing fails, or is interrupted, the partial store is removed before the error
+    propagates. Before, it was left in the temporary directory.
     """
     if chunk_size < 1:
         raise ValueError(f"chunk_size must be >= 1, got {chunk_size}")
 
-    if tmpdir is None:
-        tmpdir = get_temp_directory()
-
-    tmppath = os.path.join(tmpdir, f"temp_{os.urandom(24).hex()}.zarr")
+    tmppath = zarr_cache_path(tmpdir)
     batch = min(chunk_size, n_fragments)
 
     logging.debug(
@@ -150,23 +207,27 @@ def stream_fragments_to_zarr(
         f"(path: {tmppath})"
     )
 
-    zarr_array = zarr.open(
-        tmppath,
-        mode="w",
-        shape=(n_fragments,) + fragment_shape,
-        chunks=(batch, -1, -1),
-        dtype=fragment_dtype,
-        compressor=zarr.Blosc(cname="lz4", clevel=3, shuffle=zarr.Blosc.SHUFFLE),
-    )
+    try:
+        zarr_array = zarr.open(
+            tmppath,
+            mode="w",
+            shape=(n_fragments,) + fragment_shape,
+            chunks=(batch, -1, -1),
+            dtype=fragment_dtype,
+            compressor=zarr.Blosc(cname="lz4", clevel=3, shuffle=zarr.Blosc.SHUFFLE),
+        )
 
-    for batch_start in range(0, n_fragments, batch):
-        batch_end = min(batch_start + batch, n_fragments)
-        batch_len = batch_end - batch_start
-        np_batch = np.empty((batch_len,) + fragment_shape, dtype=fragment_dtype)
-        for local_idx, global_idx in enumerate(range(batch_start, batch_end)):
-            np_batch[local_idx] = get_fragment_fn(global_idx)
-        zarr_array[batch_start:batch_end] = np_batch
-        del np_batch
+        for batch_start in range(0, n_fragments, batch):
+            batch_end = min(batch_start + batch, n_fragments)
+            batch_len = batch_end - batch_start
+            np_batch = np.empty((batch_len,) + fragment_shape, dtype=fragment_dtype)
+            for local_idx, global_idx in enumerate(range(batch_start, batch_end)):
+                np_batch[local_idx] = get_fragment_fn(global_idx)
+            zarr_array[batch_start:batch_end] = np_batch
+            del np_batch
+    except BaseException:
+        remove_zarr_cache(tmppath)  # a partial store is of no use to anyone
+        raise
 
     logging.debug(f"  - Zarr array shape: {zarr_array.shape}")
     logging.debug(f"  - Zarr array chunks: {zarr_array.chunks}")
@@ -201,11 +262,15 @@ def stream_recording_to_zarr(
             ``None``, uses :func:`get_temp_directory`.
 
     Returns:
-        str: Path to the temporary zarr file on disk.
+        str: Path to the temporary zarr file on disk, named by :func:`zarr_cache_path`. The
+        caller removes it with :func:`remove_zarr_cache`.
 
     Raises:
         ValueError: If ``n_frag_per_chunk`` < 1.
         ImportError: If zarr is not available.
+
+    If writing fails, or is interrupted, the partial store is removed before the error
+    propagates. Before, it was left in the temporary directory.
     """
     if n_frag_per_chunk < 1:
         raise ValueError(f"n_frag_per_chunk must be >= 1, got {n_frag_per_chunk}")
@@ -215,12 +280,9 @@ def stream_recording_to_zarr(
     except ImportError:
         raise ImportError("zarr package is required for fragment caching")
 
-    if tmpdir is None:
-        tmpdir = get_temp_directory()
-
     n_channels = recording.get_num_channels()
     fragment_dtype = recording.get_dtype()
-    tmppath = os.path.join(tmpdir, f"temp_{os.urandom(24).hex()}.zarr")
+    tmppath = zarr_cache_path(tmpdir)
     # Cap the batch size so we never request more fragments than exist
     batch_size = min(n_frag_per_chunk, n_fragments)
 
@@ -229,28 +291,32 @@ def stream_recording_to_zarr(
         f"to zarr in batches of {batch_size} (path: {tmppath})"
     )
 
-    zarr_array = zarr.open(
-        tmppath,
-        mode="w",
-        shape=(n_fragments, n_samples_per_frag, n_channels),
-        chunks=(batch_size, -1, -1),
-        dtype=fragment_dtype,
-        compressor=zarr.Blosc(cname="lz4", clevel=3, shuffle=zarr.Blosc.SHUFFLE),
-    )
+    try:
+        zarr_array = zarr.open(
+            tmppath,
+            mode="w",
+            shape=(n_fragments, n_samples_per_frag, n_channels),
+            chunks=(batch_size, -1, -1),
+            dtype=fragment_dtype,
+            compressor=zarr.Blosc(cname="lz4", clevel=3, shuffle=zarr.Blosc.SHUFFLE),
+        )
 
-    for batch_start in range(0, n_fragments, batch_size):
-        batch_end = min(batch_start + batch_size, n_fragments)
-        start_sample = batch_start * n_samples_per_frag
-        end_sample = batch_end * n_samples_per_frag
-        chunk_traces = recording.get_traces(
-            start_frame=start_sample, end_frame=end_sample, return_scaled=True
-        )
-        chunk_fragments = chunk_traces.reshape(
-            batch_end - batch_start, n_samples_per_frag, n_channels
-        )
-        zarr_array[batch_start:batch_end] = chunk_fragments
-        # Explicitly free each batch to keep peak RAM bounded to batch_size fragments
-        del chunk_traces, chunk_fragments
+        for batch_start in range(0, n_fragments, batch_size):
+            batch_end = min(batch_start + batch_size, n_fragments)
+            start_sample = batch_start * n_samples_per_frag
+            end_sample = batch_end * n_samples_per_frag
+            chunk_traces = recording.get_traces(
+                start_frame=start_sample, end_frame=end_sample, return_scaled=True
+            )
+            chunk_fragments = chunk_traces.reshape(
+                batch_end - batch_start, n_samples_per_frag, n_channels
+            )
+            zarr_array[batch_start:batch_end] = chunk_fragments
+            # Explicitly free each batch to keep peak RAM bounded to batch_size fragments
+            del chunk_traces, chunk_fragments
+    except BaseException:
+        remove_zarr_cache(tmppath)  # a partial store is of no use to anyone
+        raise
 
     logging.debug(f"  - Zarr array shape: {zarr_array.shape}")
     logging.debug(f"  - Zarr array chunks: {zarr_array.chunks}")

@@ -75,7 +75,7 @@ analysis:
     # `channel_reorder: [...]` here only to override that order for a dataset.
     use_abbrevs: true
     add_unique_hash: false  # Whether to add unique hash during standardization
-    unique_hash_length: 4   # Length of unique hash if enabled
+    unique_hash_length: 4   # Random bytes in the hash if enabled, two hex characters each (4 gives 8)
 
   # Fragment filtering configuration (temporal artifact removal)
   fragment_filter_config:
@@ -107,20 +107,21 @@ analysis:
   aggregation:
     groupby: ["animalday", "isday"]  # Time window grouping for aggregation
 
-  # Zeitgeber time processing parameters
+  # Zeitgeber time processing parameters (war_zeitgeber). Every key here is read; the schema
+  # refuses any other. zeitgeber_shift_hours (clock hour of lights on, default 6) and
+  # baseline_window ("day", "night" or [start_hour, end_hour], overriding baseline_hours) may
+  # also be set.
   zeitgeber:
     features: ["logpsdband", "logpsdfrac", "logrms", "logampvar",
                "logpsdtotal", "lognspike", "psdslope",
-               "zpcorr", "zcohere", "zimcoh"]
-    time_aggregation_minutes: 60  # Time window for aggregation (60 = hourly)
+               "zpcorr", "zcohere", "zimcoh"]  # Every one must be in every WAR
+    interval_minutes: 60  # Width of each zeitgeber bin in minutes (60 = hourly); must divide 1440
+    baseline_hours: 12  # Hours from ZT0 averaged as the baseline the _nobase columns subtract
+    exclude_from_baseline: []  # Optional: columns given no _nobase version (e.g., ["logrms", "zcohere_delta"])
 
-  # Zeitgeber temporal plots parameters
+  # Zeitgeber temporal plots parameters (zeitgeber_plots). Every feature column the zeitgeber
+  # step writes is plotted.
   zeitgeber_plots:
-    features: ["logpsdband", "logpsdfrac", "logrms", "logampvar",
-               "logpsdtotal", "lognspike", "psdslope",
-               "zpcorr", "zcohere", "zimcoh"]
-    baseline_hours: 12  # Hours to use for baseline correction (first N hours)
-    exclude_from_baseline: []  # Optional: features to exclude from baseline correction (e.g., ["logrms", "zcohere_delta"])
     figure_format: "png"  # Figure output format: png, tif, pdf, svg
     data_format: "csv"    # Data export format: csv, pkl
     dpi: 300             # Figure resolution
@@ -222,28 +223,38 @@ analysis:
             halfrange: 1.5
 
 # SLURM cluster configuration
+#
+# One block per rule, or per group of rules that share it; workflow/schemas/config.schema.yaml
+# lists the keys each block takes. Every rule reads its block through
+# neurodent.workflow.utils.rule_resources:
+# - time is the job's time limit, the same on every attempt. war_zeitgeber and relfreq_plots
+#   add a run time computed from their input WARs (seconds_per_value, seconds_per_window).
+# - mem_mb is the least memory the job asks for, doubled on each retry. A rule that reads
+#   WARs also computes a peak from the parquet footers of its input WARs when the job is
+#   scheduled, and asks for 1.25 times that peak when it is more than mem_mb:
+#       peak = 1 GB + (the largest input WAR loaded whole, or one row group and one batch of
+#              it when the rule streams it) + mem_bytes_per_window * all input windows
+#   A dry run shows such a size as TBD until the inputs exist.
+# - retries is how many times a failed job is resubmitted. Every rule sets it, so the
+#   profile's restart-times is never used.
+# A --set-resources on the command line replaces what rule_resources computes for that rule,
+# including the doubling on retry.
+#
+# The per-window rates of the per-WAR rules come from the IQSEC2 run of 23 October 2026 (28
+# WARs of 8 channels, 2,322 to 115,806 windows): sacct MaxRSS of every completed job (sacct -u
+# dongjp -S 2026-10-22), joined to the parquet footers of that job's input WARs. Each rate is
+# the least non-negative one that keeps every one of those jobs at or under the peak above
+# before the factor 1.25, rounded up to 500 bytes. The mem_mb of each per-WAR rule is the value
+# it had before, kept as a floor.
 cluster:
+  # Its size is not computed: the rule declares no inputs to compute it from. These are the
+  # IQSEC2 values, which used to be passed as --set-resources war_generation:time=12h
+  # war_generation:mem_mb=80000; a --set-resources still replaces them outright.
   war_generation:
-    time: "6h"
-    mem_mb: 50_000
+    time: "12h"
+    mem_mb: 80_000
     nodes: 1
     threads: 4
-    interface: null
-    retries: 2
-
-  split_joint_recordings:
-    time: "3h"
-    mem_mb: 70_000
-    nodes: 1
-    threads: 4
-    interface: null
-    retries: 2
-
-  frequency_domain_spike_detection:
-    time: "2h"
-    mem_mb: 40_000
-    nodes: 1
-    threads: 8
     interface: null
     retries: 2
 
@@ -252,7 +263,6 @@ cluster:
     mem_mb: 20_000
     nodes: 1
     threads: 4
-    interface: null
     retries: 2
 
   war_quality_filter:
@@ -260,51 +270,66 @@ cluster:
     mem_mb: 4_000
     nodes: 1
     threads: 1
-    interface: null
     retries: 0
 
+  # Loads its whole WAR. Its 56 completed jobs peaked at up to 48.83 GB, at most 0.98 of the
+  # peak computed with no per-window rate. At 30 GB, iqsec2_80 to 83 ran out of memory; they
+  # asked for 60 GB on retry and peaked at 42.1 to 48.8 GB. They now ask for 59 to 64 GB.
   diagnostic_figures:
     time: "2h"
     mem_mb: 30_000
+    mem_bytes_per_window: 0
     nodes: 1
     threads: 4
-    interface: null
     retries: 1
 
+  # Streams its WAR. Its 28 jobs peaked at up to 3.73 GB; the rate is 4,355 rounded up.
   war_fragment_filter:
     time: "2h"
     mem_mb: 30_000
+    mem_bytes_per_window: 4_500
     nodes: 1
     threads: 1
-    interface: null
     retries: 2
 
+  # Streams its WAR, for war_flattening, war_flattening_manual and war_flattening_lof. The
+  # last two ran 56 jobs, which peaked at up to 3.70 GB; the rate is 5,674 rounded up.
   war_flattening:
     time: "2h"
     mem_mb: 30_000
+    mem_bytes_per_window: 6_000
     nodes: 1
     threads: 1
-    interface: null
     retries: 2
 
-  # Holds one whole WAR at a time, so one core is enough, and the memory covers the
-  # largest single WAR (about 47 GiB for IQSEC2). The retry doubles it.
+  # Holds one whole WAR at a time, so one core is enough. Memory and time are computed from
+  # the input WARs when the job is scheduled: mem_mb is the floor and time the fixed base. The
+  # rates were measured for this rule's script on all 28 IQSEC2 WARs (8 channels, 1.6 million
+  # windows) and on 24 synthetic 2-channel WARs (3 million windows): the time fit reproduces
+  # both runs, and the memory rate counts the whole synthetic peak per window, so many small
+  # WARs are not under-sized.
   war_zeitgeber:
-    time: "4h"
-    mem_mb: 80_000
+    time: "30m"
+    mem_mb: 2_000
+    mem_bytes_per_window: 3_200
+    seconds_per_value: 3.4e-7
+    seconds_per_window: 8.5e-4
     nodes: 1
     threads: 1
-    interface: null
     retries: 1
 
-  # Holds one whole WAR at a time, so one core is enough, and the memory covers the
-  # largest single WAR (about 47 GiB for IQSEC2). The retry doubles it.
+  # Holds one whole WAR at a time, so one core is enough. Memory and time are computed from
+  # the input WARs when the job is scheduled: mem_mb is the floor and time the fixed base. The
+  # rates were measured as for war_zeitgeber above; the plots of the banded features set this
+  # rule's peak when there are many windows.
   relfreq_plots:
-    time: "6h"
-    mem_mb: 80_000
+    time: "30m"
+    mem_mb: 2_000
+    mem_bytes_per_window: 3_500
+    seconds_per_value: 3.2e-7
+    seconds_per_window: 2.1e-3
     nodes: 1
     threads: 1
-    interface: null
     retries: 1
 
   ep_figures:
@@ -312,7 +337,6 @@ cluster:
     mem_mb: 10_000
     nodes: 1
     threads: 4
-    interface: null
     retries: 0
 
   ep_heatmaps:
@@ -320,7 +344,6 @@ cluster:
     mem_mb: 10_000
     nodes: 1
     threads: 4
-    interface: null
     retries: 0
 
   zeitgeber_plots:
@@ -328,7 +351,6 @@ cluster:
     mem_mb: 20_000
     nodes: 1
     threads: 4
-    interface: null
     retries: 2
 
   lof_evaluation:
@@ -336,7 +358,6 @@ cluster:
     mem_mb: 10_000
     nodes: 1
     threads: 4
-    interface: null
     retries: 0
 
   notebook:
@@ -344,23 +365,27 @@ cluster:
     mem_mb: 20_000
     nodes: 1
     threads: 4
-    interface: null
     retries: 1
 
+  # Streams its WAR, which war_generation writes in one row group, so its peak follows the
+  # WAR's whole uncompressed size. Its 28 jobs peaked at up to 7.85 GB, at most 0.96 of the
+  # peak computed with no per-window rate.
   war_standardize:
     time: "1h"
     mem_mb: 20_000
+    mem_bytes_per_window: 0
     nodes: 1
     threads: 1
-    interface: null
     retries: 2
 
+  # Streams its WAR, for war_channel_filtering_manual and war_channel_filtering_lof. Their 56
+  # jobs peaked at up to 3.66 GB; the rate is 5,310 rounded up.
   war_channel_filtering:
     time: "1h"
     mem_mb: 20_000
+    mem_bytes_per_window: 5_500
     nodes: 1
     threads: 1
-    interface: null
     retries: 2
 
   filtering_comparison:
@@ -368,10 +393,4 @@ cluster:
     mem_mb: 10_000
     nodes: 1
     threads: 4
-    interface: null
     retries: 0
-
-# Logging configuration
-logging:
-  level: "DEBUG"
-  format: "%(asctime)s - %(levelname)s - %(message)s"

@@ -20,7 +20,11 @@ except ImportError:
 
 import mne
 
-from neurodent.results.frequency_domain_results import FrequencyDomainSpikeAnalysisResult
+from neurodent.results.frequency_domain_results import (
+    FrequencyDomainSpikeAnalysisResult,
+    read_spike_annotations,
+    write_spike_annotations,
+)
 from neurodent import core
 
 
@@ -447,6 +451,7 @@ def _make_mock_sorting_analyzer(traces_uv, sfreq, channel_id, spike_samples):
     rec = MagicMock()
     rec.get_sampling_frequency.return_value = sfreq
     rec.get_duration.return_value = duration
+    rec.get_num_samples.return_value = n_samples
     rec.get_channel_ids.return_value = np.array([channel_id])
 
     def _get_traces(start_frame=0, end_frame=None, return_scaled=True):
@@ -626,3 +631,276 @@ class TestFrequencyDomainSpikeAnalysisResultUtils:
             ]
 
             assert len(fdsar.channel_abbrevs) == 2
+
+
+def _raw(n_channels, n_samples, sfreq=1000.0):
+    info = mne.create_info(ch_names=[f"ch{i}" for i in range(n_channels)], sfreq=sfreq, ch_types="eeg")
+    return mne.io.RawArray(np.zeros((n_channels, n_samples)), info, verbose=False)
+
+
+# Spike indices per channel, with an empty channel and spikes on the first and last samples
+SPIKES_BY_SHAPE = {
+    (3, 5000): [np.array([0, 500, 1500, 3000]), np.array([800, 2200, 4999]), np.array([], dtype=int)],
+    (5, 1001): [np.array([1000]), np.array([], dtype=int), np.array([3, 4, 5]), np.array([1]), np.array([999])],
+}
+
+
+@pytest.mark.unit
+class TestSpikeAnnotations:
+    """write_spike_annotations and read_spike_annotations, the one writer and the one reader."""
+
+    @pytest.mark.parametrize("shape", list(SPIKES_BY_SHAPE))
+    def test_each_spike_is_written_on_its_sample(self, shape):
+        """Onsets are index / sfreq. They used to be (index + 1) / sfreq, one sample late."""
+        spikes = SPIKES_BY_SHAPE[shape]
+        raw = write_spike_annotations(_raw(*shape), spikes)
+
+        expected = sorted(
+            (index / 1000.0, f"Spike_Ch{ch}") for ch, indices in enumerate(spikes) for index in indices
+        )
+        assert list(zip(raw.annotations.onset, raw.annotations.description)) == expected
+        assert np.all(raw.annotations.duration == 0)
+
+    @pytest.mark.parametrize("shape", list(SPIKES_BY_SHAPE))
+    def test_read_gives_back_the_written_indices(self, shape):
+        spikes = SPIKES_BY_SHAPE[shape]
+        read = read_spike_annotations(write_spike_annotations(_raw(*shape), spikes))
+
+        assert len(read) == shape[0]
+        for got, want in zip(read, spikes):
+            np.testing.assert_array_equal(got, want)
+            assert got.dtype == np.int64
+
+    def test_round_trip_through_a_fif(self, tmp_path):
+        spikes = SPIKES_BY_SHAPE[(3, 5000)]
+        write_spike_annotations(_raw(3, 5000), spikes).save(tmp_path / "x-raw.fif", verbose=False)
+
+        read = read_spike_annotations(mne.io.read_raw_fif(tmp_path / "x-raw.fif", verbose=False))
+
+        for got, want in zip(read, spikes):
+            np.testing.assert_array_equal(got, want)
+
+    def test_writing_replaces_earlier_annotations(self):
+        raw = _raw(2, 1000)
+        raw.set_annotations(mne.Annotations([0.1], [0.0], ["ch0"]))
+
+        write_spike_annotations(raw, [np.array([], dtype=int), np.array([10])])
+
+        assert list(raw.annotations.description) == ["Spike_Ch1"]
+
+    def test_an_index_outside_the_recording_raises(self):
+        with pytest.raises(ValueError, match="outside the recording's 1000 samples"):
+            write_spike_annotations(_raw(2, 1000), [np.array([10]), np.array([1000])])
+
+    def test_an_annotation_for_a_missing_channel_raises(self):
+        raw = _raw(2, 1000)
+        raw.set_annotations(mne.Annotations([0.1], [0.0], ["Spike_Ch2"]))
+
+        with pytest.raises(ValueError, match="Spike_Ch2"):
+            read_spike_annotations(raw)
+
+    def test_other_annotations_are_not_read(self):
+        raw = _raw(2, 1000)
+        raw.set_annotations(mne.Annotations([0.1, 0.2], [0.0, 0.0], ["Spike_Ch1", "BAD_artifact"]))
+
+        read = read_spike_annotations(raw)
+
+        assert [r.tolist() for r in read] == [[], [100]]
+
+    @pytest.mark.parametrize("n_channels", [1, 3])
+    def test_convert_sas_to_mne_annotates_with_the_writer(self, n_channels):
+        """The export used to annotate spikes by channel name and then rewrite them as
+        Spike_Ch{i} one sample late; now there is one form, on the detected sample."""
+        rng = np.random.default_rng(3)
+        n_samples = 4000
+        trains = [np.sort(rng.choice(n_samples, size=5 + ch, replace=False)) for ch in range(n_channels)]
+        sas = [
+            _make_mock_sorting_analyzer(rng.standard_normal(n_samples), 1000.0, f"ch{ch}", train)
+            for ch, train in enumerate(trains)
+        ]
+
+        raw = FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(sas, multiprocess_mode="serial")
+
+        assert {d[: len("Spike_Ch")] for d in raw.annotations.description} == {"Spike_Ch"}
+        for got, want in zip(read_spike_annotations(raw), trains):
+            np.testing.assert_array_equal(got, want)
+
+
+@pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
+@pytest.mark.parametrize("n_samples, n_channels", [(1001, 2), (4004, 3), (5000, 1)])
+def test_the_fif_holds_every_sample(tmp_path, n_samples, n_channels):
+    """The export's length used to be int(duration * sfreq), one short for 1001 or 4004 samples
+    at 1000 Hz, which lost the last sample and any spike on it."""
+    if n_samples != 5000:
+        assert int(n_samples / 1000.0 * 1000.0) == n_samples - 1  # the old count
+    rng = np.random.default_rng(n_samples)
+    traces = rng.standard_normal((n_samples, n_channels)).astype(np.float32) * 50
+    recording = si.NumpyRecording(traces, sampling_frequency=1000.0)
+    spikes = [np.array([0, n_samples // 2, n_samples - 1])] + [
+        np.array([10 + ch]) for ch in range(1, n_channels)
+    ]
+    fdsar = FrequencyDomainSpikeAnalysisResult.from_detection_results(
+        spike_indices_per_channel=spikes, recording=recording, detection_params={},
+        animal_id="A1", genotype="WT", animal_day="A1 WT Jan-01-2020",
+    )
+
+    raw = fdsar.convert_to_mne(save_raw=False)
+
+    assert raw.n_times == n_samples
+    np.testing.assert_allclose(raw.get_data(), traces.T * 1e-6, rtol=1e-6)
+    for got, want in zip(read_spike_annotations(raw), spikes):
+        np.testing.assert_array_equal(got, want)
+
+
+@pytest.mark.unit
+def test_convert_sas_to_mne_refuses_channels_of_different_lengths():
+    sas = [
+        _make_mock_sorting_analyzer(np.zeros(1000), 1000.0, "ch0", np.array([1])),
+        _make_mock_sorting_analyzer(np.zeros(999), 1000.0, "ch1", np.array([1])),
+    ]
+    with pytest.raises(ValueError, match="same number of samples"):
+        FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(sas)
+
+
+def _late_raw(n_channels, n_samples=5000):
+    """A short recording whose first sample is 80,000 s after its measurement date.
+
+    Its annotation onsets are about 80,000 s, as they are late in a day-long recording, where
+    float32 holds a time only to 1/128 s, about 8 samples at 1000 Hz.
+    """
+    import datetime
+
+    raw = _raw(n_channels, n_samples)
+    raw = mne.io.RawArray(raw.get_data(), raw.info, first_samp=80_000_000, verbose=False)
+    raw.set_meas_date(datetime.datetime(2020, 1, 1, tzinfo=datetime.timezone.utc))
+    return raw
+
+
+LATE_SPIKES = {
+    2: [np.arange(1, 4999, 37), np.array([0, 4999])],
+    4: [np.array([], dtype=int), np.arange(3, 4990, 101), np.array([2500]), np.arange(0, 5000, 499)],
+}
+
+
+@pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
+class TestSidecarSpikeIndices:
+    """The JSON sidecar keeps exact spike indices, which the FIF annotations cannot."""
+
+    def _saved(self, tmp_path, n_channels, spike_indices="given"):
+        spikes = LATE_SPIKES[n_channels]
+        raw = write_spike_annotations(_late_raw(n_channels), spikes)
+        fdsar = FrequencyDomainSpikeAnalysisResult(
+            result_mne=raw,
+            spike_indices=spikes if spike_indices == "given" else None,
+            detection_params={"bp": (3.0, 40.0)},
+            animal_id="A1",
+            genotype="WT",
+            animal_day="A1 WT Jan-01-2020",
+            channel_names=raw.ch_names,
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            fdsar.save_fif_and_json(tmp_path)
+        (json_path,) = tmp_path.glob("*.json")
+        return spikes, json_path
+
+    @pytest.mark.parametrize("n_channels", list(LATE_SPIKES))
+    def test_save_and_load_keep_exact_indices(self, tmp_path, n_channels):
+        spikes, json_path = self._saved(tmp_path, n_channels)
+
+        data = json.loads(json_path.read_text())
+        assert data["spike_indices_per_channel"] == [s.tolist() for s in spikes]
+        assert data["spike_counts_per_channel"] == [len(s) for s in spikes]
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)  # no fallback warning
+            warnings.filterwarnings("ignore", message=".*could not be mapped.*")
+            loaded = FrequencyDomainSpikeAnalysisResult.load_fif_and_json(tmp_path)
+
+        for got, want in zip(loaded.spike_indices, spikes):
+            np.testing.assert_array_equal(got, want)
+            assert got.dtype == np.int64
+        # The FIF annotations alone are several samples off, which is why the sidecar keeps them
+        from_fif = read_spike_annotations(loaded.result_mne)
+        assert any(not np.array_equal(a, b) for a, b in zip(from_fif, spikes))
+
+    def test_an_old_sidecar_loads_from_the_annotations_with_a_warning(self, tmp_path):
+        _, json_path = self._saved(tmp_path, 2)
+        data = json.loads(json_path.read_text())
+        del data["spike_indices_per_channel"]
+        json_path.write_text(json.dumps(data))
+
+        with pytest.warns(UserWarning, match="has no spike_indices_per_channel"):
+            loaded = FrequencyDomainSpikeAnalysisResult.load_fif_and_json(tmp_path)
+
+        for got, want in zip(loaded.spike_indices, read_spike_annotations(loaded.result_mne)):
+            np.testing.assert_array_equal(got, want)
+
+    def test_a_sidecar_with_the_wrong_channel_count_raises(self, tmp_path):
+        _, json_path = self._saved(tmp_path, 2)
+        data = json.loads(json_path.read_text())
+        data["spike_indices_per_channel"] = data["spike_indices_per_channel"][:1]
+        json_path.write_text(json.dumps(data))
+
+        with pytest.raises(ValueError, match="spike indices for 1 channels"):
+            FrequencyDomainSpikeAnalysisResult.load_fif_and_json(tmp_path)
+
+    def test_without_spike_indices_the_sidecar_takes_them_from_the_annotations(self, tmp_path):
+        """The in-memory annotations are exact; the counts used to be left empty here."""
+        spikes, json_path = self._saved(tmp_path, 4, spike_indices=None)
+
+        data = json.loads(json_path.read_text())
+        assert data["spike_indices_per_channel"] == [s.tolist() for s in spikes]
+        assert data["spike_counts_per_channel"] == [len(s) for s in spikes]
+
+    def _loaded(self, tmp_path, n_channels):
+        spikes, _ = self._saved(tmp_path, n_channels)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return spikes, FrequencyDomainSpikeAnalysisResult.load_fif_and_json(tmp_path)
+
+    @pytest.mark.parametrize("n_channels", list(LATE_SPIKES))
+    def test_spike_events_sit_on_the_exact_samples(self, tmp_path, n_channels):
+        spikes, loaded = self._loaded(tmp_path, n_channels)
+        raw = loaded.result_mne
+
+        events, event_id = loaded._spike_events(raw)
+
+        assert np.all(np.diff(events[:, 0]) >= 0)
+        for ch_idx, want in enumerate(spikes):
+            name = f"Spike_Ch{ch_idx}"
+            if not len(want):
+                assert name not in event_id
+                continue
+            got = events[events[:, 2] == event_id[name], 0] - raw.first_samp
+            np.testing.assert_array_equal(got, np.sort(want))
+        # The events used to come from the FIF annotations, several samples off this late
+        from_annotations, _ = mne.events_from_annotations(raw, verbose=False)
+        assert not np.array_equal(np.sort(from_annotations[:, 0]), events[:, 0])
+
+    def test_spike_averaged_epochs_are_centred_on_the_exact_samples(self, tmp_path, monkeypatch):
+        spikes, loaded = self._loaded(tmp_path, 4)
+        seen = {}
+
+        def epochs(raw, events, event_id, **kwargs):
+            (name,) = event_id
+            seen[name] = events[:, 0] - raw.first_samp
+            return []  # no epochs, so nothing is plotted or saved
+
+        monkeypatch.setattr(mne, "Epochs", epochs)
+        counts = loaded.plot_spike_averaged_traces()
+
+        assert counts == {i: len(s) for i, s in enumerate(spikes)}
+        assert sorted(seen) == [f"Spike_Ch{i}" for i, s in enumerate(spikes) if len(s)]
+        for name, got in seen.items():
+            np.testing.assert_array_equal(got, np.sort(spikes[int(name.removeprefix("Spike_Ch"))]))
+
+    def test_without_spike_indices_the_events_come_from_the_annotations(self):
+        spikes = LATE_SPIKES[4]
+        raw = write_spike_annotations(_raw(4, 5000), spikes)
+        fdsar = FrequencyDomainSpikeAnalysisResult(result_mne=raw, channel_names=raw.ch_names)
+
+        events, event_id = fdsar._spike_events(raw)
+
+        want, want_id = mne.events_from_annotations(raw, verbose=False)
+        np.testing.assert_array_equal(events, want)
+        assert event_id == {k: v for k, v in want_id.items() if k.startswith("Spike_Ch")}

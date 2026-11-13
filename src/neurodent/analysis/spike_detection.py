@@ -19,7 +19,6 @@ except Exception:  # pragma: no cover
     dask = None
 
 import numpy as np
-import mne
 
 from neurodent import constants
 from scipy.signal import iirfilter, iirnotch, sosfiltfilt, filtfilt, stft, windows
@@ -699,45 +698,3 @@ class FrequencyDomainSpikeDetector:
             chosen.append(best_idx)
 
         return np.array(sorted(set(chosen)), dtype=int)
-
-    @staticmethod
-    def _add_spike_annotations(mne_raw, spike_indices_per_channel, sampling_freq):
-        """
-        Add spike annotations to MNE RawArray object.
-
-        Args:
-            mne_raw: MNE RawArray object
-            spike_indices_per_channel: List of spike indices per channel
-            sampling_freq: Sampling frequency
-
-        Returns:
-            mne_raw_with_annotations: MNE RawArray with spike annotations added
-        """
-        spike_annotations = []
-
-        for ch_idx, channel_spikes in enumerate(spike_indices_per_channel):
-            if len(channel_spikes) > 0:
-                # Convert sample indices to seconds
-                spike_times_seconds = (
-                    channel_spikes + 1
-                ) / sampling_freq  # REVIEW why is +1 here?
-                for spike_time in spike_times_seconds:
-                    spike_annotations.append(
-                        {
-                            "onset": float(spike_time),
-                            "duration": 0.0,
-                            "description": f"Spike_Ch{ch_idx}",
-                        }
-                    )
-
-        if spike_annotations:
-            # Sort by onset time
-            spike_annotations.sort(key=lambda x: x["onset"])
-            annotations = mne.Annotations(
-                onset=[a["onset"] for a in spike_annotations],
-                duration=[a["duration"] for a in spike_annotations],
-                description=[a["description"] for a in spike_annotations],
-            )
-            mne_raw.set_annotations(annotations)
-
-        return mne_raw

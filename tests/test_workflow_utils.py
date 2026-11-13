@@ -1,7 +1,6 @@
 """Tests for neurodent.workflow utilities."""
 
 import gc
-import logging
 import tempfile
 import weakref
 from pathlib import Path
@@ -9,43 +8,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from neurodent.workflow import setup_snakemake_logging, iter_wars, load_wars
+from neurodent.workflow import iter_wars, load_wars
 from neurodent.workflow.utils import apply_path_overrides
 
 
-class TestSetupSnakemakeLogging:
-    """Tests for setup_snakemake_logging function."""
-
-    def test_creates_log_file(self, tmp_path):
-        """Test that logging creates the specified log file."""
-        log_file = tmp_path / "test.log"
-
-        # Mock snakemake object
-        mock_snakemake = MagicMock()
-        mock_snakemake.log = [str(log_file)]
-
-        logger = setup_snakemake_logging(mock_snakemake)
-
-        # Log something
-        logger.info("Test message")
-
-        # Flush to ensure write
-        logging.shutdown()
-
-        # Verify log file was created and contains message
-        assert log_file.exists()
-        content = log_file.read_text()
-        assert "Test message" in content
-
-    def test_returns_logger(self, tmp_path):
-        """Test that function returns a logger instance."""
-        log_file = tmp_path / "test.log"
-        mock_snakemake = MagicMock()
-        mock_snakemake.log = [str(log_file)]
-
-        result = setup_snakemake_logging(mock_snakemake)
-
-        assert isinstance(result, logging.Logger)
+# setup_snakemake_logging is tested in test_workflow_logging.py, in a subprocess: it points the
+# process's file descriptors 1 and 2 at the rule's logs, which in process would swap pytest's own.
 
 
 class TestLoadWars:

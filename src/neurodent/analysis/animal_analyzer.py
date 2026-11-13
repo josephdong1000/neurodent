@@ -40,9 +40,13 @@ class AnimalAnalyzer:
     Analysis state (``bad_channels_dict``, ``features_df``, ``window_analysis_result``,
     ``frequency_domain_spike_analysis_results``) is stored on the instance, so reuse a
     single ``AnimalAnalyzer(ao)`` across ``compute_bad_channels`` /
-    ``compute_windowed_analysis`` / ``compute_frequency_domain_spike_analysis``. Computing
-    bad channels on one instance and windowed analysis on a separate ``AnimalAnalyzer(ao)``
-    will yield a result with empty bad channels on the second instance.
+    ``compute_windowed_analysis`` / ``compute_frequency_domain_spike_analysis``. LOF scores
+    are kept on the organizer's recordings, and ``compute_windowed_analysis`` records them in
+    the result's ``lof_scores_dict``. The result's ``bad_channels_dict`` always starts empty:
+    the channels a LOF threshold picks stay in this instance's ``bad_channels_dict``, and a
+    result gives them with ``get_bad_channels_by_lof_threshold``. The result used to start
+    with this instance's ``bad_channels_dict``, so a threshold given to
+    ``compute_bad_channels`` put LOF's picks into it.
 
     Args:
         ao (AnimalOrganizer): A loaded organizer whose recordings are analyzed.
@@ -61,6 +65,9 @@ class AnimalAnalyzer:
         lof_chunk_duration_s: float = 60,
     ):
         """Compute bad channels using LOF analysis for all recordings.
+
+        The scores are recorded in the result of :meth:`compute_windowed_analysis`; the channels
+        a threshold picks are kept in ``self.bad_channels_dict`` only, not in that result.
 
         Args:
             lof_threshold (float, optional): Threshold for determining bad channels from LOF scores.
@@ -125,6 +132,8 @@ class AnimalAnalyzer:
         suppress_short_interval_error=False,
         apply_notch_filter=True,
         chunk_duration_s: Optional[float] = 3600,
+        batch_fragments: Optional[int] = None,
+        first_batch_timeout_s: Optional[float] = core_utils.dask_batches.FIRST_TIMEOUT_S,
         **kwargs,
     ) -> "WindowAnalysisResult":
         """Computes windowed analysis of animal recordings. The data is divided into windows (time bins), then features are extracted from each window. The result is
@@ -135,8 +144,11 @@ class AnimalAnalyzer:
             exclude (list[str], optional): List of features to ignore. Will override the features parameter. Defaults to [].
             window_s (int, optional): Length of each window in seconds. Note that some features break with very short window times. Defaults to 5.
             multiprocess_mode (Literal["dask", "serial"], optional): Whether to compute windows in parallel with Dask, one task per window, or serially.
-                Process-level parallelism requires an active ``dask.distributed`` Client. The Dask path drops the last fragment unconditionally, even when it is a
-                full window, so it yields one fewer window than "serial". Defaults to "serial".
+                Process-level parallelism requires an active ``dask.distributed`` Client. Both modes analyse the same windows, the complete
+                windows of each recording, floor(samples / window). The samples after the last complete window are logged and not analysed,
+                and a recording shorter than one window gives no rows and a warning. Before, the Dask path dropped the last window
+                unconditionally, so it gave one window fewer than "serial" when a recording was an exact multiple of the window length, and
+                "serial" kept a partial last window whose PSD it interpolated. Defaults to "serial".
             suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps in resulting WindowAnalysisResult. Useful for aggregated WARs. Defaults to False.
             apply_notch_filter (bool, optional): Whether to apply notch filtering to remove line noise. Uses constants.LINE_FREQ. Defaults to True.
             chunk_duration_s (float, optional): Duration in seconds of data to hold
@@ -152,12 +164,35 @@ class AnimalAnalyzer:
                 memory-constrained machines and a larger value (e.g. 2500+) on
                 high-memory nodes for maximum throughput.  Only has an effect when
                 ``multiprocess_mode="dask"``.  Defaults to 3600.
+            batch_fragments (int, optional): Windows the Dask path computes and gathers at a
+                time, by :func:`neurodent.core.utils.compute_in_batches`. None, the default,
+                takes one chunk of the zarr cache: ``int(chunk_duration_s / window_s)``
+                windows, or 100 when ``chunk_duration_s`` is None. Results do not depend on
+                it. Before, every window of a recording was gathered in one transfer, which
+                stalled the scheduler on a 51,000-window day and hung war_generation for 12
+                hours. Only has an effect when ``multiprocess_mode="dask"``.
+            first_batch_timeout_s (float, optional): Seconds the first batch may take with a
+                ``dask.distributed`` client. Later batches may take ten times their windows
+                at the slowest rate seen, and at least 600 s (see
+                :func:`neurodent.core.utils.dask_batches.batch_timeout`). A batch past its
+                deadline raises ``BatchTimeoutError``. None sets no deadline. Defaults to
+                3600.
+
+        Note:
+            The Dask path caches each recording's windows in a temporary zarr store in the
+            temp directory, named by ``core.utils.zarr_cache_path``, and removes it on every
+            exit: after the computation, on an error, and on the ``SystemExit`` that
+            ``setup_snakemake_logging`` raises when SLURM sends SIGTERM at a job's time limit.
+            Before, it was removed only when the computation succeeded.
 
         Raises:
             AttributeError: If a feature's ``compute_...()`` function was not implemented, this error will be raised.
+            ValueError: If no recording of the animal is as long as one window.
 
         Returns:
-            WindowAnalysisResult: A WindowAnalysisResult object containing extracted features for all recordings
+            WindowAnalysisResult: A WindowAnalysisResult object containing extracted features for all recordings,
+            the LOF scores of every recording that has them, and an empty ``bad_channels_dict``. The
+            ``bad_channels_dict`` used to be this analyzer's, holding any LOF threshold's picks.
         """
         features = _sanitize_feature_request(features, exclude)
 
@@ -169,21 +204,29 @@ class AnimalAnalyzer:
             lan = LongRecordingAnalyzer(
                 lrec, fragment_len_s=window_s, apply_notch_filter=apply_notch_filter
             )
+            # Both modes analyse the same complete windows, cut at this sample count.
+            n_samples_per_frag = lrec.get_fragment_num_samples(window_s)
+            n_leftover = lrec.LongRecording.get_num_frames() - lan.n_fragments * n_samples_per_frag
             if lan.n_fragments == 0:
                 logging.warning(
-                    f"No fragments found for {lrec.display_name}. Skipping."
+                    f"{lrec.display_name} has {n_leftover} samples, fewer than one {window_s} s "
+                    f"window of {n_samples_per_frag}, so it gives no rows."
                 )
                 continue
+            if n_leftover:
+                logging.info(
+                    f"{lrec.display_name}: {lan.n_fragments} windows of {window_s} s. The last "
+                    f"{n_leftover} samples ({n_leftover / lan.f_s:.3f} s) are less than a window "
+                    f"and are not analysed."
+                )
 
             logging.debug(f"Processing {lan.n_fragments} fragments")
             miniters = int(lan.n_fragments / 100)
             match multiprocess_mode:
                 case "dask":
-                    # The last fragment is not included because it makes the dask array ragged
                     logging.debug("Converting LongRecording to numpy array")
 
-                    n_fragments_war = max(lan.n_fragments - 1, 1)
-                    n_samples_per_frag = int(window_s * lan.f_s)
+                    n_fragments_war = lan.n_fragments
 
                     # Apply notch filter once to the entire recording (lazy SI wrapper)
                     rec = lrec.LongRecording
@@ -207,6 +250,7 @@ class AnimalAnalyzer:
                             n_samples_per_frag,
                             n_frag_per_chunk,
                         )
+                        zarr_chunk = n_frag_per_chunk
                     else:
                         # Default path: read all traces at once then write to zarr.
                         # Maximises throughput on high-memory systems.
@@ -221,48 +265,49 @@ class AnimalAnalyzer:
                         )
                         logging.debug(f"np_fragments.shape: {np_fragments.shape}")
                         # Cache fragments to zarr
-                        tmppath, _ = core_utils.cache_fragments_to_zarr(
+                        tmppath, zarr_array = core_utils.cache_fragments_to_zarr(
                             np_fragments, n_fragments_war
                         )
-                        del all_traces, np_fragments
+                        zarr_chunk = zarr_array.chunks[0]
+                        del all_traces, np_fragments, zarr_array
 
-                    logging.debug("Processing metadata serially")
-                    metadatas = [
-                        self._process_fragment_metadata(idx, lan, window_s)
-                        for idx in range(n_fragments_war)
-                    ]
-                    meta_df = pd.DataFrame(metadatas)
-
-                    logging.debug("Processing features in parallel")
-                    np_fragments_reconstruct = da.from_zarr(
-                        tmppath, chunks=("auto", -1, -1)
-                    )
-                    logging.debug(f"Dask array shape: {np_fragments_reconstruct.shape}")
-                    logging.debug(
-                        f"Dask array chunks: {np_fragments_reconstruct.chunks}"
-                    )
-
-                    # Create delayed tasks for each fragment using efficient dependency resolution
-                    feature_values = [
-                        delayed(FragmentAnalyzer.process_fragment_with_dependencies)(
-                            np_fragments_reconstruct[idx], lan.f_s, features, kwargs
-                        )
-                        for idx in range(n_fragments_war)
-                    ]
-
-                    # Compute features in parallel
-                    feature_values = dask.compute(*feature_values)
-
-                    # Clean up temp directory after processing
-                    logging.debug("Cleaning up temp directory")
                     try:
-                        import shutil
+                        logging.debug("Processing metadata serially")
+                        metadatas = [
+                            self._process_fragment_metadata(idx, lan, window_s)
+                            for idx in range(n_fragments_war)
+                        ]
+                        meta_df = pd.DataFrame(metadatas)
 
-                        shutil.rmtree(tmppath)
-                    except (OSError, FileNotFoundError) as e:
-                        logging.warning(
-                            f"Failed to remove temporary directory {tmppath}: {e}"
+                        logging.debug("Processing features in parallel")
+                        np_fragments_reconstruct = da.from_zarr(
+                            tmppath, chunks=("auto", -1, -1)
                         )
+                        logging.debug(f"Dask array shape: {np_fragments_reconstruct.shape}")
+                        logging.debug(
+                            f"Dask array chunks: {np_fragments_reconstruct.chunks}"
+                        )
+
+                        # Create delayed tasks for each fragment using efficient dependency resolution
+                        feature_values = [
+                            delayed(FragmentAnalyzer.process_fragment_with_dependencies)(
+                                np_fragments_reconstruct[idx], lan.f_s, features, kwargs
+                            )
+                            for idx in range(n_fragments_war)
+                        ]
+
+                        # A batch at a time, one zarr chunk by default
+                        feature_values = core_utils.compute_in_batches(
+                            feature_values,
+                            zarr_chunk if batch_fragments is None else batch_fragments,
+                            first_timeout_s=first_batch_timeout_s,
+                            label="window",
+                        )
+                    finally:
+                        # On every exit, including an error or the SystemExit that
+                        # setup_snakemake_logging raises on SIGTERM
+                        logging.debug("Removing the zarr cache")
+                        core_utils.remove_zarr_cache(tmppath)
 
                     logging.debug("Combining metadata and feature values")
                     feat_df = pd.DataFrame(feature_values)
@@ -291,6 +336,11 @@ class AnimalAnalyzer:
             self.long_analyzers.append(lan)
             dataframes.append(lan_df)
 
+        if not dataframes:
+            raise ValueError(
+                f"No recording of {self.ao.animal_id} is as long as one {window_s} s window, so "
+                f"there is no window to analyse."
+            )
         self.features_df = pd.concat(dataframes)
 
         # Collect LOF scores from long recordings
@@ -329,13 +379,14 @@ class AnimalAnalyzer:
             logging.warning(warning_msg)
             warnings.warn(warning_msg)
 
+        # The result starts with no bad channels; a channel filter records what it masks
         self.window_analysis_result = WindowAnalysisResult(
             self.features_df,
             self.ao.animal_id,
             self.ao.genotype,
             self.ao.sex,
             self.ao.channel_names,
-            self.bad_channels_dict,
+            {},
             suppress_short_interval_error,
             lof_scores_dict,
         )

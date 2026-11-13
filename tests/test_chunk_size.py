@@ -440,6 +440,7 @@ class TestComputeWindowedAnalysisSignature:
         chunk_duration_s=...)`` must invoke ``stream_recording_to_zarr``
         inside the dask branch."""
         import pandas as pd
+        from neurodent.core import utils as core_utils
         from neurodent.loading import AnimalOrganizer
         from neurodent.analysis import AnimalAnalyzer
 
@@ -462,9 +463,11 @@ class TestComputeWindowedAnalysisSignature:
         # -- mock lrec (LongRecordingOrganizer) with a SI recording ----------
         mock_si_rec = MagicMock()
         mock_si_rec.get_num_channels.return_value = 2
+        mock_si_rec.get_num_frames.return_value = 25_000  # five 5 s windows at 1000 Hz
         mock_lrec = MagicMock()
         mock_lrec.display_name = "rec0"
         mock_lrec.LongRecording = mock_si_rec
+        mock_lrec.get_fragment_num_samples.return_value = 5000
 
         ao._iter_valid_recordings = MagicMock(
             return_value=iter([(0, mock_lrec)])
@@ -479,13 +482,14 @@ class TestComputeWindowedAnalysisSignature:
             ),
             patch(
                 "neurodent.core.utils.stream_recording_to_zarr",
-                return_value=str(tmp_path / "fake.zarr"),
+                # A cache name, which the analyzer removes when it is done
+                return_value=core_utils.zarr_cache_path(tmp_path),
             ) as mock_stream,
             patch("neurodent.analysis.animal_analyzer.da.from_zarr"),
             patch(
                 "neurodent.analysis.animal_analyzer.dask.compute",
-                # n_fragments_war = max(n_fragments - 1, 1) = 4
-                return_value=[{"rms": 0.0}] * (mock_lan.n_fragments - 1),
+                # Every complete window is analysed, n_fragments_war = n_fragments = 5
+                return_value=[{"rms": 0.0}] * mock_lan.n_fragments,
             ),
             patch(
                 "neurodent.analysis.animal_analyzer.delayed",
@@ -520,6 +524,8 @@ class TestComputeWindowedAnalysisSignature:
             assert actual_n_frag_per_chunk == 120, (
                 f"Expected n_frag_per_chunk=120 (600/5), got {actual_n_frag_per_chunk}"
             )
+            # Every complete window, cut at the organizer's sample count
+            assert call_args[0][1:3] == (5, 5000)
 
 
 # ---------------------------------------------------------------------------

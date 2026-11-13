@@ -165,6 +165,54 @@ def slugify(value, allow_unicode=False):
     return re.sub(r"[-\s]+", "-", value).strip("-_")
 
 
+def channel_averaged_columns(feature: str) -> list[str]:
+    """The columns a feature becomes when it is averaged across channels, in order.
+
+    This is the one place these names are made. ``get_channel_averaged_result`` of a
+    ``WindowAnalysisResult`` gives a feature exactly these columns, and the zeitgeber
+    extraction and ``ZeitgeberPlotter`` find them by these names. Linear and simple matrix
+    features keep their own name. Band and banded matrix features give one column per band,
+    ``{feature}_{band}`` in ``constants.BAND_NAMES`` order. Multi-component features give
+    one column per component, ``{feature}_{component}`` in ``constants.COMPONENT_LABELS``
+    order, so psdslope gives psdslope_slope and psdslope_intercept. The zeitgeber extraction
+    used to name columns with its own rule, which left psdslope whole, so psdslope's two
+    columns never reached its outputs.
+
+    Args:
+        feature (str): A feature name from ``constants.FEATURES``.
+
+    Returns:
+        list[str]: The column names.
+
+    Raises:
+        ValueError: For a name that is not a feature, for psd, a spectrum per channel with
+            no single value per window, and for a multi-component feature with no
+            component labels.
+
+    Examples:
+        >>> channel_averaged_columns("logrms")
+        ['logrms']
+        >>> channel_averaged_columns("psdslope")
+        ['psdslope_slope', 'psdslope_intercept']
+    """
+    feature_type = constants.classify_feature(feature)
+    if feature_type in (constants.FeatureType.BAND, constants.FeatureType.BANDED_MATRIX):
+        return [f"{feature}_{band}" for band in constants.BAND_NAMES]
+    if feature_type is constants.FeatureType.LINEAR_2D:
+        components = constants.COMPONENT_LABELS.get(feature)
+        if not components:
+            raise ValueError(
+                f"{feature} has several components per channel but no entry in "
+                f"constants.COMPONENT_LABELS to name their columns"
+            )
+        return [f"{feature}_{component}" for component in components]
+    if feature_type in (constants.FeatureType.LINEAR, constants.FeatureType.SIMPLE_MATRIX):
+        return [feature]
+    raise ValueError(
+        f"{feature} is a spectrum per channel and has no channel-averaged value per window"
+    )
+
+
 def get_feature_label(feature_name: str) -> str:
     """
     Convert a feature column name to a human-readable label.
