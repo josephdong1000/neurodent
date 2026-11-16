@@ -33,7 +33,6 @@ authors:
     email: marshe@chop.edu
 preferred-citation:
   type: article
-  status: submitted
   title: "NeuRodent: a Python Package and Pipeline for Unifying Rodent EEG Analyses"
   authors:
     - family-names: Dong
@@ -51,5 +50,12 @@ preferred-citation:
     - family-names: Marsh
       given-names: Eric D.
       orcid: "https://orcid.org/0000-0003-3264-0902"
+  journal: "Journal of Open Source Software"
+  publisher:
+    name: "The Open Journal"
   year: 2026
-  url: "https://github.com/josephdong1000/neurodent/blob/main/paper/paper.md"
+  volume: 11
+  issue: 126
+  start: 11032
+  doi: "10.21105/joss.11032"
+  url: "https://doi.org/10.21105/joss.11032"
