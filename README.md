@@ -107,14 +107,17 @@ This project benefited from insights and best practices described in Peter K. G.
 If you find NeuRodent useful, please cite our work!
 
 ```bibtex
-@software{dong2026neurodent,
-  author    = {Dong, Joseph P. and Oh, Yongtaek and Marsh, Eric D.},
-  title     = {NeuRodent},
-  year      = {2025},
-  publisher = {Zenodo},
-  doi       = {10.5281/zenodo.15780751},
-  url       = {https://doi.org/10.5281/zenodo.15780751},
-  license   = {MIT}
+@article{dong2026neurodent,
+  author    = {Dong, Joseph P. and Oh, Yongtaek and Singh, Yastika and Wei, Yifan and Marsh, Eric D.},
+  title     = {{NeuRodent}: a {Python} Package and Pipeline for Unifying Rodent {EEG} Analyses},
+  journal   = {Journal of Open Source Software},
+  year      = {2026},
+  volume    = {11},
+  number    = {126},
+  pages     = {11032},
+  publisher = {The Open Journal},
+  doi       = {10.21105/joss.11032},
+  url       = {https://doi.org/10.21105/joss.11032}
 }
 ```
 
