@@ -1,0 +1,602 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Windowed Analysis Tutorial\n",
+    "\n",
+    "This tutorial provides a deep dive into Neurodent's windowed analysis capabilities for extracting features from continuous EEG data.\n",
+    "\n",
+    "## Overview\n",
+    "\n",
+    "Windowed Analysis Results (WAR) is the core feature extraction system in Neurodent. It:\n",
+    "\n",
+    "1. Divides continuous EEG data into time windows\n",
+    "2. Computes features for each window\n",
+    "3. Aggregates results across time and channels\n",
+    "4. Provides filtering and quality control methods\n",
+    "\n",
+    "This approach is efficient for long recordings and enables parallel processing."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "from pathlib import Path\n",
+    "import logging\n",
+    "from datetime import datetime\n",
+    "\n",
+    "import numpy as np\n",
+    "import matplotlib.pyplot as plt\n",
+    "import pandas as pd\n",
+    "\n",
+    "from neurodent import (\n",
+    "    LongRecordingOrganizer,\n",
+    "    AnimalOrganizer,\n",
+    "    AnimalAnalyzer,\n",
+    "    WindowAnalysisResult,\n",
+    "    ZeitgeberAnalysisResult,\n",
+    "    constants,\n",
+    "    set_channel_map,\n",
+    ")\n",
+    "\n",
+    "logging.basicConfig(level=logging.INFO)\n",
+    "logger = logging.getLogger()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "set_channel_map({\n",
+    "    \"LMot\": [\"C-015\", \"D-015\"],\n",
+    "    \"RMot\": [\"C-016\", \"D-016\"],\n",
+    "    \"LBar\": [\"C-014\", \"D-014\"],\n",
+    "    \"RBar\": [\"C-017\", \"D-017\"],\n",
+    "    \"LHip\": [\"C-012\", \"D-012\"],\n",
+    "    \"RHip\": [\"C-019\", \"D-019\"],\n",
+    "    \"LAud\": [\"C-009\", \"D-009\"],\n",
+    "    \"RAud\": [\"C-022\", \"D-022\"],\n",
+    "    \"LVis\": [\"C-010\", \"D-010\"],\n",
+    "    \"RVis\": [\"C-021\", \"D-021\"],\n",
+    "})"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 1. Feature Categories\n",
+    "\n",
+    "Neurodent extracts four main categories of features:\n",
+    "\n",
+    "### Linear Features (per channel)\n",
+    "Single-value metrics for each channel in each time window:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Available linear features\n",
+    "print(\"Linear features:\")\n",
+    "for feature in constants.LINEAR_FEATURES:\n",
+    "    print(f\"  - {feature}\")\n",
+    "\n",
+    "# Examples:\n",
+    "# - rms: Root mean square amplitude\n",
+    "# - logrms: Log of RMS amplitude\n",
+    "# - ampvar: Amplitude variance\n",
+    "# - psdtot: Total power spectral density\n",
+    "# - psdslope: Slope of PSD on log-log scale"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Band Features (per frequency band)\n",
+    "Features computed for each frequency band (delta, theta, alpha, beta, gamma):"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Available band features\n",
+    "print(\"\\nBand features:\")\n",
+    "for feature in constants.BAND_FEATURES:\n",
+    "    print(f\"  - {feature}\")\n",
+    "\n",
+    "# Frequency bands\n",
+    "print(\"\\nFrequency bands:\")\n",
+    "for band, (lo, hi) in constants.FREQ_BANDS.items():\n",
+    "    print(f\"  {band.capitalize()}: {lo}-{hi} Hz\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Matrix Features (connectivity)\n",
+    "Features measuring relationships between channels:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Available matrix features\n",
+    "print(\"\\nMatrix features:\")\n",
+    "for feature in constants.MATRIX_FEATURES:\n",
+    "    print(f\"  - {feature}\")\n",
+    "\n",
+    "# Examples:\n",
+    "# - cohere: Spectral coherence between channel pairs\n",
+    "# - pcorr: Pearson correlation between channels"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 2. Computing Windowed Analysis\n",
+    "\n",
+    "### Basic Usage"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Using included test data\n",
+    "data_path = Path(\"../../.tests/integration/data/A10/A10_recording.edf\")\n",
+    "animal_id = \"A10\"\n",
+    "\n",
+    "# Create LongRecordingOrganizer with SpikeInterface mode\n",
+    "# mode options: 'si' (SpikeInterface), 'mne', or None\n",
+    "lro = LongRecordingOrganizer(\n",
+    "    item=data_path,\n",
+    "    mode=\"si\",\n",
+    "    extract_func=\"read_edf\",\n",
+    "    manual_datetimes=datetime(2023, 12, 13),\n",
+    ")\n",
+    "\n",
+    "# Create AnimalOrganizer using pattern-based discovery\n",
+    "ao = AnimalOrganizer(\n",
+    "    pattern=\"../../.tests/integration/data/{animal}/*.edf\",\n",
+    "    animal_id=animal_id,\n",
+    "    lro_kwargs={\n",
+    "        \"mode\": \"si\",\n",
+    "        \"extract_func\": \"read_edf\",\n",
+    "        \"manual_datetimes\": datetime(2023, 12, 13),\n",
+    "    },\n",
+    ")\n",
+    "\n",
+    "# Compute all features\n",
+    "war_all = AnimalAnalyzer(ao).compute_windowed_analysis(\n",
+    "    features=['all'],\n",
+    "    exclude=['nspike', 'lognspike'],  # Exclude spike features if no spikes\n",
+    "    multiprocess_mode='serial'\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Access information in WindowedAnalysis object\n",
+    "\n",
+    "You can access the summary of WindowedAnalysis object using the `get_info` method, and access the computed features in the WindowedAnalysis object using the `get_result` method."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "war_info = war_all.get_info()\n",
+    "print(war_info)\n",
+    "\n",
+    "result = war_all.get_result(\n",
+    "    features=[\"all\"],\n",
+    "    exclude=['nspike', 'lognspike']\n",
+    ")\n",
+    "display(result)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Selective Feature Computation\n",
+    "\n",
+    "For faster processing, compute only needed features:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Compute specific features\n",
+    "war_selective = AnimalAnalyzer(ao).compute_windowed_analysis(\n",
+    "    features=['rms', 'logrms', 'psdband', 'cohere'],\n",
+    "    multiprocess_mode='serial'\n",
+    ")\n",
+    "\n",
+    "result = war_selective.get_result(\n",
+    "    features=['rms', 'logrms', 'psdband', 'cohere']\n",
+    ")\n",
+    "\n",
+    "print(f\"Computed features: {list(result.keys())}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Parallel Processing\n",
+    "\n",
+    "For large datasets, use parallel processing:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Option 1: Multiprocessing (uses all CPU cores)\n",
+    "war_mp = AnimalAnalyzer(ao).compute_windowed_analysis(\n",
+    "    features=['rms', 'psdband'],\n",
+    "    multiprocess_mode='multiprocess'\n",
+    ")\n",
+    "\n",
+    "# Option 2: Dask (for distributed computing)\n",
+    "# Requires Dask cluster setup\n",
+    "war_dask = AnimalAnalyzer(ao).compute_windowed_analysis(\n",
+    "    features=['rms', 'psdband'],\n",
+    "    multiprocess_mode='dask'\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 3. Data Quality and Filtering\n",
+    "\n",
+    "### Method Chaining (Recommended)\n",
+    "\n",
+    "Apply multiple filters in sequence:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "war_filtered = (\n",
+    "    war_all\n",
+    "    .filter_logrms_range(z_range=3)           # Remove outliers (±3 SD)\n",
+    "    .filter_high_rms(max_rms=500)             # Remove high amplitude artifacts\n",
+    "    .filter_low_rms(min_rms=10)               # Remove low amplitude periods\n",
+    "    # .filter_high_beta(max_beta_prop=0.4)      # Remove high beta activity\n",
+    "    .filter_reject_channels_by_session()      # Reject bad channels\n",
+    ")\n",
+    "\n",
+    "print(\"Filtering completed!\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Configuration-Driven Filtering\n",
+    "\n",
+    "Alternative approach using configuration dictionary:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "filter_config = {\n",
+    "    'logrms_range': {'z_range': 3},\n",
+    "    'high_rms': {'max_rms': 500},\n",
+    "    'low_rms': {'min_rms': 10},\n",
+    "    # 'high_beta': {'max_beta_prop': 0.4},\n",
+    "    'reject_channels_by_session': {},\n",
+    "    'morphological_smoothing': {'smoothing_seconds': 4.0}\n",
+    "}\n",
+    "\n",
+    "war_filtered_config = war_all.apply_filters(\n",
+    "    filter_config,\n",
+    "    min_valid_channels=3\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Available Filters\n",
+    "\n",
+    "- `filter_logrms_range(z_range)`: Remove outliers based on log RMS\n",
+    "- `filter_high_rms(max_rms)`: Remove high amplitude artifacts\n",
+    "- `filter_low_rms(min_rms)`: Remove low amplitude periods\n",
+    "- `filter_high_beta(max_beta_prop)`: Remove high beta activity (muscle artifacts)\n",
+    "- `filter_reject_channels_by_session()`: Identify and reject bad channels\n",
+    "- `morphological_smoothing(smoothing_seconds)`: Smooth data morphologically"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 4. Data Aggregation\n",
+    "\n",
+    "Average across time windows, producing a single row per group (e.g., per recording session and light/dark phase). Channel information is preserved."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Aggregate time windows\n",
+    "war_filtered.aggregate_time_windows()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 5. Channel Management\n",
+    "\n",
+    "### Reorder and Pad Channels\n",
+    "\n",
+    "Ensure consistent channel ordering across animals:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Define standard channel order\n",
+    "standard_channels = [\n",
+    "    \"LMot\", \"RMot\",  # Motor cortex\n",
+    "    \"LBar\", \"RBar\",  # Barrel cortex\n",
+    "    \"LAud\", \"RAud\",  # Auditory cortex\n",
+    "    \"LVis\", \"RVis\",  # Visual cortex\n",
+    "    \"LHip\", \"RHip\"   # Hippocampus\n",
+    "]\n",
+    "\n",
+    "war_filtered.reorder_and_pad_channels(\n",
+    "    standard_channels,\n",
+    "    use_abbrevs=True  # Use abbreviated channel names\n",
+    ")\n",
+    "\n",
+    "print(f\"Channels: {war_filtered.channel_names}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 6. Accessing Computed Features\n",
+    "\n",
+    "WAR objects store features in a pandas DataFrame. Use `get_result()` to retrieve features with full channel information, or `get_channel_averaged_result()` to average across channels (or channel pairs for connectivity features), producing scalar values per time window."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Get the full result DataFrame\n",
+    "result_df = war_filtered.get_result(\n",
+    "    features=['rms', 'psdband', 'cohere']\n",
+    ")\n",
+    "print(f\"Result columns: {list(result_df.columns)}\")\n",
+    "print(f\"Result shape: {result_df.shape}\")\n",
+    "print(f\"\\nRMS values (per-channel arrays):\\n{result_df['rms'].iloc[0]}\")\n",
+    "\n",
+    "# Get channel-averaged result (scalars per time window)\n",
+    "df_avg = war_filtered.get_channel_averaged_result(\n",
+    "    features=['logrms', 'logpsdband', 'zcohere']\n",
+    ")\n",
+    "print(f\"\\nChannel-averaged columns: {list(df_avg.columns)}\")\n",
+    "print(f\"\\nSample logrms value: {df_avg['logrms'].iloc[0]}\")  # single float"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 7. Metadata and Grouping Variables\n",
+    "\n",
+    "WAR objects contain metadata for grouping and analysis:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Access metadata\n",
+    "print(f\"Animal ID: {war_filtered.animal_id}\")\n",
+    "print(f\"Genotype: {war_filtered.genotype}\")\n",
+    "print(f\"Animal days: {war_filtered.animaldays}\")\n",
+    "print(f\"Channel names: {war_filtered.channel_names}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 8. Circadian Analysis (ZeitgeberAnalysisResult)\n",
+    "\n",
+    "Once your data is filtered and metadata (like genotype and timestamps) is verified, you can analyze circadian rhythms. \n",
+    "\n",
+    "The `ZeitgeberAnalysisResult` wrapper uses this metadata to:\n",
+    "1.  **Shift Timestamps**: Converts absolute timestamps to Zeitgeber Time (ZT), where ZT0 is \"Lights On\".\n",
+    "2.  **Define Baseline**: Subtracts a baseline period (e.g., the first 12 hours of the light phase) to normalization data.\n",
+    "3.  **Prepare for Visualization**: Duplicates data for 48-hour \"double-plotted\" actograms.\n",
+    "\n",
+    "For plotting these results, see the **[Visualization Tutorial](visualization.ipynb)**."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Wrap the result for circadian analysis\n",
+    "zar = ZeitgeberAnalysisResult(\n",
+    "    war_filtered,\n",
+    "    baseline_hours=12,\n",
+    "    zeitgeber_shift_hours=6,\n",
+    "    shift_for_48h=True\n",
+    ")\n",
+    "\n",
+    "# Access the processed data\n",
+    "df_zar = zar.get_result(features=['rms'])\n",
+    "\n",
+    "timestamps = war_filtered.result['timestamp']\n",
+    "print(f\"Original Time Range: {timestamps.min()} to {timestamps.max()}\")\n",
+    "print(f\"ZT Coordinate Range: {df_zar.total_minutes.min()} to {df_zar.total_minutes.max()} min\")\n",
+    "print(f\"Baseline-Corrected Columns: {[c for c in df_zar.columns if '_nobase' in c][:3]}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 9. Saving and Loading\n",
+    "\n",
+    "Save WAR objects for later analysis:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import tempfile\n",
+    "\n",
+    "# Use a temporary directory for demonstration purposes\n",
+    "with tempfile.TemporaryDirectory() as tmpdir:\n",
+    "    output_path = Path(tmpdir) / animal_id\n",
+    "    output_path.mkdir(parents=True, exist_ok=True)\n",
+    "\n",
+    "    # Save WAR\n",
+    "    war_filtered.save_pickle_and_json(output_path)\n",
+    "    print(f\"Saved to {output_path}\")\n",
+    "\n",
+    "    # Load WAR\n",
+    "    war_loaded = WindowAnalysisResult.load_pickle_and_json(output_path)\n",
+    "    print(f\"Loaded from {output_path}\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 10. Best Practices\n",
+    "\n",
+    "### Feature Selection\n",
+    "- Start with basic features (rms, psdband) before computing expensive ones (cohere, psd)\n",
+    "- Exclude spike features if you don't have spike data\n",
+    "- Use selective feature computation for faster iteration\n",
+    "\n",
+    "### Filtering\n",
+    "- Always inspect data before and after filtering\n",
+    "- Use conservative thresholds initially, then adjust\n",
+    "- Consider biological significance (e.g., high beta may indicate muscle artifacts)\n",
+    "\n",
+    "### Processing\n",
+    "- Use serial mode for debugging\n",
+    "- Use multiprocess for local analysis of large datasets\n",
+    "- Use Dask for cluster computing\n",
+    "\n",
+    "### Quality Control\n",
+    "- Check channel consistency across animals\n",
+    "- Verify metadata (genotype, day, etc.)\n",
+    "- Save intermediate results frequently"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Summary\n",
+    "\n",
+    "This tutorial covered:\n",
+    "\n",
+    "1. Feature categories and types\n",
+    "2. Computing windowed analysis with different options\n",
+    "3. Data quality control and filtering\n",
+    "4. Channel management and standardization\n",
+    "5. Accessing computed features\n",
+    "6. Metadata and grouping variables\n",
+    "7. Saving and loading results\n",
+    "8. Best practices\n",
+    "\n",
+    "## Next Steps\n",
+    "\n",
+    "- **[Visualization Tutorial](visualization.ipynb)**: Plot and analyze WAR results\n",
+    "- **[Spike Analysis Tutorial](spike_analysis.ipynb)**: Integrate spike-sorted data"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": ".venv",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.10.8"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
